@@ -1,17 +1,20 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import AppShell from "@/components/AppShell";
+import { ToastProvider } from "@/components/ui";
 
 export const metadata: Metadata = {
-  title: "EduClass Fusion",
-  description: "Interactive learning + classroom control, built on Supabase."
+  title: { default: "SwiftCipher", template: "%s · SwiftCipher" },
+  description: "Interactive lessons, live assessment and classroom focus in one school workspace.",
+  icons: { icon: "/icon.svg" }
 };
+
+export const viewport: Viewport = { themeColor: "#4f46e5", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
-        <AppShell>{children}</AppShell>
+      <body style={{ ["--font-sans" as string]: "Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

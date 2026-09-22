@@ -40,7 +40,7 @@ create policy "lesson media delete" on storage.objects for delete to authenticat
   using (bucket_id = 'lesson-media' and (storage.foldername(name))[1] = (select app.tenant_id())::text
          and ((storage.foldername(name))[2] = (select auth.uid())::text or (select app.is_admin())));
 
--- submissions/<tenant_id>/<student_id>/<assignment_id>/<file>
+-- submissions/<tenant_id>/<student_id>/<assignment_id | attempt_id>/<file>
 create policy "submission read" on storage.objects for select to authenticated
   using (bucket_id = 'submissions' and (storage.foldername(name))[1] = (select app.tenant_id())::text
          and ((storage.foldername(name))[2] = (select auth.uid())::text
@@ -49,5 +49,7 @@ create policy "submission read" on storage.objects for select to authenticated
 create policy "submission write" on storage.objects for insert to authenticated
   with check (bucket_id = 'submissions' and (storage.foldername(name))[1] = (select app.tenant_id())::text
               and (storage.foldername(name))[2] = (select auth.uid())::text
-              and exists (select 1 from public.assignments a where a.id::text = (storage.foldername(name))[3]
-                          and app.in_class(a.class_id)));
+              and (exists (select 1 from public.assignments a where a.id::text = (storage.foldername(name))[3]
+                           and app.in_class(a.class_id))
+                   or exists (select 1 from public.quiz_attempts t where t.id::text = (storage.foldername(name))[3]
+                              and t.student_id = (select auth.uid()) and t.status = 'in_progress')));

@@ -1,0 +1,155 @@
+"use client";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { rpc, errorText } from "@/lib/rpc";
+import { safeNext } from "@/lib/utils";
+import { Alert, Button, Field, Input } from "@/components/ui";
+
+const SSO = (process.env.NEXT_PUBLIC_SSO_PROVIDERS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const SSO_LABEL: Record<string, string> = { google: "Google", azure: "Microsoft", keycloak: "School SSO" };
+
+function SsoButtons({ next }: { next: string }) {
+  if (!SSO.length) return null;
+  return (
+    <div className="space-y-2">
+      {SSO.map((p) => (
+        <Button key={p} variant="secondary" className="w-full" onClick={() =>
+          createClient().auth.signInWithOAuth({
+            provider: p as "google",
+            options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` }
+          })}>
+          Continue with {SSO_LABEL[p] ?? p}
+        </Button>
+      ))}
+      <div className="flex items-center gap-3 py-1 text-[11px] uppercase text-ink-400"><span className="h-px flex-1 bg-ink-200" />or<span className="h-px flex-1 bg-ink-200" /></div>
+    </div>
+  );
+}
+
+export function LoginForm() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const next = safeNext(params.get("next"));
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(params.get("error") === "suspended" ? "Your account is suspended. Contact your school administrator." : params.get("error"));
+  const [info, setInfo] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setErr(null);
+    const { error } = await createClient().auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    router.replace(next);
+    router.refresh();
+  }
+
+  async function reset() {
+    if (!email) { setErr("Enter your email first."); return; }
+    const { error } = await createClient().auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/account?reset=1`
+    });
+    if (error) setErr(error.message); else setInfo("Check your inbox for a password reset link.");
+  }
+
+  return (
+    <div className="card card-pad space-y-4">
+      <SsoButtons next={next} />
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Email" htmlFor="email"><Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field label="Password" htmlFor="password"><Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+        {err && <Alert tone="error">{err}</Alert>}
+        {info && <Alert tone="success">{info}</Alert>}
+        <Button type="submit" className="w-full" loading={busy}>Sign in</Button>
+      </form>
+      <div className="flex justify-between text-xs">
+        <button type="button" className="font-medium text-brand-700" onClick={reset}>Forgot password?</button>
+        <Link href="/signup">Create a school</Link>
+      </div>
+    </div>
+  );
+}
+
+type Intent = { intent: "school"; school_name: string } | { intent: "code"; code: string };
+
+export function SignupForm({ mode }: { mode: "school" | "code" }) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [school, setSchool] = useState("");
+  const [code, setCode] = useState((params.get("code") ?? "").toUpperCase());
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setErr(null);
+    const intent: Intent = mode === "school" ? { intent: "school", school_name: school.trim() } : { intent: "code", code: code.trim().toUpperCase() };
+    const sb = createClient();
+    const { data, error } = await sb.auth.signUp({
+      email, password,
+      options: {
+        data: { full_name: fullName.trim(), ...intent },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`
+      }
+    });
+    if (error) { setBusy(false); setErr(error.message); return; }
+    if (!data.session) { setBusy(false); setConfirm(true); return; }
+    try {
+      await completeIntent(intent, fullName.trim());
+      router.replace("/dashboard");
+      router.refresh();
+    } catch (e2) {
+      setErr(errorText(e2));
+      setBusy(false);
+    }
+  }
+
+  if (confirm) {
+    return (
+      <Alert tone="success" title="Check your email">
+        We sent a confirmation link to <strong>{email}</strong>. Open it on this device to finish setting up your account.
+      </Alert>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="card card-pad space-y-4">
+      {mode === "code" ? (
+        <Field label="Join code" hint="From your teacher (class code) or your school (invite code)." htmlFor="code">
+          <Input id="code" required value={code} maxLength={12} className="font-mono uppercase tracking-widest"
+                 onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
+        </Field>
+      ) : (
+        <Field label="School or organisation name" htmlFor="school">
+          <Input id="school" required value={school} onChange={(e) => setSchool(e.target.value)} placeholder="e.g. Lagos Model College" />
+        </Field>
+      )}
+      <Field label="Your full name" htmlFor="name"><Input id="name" required autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} /></Field>
+      <Field label="Email" htmlFor="email"><Input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+      <Field label="Password" hint="At least 8 characters." htmlFor="password">
+        <Input id="password" type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      </Field>
+      {err && <Alert tone="error">{err}</Alert>}
+      <Button type="submit" className="w-full" loading={busy}>{mode === "school" ? "Create school workspace" : "Create account and join"}</Button>
+      <p className="text-center text-xs text-ink-500">
+        By continuing you agree to your school's acceptable-use policy and the <Link href="/privacy">privacy notice</Link>.
+      </p>
+    </form>
+  );
+}
+
+export async function completeIntent(intent: Intent, fullName: string) {
+  if (intent.intent === "school") {
+    await rpc("bootstrap_school", { p_school_name: intent.school_name, p_full_name: fullName });
+  } else {
+    await rpc("redeem_code", { p_code: intent.code, p_full_name: fullName });
+  }
+}

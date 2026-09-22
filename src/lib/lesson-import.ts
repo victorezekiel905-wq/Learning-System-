@@ -94,7 +94,7 @@ async function parsePptx(bytes: Uint8Array, filename: string): Promise<ImportedS
     const bodyLines = chunks.slice(1);
     slides.push({
       title,
-      body: toHtml(bodyLines.length ? bodyLines.join("\n") : title),
+      body: toText(bodyLines.length ? bodyLines.join("\n") : title),
       kind: slides.length === 0 ? "title" : "embed",
       source: { type: "pptx", path, slideNumber: slides.length + 1 }
     });
@@ -159,7 +159,7 @@ function textToSlides(text: string, fallbackTitle: string, sourceType: string): 
       const isFirstSlide = slides.length === 0 && sectionIndex === 0 && chunkIndex === 0;
       slides.push({
         title: chunkIndex === 0 ? section.title : `${section.title} (cont.)`,
-        body: toHtml(chunk),
+        body: toText(chunk),
         kind: isFirstSlide ? "title" : "embed",
         source: {
           type: sourceType,
@@ -236,29 +236,18 @@ function chunkSection(text: string, maxChars: number): string[] {
   return chunks;
 }
 
-function toHtml(text: string): string {
-  const paragraphs = text
+/** Plain text with '- ' bullets; rendered safely by <RichText>, never as HTML. */
+function toText(text: string): string {
+  return text
     .split(/\n\n+/)
     .map((p) => p.trim())
     .filter(Boolean)
     .map((p) => {
       const lines = p.split("\n").map((line) => line.trim()).filter(Boolean);
       const allBullets = lines.length > 1 && lines.every((line) => /^[-*•]\s+/.test(line));
-      if (allBullets) {
-        return `<ul>${lines.map((line) => `<li>${escapeHtml(line.replace(/^[-*•]\s+/, ""))}</li>`).join("")}</ul>`;
-      }
-      return `<p>${escapeHtml(lines.join(" "))}</p>`;
-    });
-  return paragraphs.join("");
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+      return allBullets ? lines.map((line) => "- " + line.replace(/^[-*•]\s+/, "")).join("\n") : lines.join(" ");
+    })
+    .join("\n\n");
 }
 
 function normalizeImportedSlides(slides: ImportedSlide[], fallbackTitle: string): ImportedSlide[] {
@@ -272,7 +261,7 @@ function normalizeImportedSlides(slides: ImportedSlide[], fallbackTitle: string)
         ...slide,
         title,
         kind: "title",
-        body: slide.body || `<p>${escapeHtml(title)}</p>`
+        body: slide.body || title
       });
       continue;
     }
