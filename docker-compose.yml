@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  web:
+    build: .
+    image: educlass-fusion-web:local
+    env_file: .env.local
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/me"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  # Self-managed Postgres + Realtime companions are NOT included: the blueprint
+  # pins the database to managed Supabase for realtime publication + RLS + Storage.
+  # Use Supabase SQL editor to apply /supabase/migrations/*.sql in order.
