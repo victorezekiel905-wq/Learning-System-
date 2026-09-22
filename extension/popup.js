@@ -1,54 +1,46 @@
-// Extension popup controller — configuration + pairing UI.
 const $ = (id) => document.getElementById(id);
-const status = $("status");
+const send = (msg) => new Promise((res) => chrome.runtime.sendMessage(msg, res));
 
-function say(text, ok) {
-  status.textContent = text;
-  status.className = ok ? "ok" : "";
+async function render() {
+  $("err").textContent = "";
+  const r = await send({ type: "status" });
+  if (!r?.ok) { $("err").textContent = r?.error || "Extension error"; return; }
+  const { cfg, remote } = r;
+  $("setup").hidden = cfg.paired;
+  $("paired").hidden = !cfg.paired;
+  $("serverRow").hidden = cfg.managedServer;
+  $("server").value = cfg.serverUrl || "";
+  if (!cfg.paired) return;
+
+  if (remote?.error) {
+    $("state").className = "pill off";
+    $("state").textContent = /disabled|unenrolled|credentials/i.test(remote.error) ? "Disabled by school" : "Can't reach server";
+    $("err").textContent = remote.error;
+    return;
+  }
+  $("student").textContent = remote?.student_name || "Unassigned device";
+  $("school").textContent = remote?.school || "";
+  $("notice").textContent = remote?.notice || "";
+  const live = !!remote?.session;
+  $("state").className = `pill ${live ? "live" : "idle"}`;
+  $("state").textContent = live ? "Live class: sharing with teacher" : "No live class: nothing shared";
+  $("session").textContent = live ? `Session: ${remote.session.title}` : "";
+  $("details").href = `${cfg.serverUrl}/student/device`;
+  if (cfg.lastError) $("err").textContent = `Last problem: ${cfg.lastError}`;
 }
 
-chrome.storage.local.get(["SUPABASE_URL", "SUPABASE_ANON", "DEVICE_UID", "SESSION_ID"]).then((cfg) => {
-  $("url").value = cfg.SUPABASE_URL || "";
-  $("anon").value = cfg.SUPABASE_ANON || "";
-  $("uid").value = cfg.DEVICE_UID || "";
+$("pair").addEventListener("click", async () => {
+  $("pair").disabled = true;
+  const r = await send({ type: "enroll", code: $("code").value, serverUrl: $("server").value.trim() || undefined });
+  $("pair").disabled = false;
+  if (!r?.ok) { $("err").textContent = r?.error || "Pairing failed"; return; }
+  render();
+});
+$("refresh").addEventListener("click", async () => { await send({ type: "tick" }); render(); });
+$("unpair").addEventListener("click", async () => {
+  if (!confirm("Remove SwiftCipher from this browser? Your school may need to pair it again.")) return;
+  await send({ type: "unpair" });
+  render();
 });
 
-$("save").addEventListener("click", () => {
-  const url = $("url").value.trim().replace(/\/$/, "");
-  const anon = $("anon").value.trim();
-  const uid = $("uid").value.trim();
-  if (!url || !anon || !uid) { say("URL, anon key and device UID are required", false); return; }
-  chrome.storage.local.set({ SUPABASE_URL: url, SUPABASE_ANON: anon, DEVICE_UID: uid }).then(() => {
-    say("Configuration saved. Agent alarms are active.", true);
-  });
-});
-
-$("lookup").addEventListener("click", async () => {
-  const code = $("code").value.trim().toUpperCase();
-  if (!code) { say("Enter the session join code first", false); return; }
-  try {
-    const session = await globalThis.__agentApi.lookupSession(code);
-    if (!session) { say("No live session found for that code", false); return; }
-    await chrome.storage.local.set({ SESSION_ID: session.id });
-    say(`Paired to session ${code} (${session.state}). Thumbnails will be sent every 30s.`, true);
-  } catch (e) {
-    say(e.message, false);
-  }
-});
-
-$("test").addEventListener("click", async () => {
-  try {
-    const cfg = await chrome.storage.local.get(["DEVICE_UID"]);
-    await globalThis.__agentApi.heartbeat(cfg.DEVICE_UID);
-    say("Heartbeat OK.", true);
-  } catch (e) {
-    say(e.message, false);
-  }
-});
-
-// Load the agent API (importScripts is service-worker only, so inject the same module).
-chrome.runtime.getBackgroundPage ? (() => {})() : null;
-fetch(chrome.runtime.getURL("api.js")).then((r) => r.text()).then((code) => {
-  const fn = new Function(`${code}; return globalThis.__agentApi;`);
-  globalThis.__agentApi = fn();
-}).catch(() => {});
+render();

@@ -1,17 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "EduClass Fusion — Classroom Agent",
+  "name": "SwiftCipher Classroom",
+  "short_name": "SwiftCipher",
   "version": "1.0.0",
-  "description": "Managed-device agent for EduClass Fusion: presence heartbeat, tab telemetry, screen thumbnails and teacher commands. School-managed devices only.",
-  "permissions": ["storage", "tabs", "activeTab", "alarms"],
-  "host_permissions": ["<all_urls>", "https://*.supabase.co/*"],
-  "background": { "service_worker": "background.js" },
-  "action": { "default_popup": "popup.html", "default_title": "EduClass Fusion Agent" },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ]
+  "description": "Connects a school-managed browser to SwiftCipher live classes. Reports only while a class session is live.",
+  "minimum_chrome_version": "116",
+  "permissions": ["tabs", "storage", "alarms", "idle", "notifications", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "SwiftCipher Classroom", "default_icon": { "32": "icons/icon32.png", "128": "icons/icon128.png" } },
+  "icons": { "32": "icons/icon32.png", "128": "icons/icon128.png" },
+  "storage": { "managed_schema": "managed_schema.json" },
+  "web_accessible_resources": [{ "resources": ["blocked.html", "blocked.js"], "matches": ["<all_urls>"] }]
 }

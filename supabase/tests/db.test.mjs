@@ -409,6 +409,32 @@ test("device agent: pairing, telemetry, grace period, dedup, commands (§3.5, §
 });
 
 // ---------------------------------------------------------------------------
+test("webrtc signalling, share links, audit triggers", async () => {
+  const room = await db.rpc(S.teacherA, "rtc_open_room", { p_session: S.session, p_purpose: "screen_share" });
+  const host = await db.rpc(S.teacherA, "rtc_join", { p_room: room });
+  const stu = await db.rpc(S.stu1, "rtc_join", { p_room: room });
+  assert.equal(stu.role, "participant");
+  await rejects(db.rpc(S.adminB, "rtc_join", { p_room: room }), /closed|Not your|profile/);
+  await db.rpc(S.teacherA, "rtc_signal", { p_room: room, p_to_peer: stu.peer_id, p_kind: "offer", p_payload: J({ sdp: { type: "offer", sdp: "v=0" } }) });
+  const poll = await db.rpc(S.stu1, "rtc_poll", { p_room: room, p_after: 0 });
+  assert.equal(poll.signals.length, 1);
+  assert.equal(poll.signals[0].from, host.peer_id);
+  assert.equal((await db.rpc(S.stu2, "rtc_poll", { p_room: room, p_after: 0 }).catch((e) => e.message)).includes("Join the room"), true);
+  // Students cannot read signals addressed to others.
+  assert.equal((await db.as(S.stu2, "select * from public.rtc_signals")).length, 0);
+  await db.rpc(S.teacherA, "rtc_close", { p_room: room });
+
+  const share = await db.rpc(S.teacherA, "create_lesson_share", { p_lesson: S.lesson, p_hours: 24, p_class: S.classA });
+  const opened = await db.rpc(S.stu2, "open_lesson_share", { p_code: share.code });
+  assert.equal(opened.slides.length, 3);
+  assert.ok(!JSON.stringify(opened).includes("answer_key"));
+  await rejects(db.rpc(S.adminB, "open_lesson_share", { p_code: share.code }), /invalid or has expired|profile/);
+
+  const audit = await db.as(S.adminA, "select action from public.audit_logs where action like 'environment_policies.%'");
+  assert.ok(audit.length >= 2, "environment policy changes are audited");
+});
+
+// ---------------------------------------------------------------------------
 test("chat, hands, announcements, end of session, reports (§3.4, §17)", async () => {
   const thread = await db.rpc(S.stu1, "open_direct_thread", { p_class: S.classA });
   await db.rpc(S.stu1, "send_message", { p_thread: thread, p_body: "Can I get help?" });

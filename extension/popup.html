@@ -2,40 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>EduClass Fusion Agent</title>
+  <title>SwiftCipher Classroom</title>
   <style>
-    body { width: 320px; margin: 0; padding: 14px; font: 13px/1.4 system-ui, sans-serif; color: #0f172a; background: #f8fafc; }
-    h1 { font-size: 14px; margin: 0 0 10px; }
-    label { display: block; font-size: 11px; font-weight: 600; color: #64748b; margin: 8px 0 3px; }
-    input, select { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
-    button { margin-top: 10px; width: 100%; padding: 7px; border: 0; border-radius: 6px; background: #1d5ddb; color: #fff; font-weight: 600; cursor: pointer; }
-    button.ghost { background: #e2e8f0; color: #334155; }
-    #status { margin-top: 10px; font-size: 11px; color: #475569; min-height: 14px; white-space: pre-wrap; }
-    .ok { color: #047857; } .err { color: #be123c; }
+    body { font: 13px/1.45 system-ui, "Segoe UI", sans-serif; width: 320px; margin: 0; color: #0f172a; }
+    header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: linear-gradient(135deg, #4f46e5, #0891b2); color: #fff; }
+    header b { font-size: 15px; }
+    main { padding: 12px 14px; }
+    label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748b; margin: 10px 0 4px; }
+    input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
+    #code { font: 700 20px/1 ui-monospace, monospace; letter-spacing: .25em; text-align: center; text-transform: uppercase; }
+    button { margin-top: 12px; width: 100%; padding: 9px; border: 0; border-radius: 8px; background: #4f46e5; color: #fff; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #e2e8f0; color: #0f172a; }
+    .notice { background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+    .err { color: #be123c; margin-top: 8px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .live { background: #dcfce7; color: #166534; } .idle { background: #f1f5f9; color: #334155; } .off { background: #ffe4e6; color: #9f1239; }
+    .muted { color: #64748b; font-size: 12px; }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
-  <h1>EduClass Fusion — Classroom Agent</h1>
+  <header><b>SwiftCipher</b><span>Classroom</span></header>
+  <main>
+    <section id="setup" hidden>
+      <p>Pair this school browser with your SwiftCipher account.</p>
+      <div id="serverRow">
+        <label for="server">School server</label>
+        <input id="server" placeholder="https://school.swiftcipher.app" />
+      </div>
+      <label for="code">Pairing code</label>
+      <input id="code" maxlength="8" autocomplete="off" />
+      <p class="muted">Get a code in SwiftCipher under <b>This device</b>, or ask your teacher.</p>
+      <button id="pair">Pair this browser</button>
+    </section>
 
-  <label>Supabase URL</label>
-  <input id="url" placeholder="https://xxxx.supabase.co" />
-
-  <label>Supabase anon key</label>
-  <input id="anon" placeholder="sb_publishable_..." />
-
-  <label>Device UID (unique per managed device)</label>
-  <input id="uid" placeholder="ext-chromebook-001" />
-
-  <label>Session join code (optional pairing)</label>
-  <input id="code" placeholder="ABC123" maxlength="6" />
-
-  <button id="save">Save configuration</button>
-  <div style="display:flex; gap:6px;">
-    <button id="lookup" class="ghost">Pair session</button>
-    <button id="test" class="ghost">Test heartbeat</button>
-  </div>
-
-  <div id="status"></div>
+    <section id="paired" hidden>
+      <p><b id="student"></b><br /><span class="muted" id="school"></span></p>
+      <p>Status: <span id="state" class="pill"></span></p>
+      <p id="session" class="muted"></p>
+      <div class="notice" id="notice"></div>
+      <p class="muted">Nothing is shared when no class session is live. <a id="details" target="_blank">See what's shared</a></p>
+      <button class="secondary" id="refresh">Check connection</button>
+      <button class="secondary" id="unpair">Remove from this browser</button>
+    </section>
+    <p class="err" id="err"></p>
+  </main>
   <script src="popup.js"></script>
 </body>
 </html>

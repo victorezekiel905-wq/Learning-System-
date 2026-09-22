@@ -1,18 +1,17 @@
-version: "3.9"
+# Runs the SwiftCipher web app against a hosted Supabase project.
+# The database, auth, realtime and storage are Supabase; apply migrations with
+# `supabase db push` (see docs/SETUP.md).
 services:
   web:
-    build: .
-    image: educlass-fusion-web:local
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_SSO_PROVIDERS: ${NEXT_PUBLIC_SSO_PROVIDERS:-}
+    image: swiftcipher-web:local
     env_file: .env.local
     ports:
       - "3000:3000"
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/me"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-
-  # Self-managed Postgres + Realtime companions are NOT included: the blueprint
-  # pins the database to managed Supabase for realtime publication + RLS + Storage.
-  # Use Supabase SQL editor to apply /supabase/migrations/*.sql in order.

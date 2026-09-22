@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "serverUrl": {
+      "title": "SwiftCipher server URL",
+      "description": "Base URL of your SwiftCipher deployment, e.g. https://school.swiftcipher.app. Pushed by the school admin console.",
+      "type": "string"
+    },
+    "deviceLabel": {
+      "title": "Device label",
+      "description": "Optional label shown to teachers, e.g. Lab A - Chromebook 12.",
+      "type": "string"
+    }
+  }
+}

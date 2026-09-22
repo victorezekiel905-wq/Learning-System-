@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { TeacherBroadcast } from "@/components/live/RtcBroadcast";
 import { SlideView, type SlideData } from "@/components/slides/SlideView";
 import { BOARD_H, BOARD_W, StrokeLayer, Whiteboard } from "@/components/slides/Whiteboard";
 import { Alert, Badge, Button, Select, Toggle, useToast } from "@/components/ui";
@@ -34,7 +35,12 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
   }
 
   if (!s.lesson_id) {
-    return <Alert>This session has no lesson. Use Responses to run quick activities, or the Screens and Environment tabs to manage devices.</Alert>;
+    return (
+      <div className="space-y-4">
+        <Alert>This session has no lesson. Use Responses to run quick activities, or the Screens and Environment tabs to manage devices.</Alert>
+        <TeacherBroadcast sessionId={s.id} />
+      </div>
+    );
   }
   if (!slide) return <p className="text-sm text-ink-500">Loading lesson…</p>;
   const isActivity = slide.kind === "activity" && slide.activity;
@@ -92,6 +98,8 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
           </button>
         ))}
       </div>
+
+      <TeacherBroadcast sessionId={s.id} />
 
       <div className="grid gap-4 md:grid-cols-2">
         {notes.data?.[s.current_slide] && <Alert title="Speaker notes">{notes.data[s.current_slide]}</Alert>}
