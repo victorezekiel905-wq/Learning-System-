@@ -36,7 +36,9 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(params.get("error") === "suspended" ? "Your account is suspended. Contact your school administrator." : params.get("error"));
-  const [info, setInfo] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(
+    params.get("notice") === "confirmed" ? "Your email is confirmed. Sign in to finish setting up." : null
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,7 +53,7 @@ export function LoginForm() {
   async function reset() {
     if (!email) { setErr("Enter your email first."); return; }
     const { error } = await createClient().auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/account?reset=1`
+      redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account?reset=1")}`
     });
     if (error) setErr(error.message); else setInfo("Check your inbox for a password reset link.");
   }

@@ -8,9 +8,17 @@
    - Set **Site URL** to your app URL, e.g. `https://swiftcipher.yourschool.org`.
    - Add these **Redirect URLs**: `https://<your-app>/auth/callback` and `http://localhost:3000/auth/callback`.
 4. Under **Authentication → Providers**, keep Email enabled. To add SSO (§6), also enable Google or Azure (Microsoft), then set `NEXT_PUBLIC_SSO_PROVIDERS=google,azure`.
-5. Under **Authentication → SMTP**, configure SMTP for production. The built-in sender is heavily rate-limited, and invites, confirmations and password resets all send email.
-6. Under **Realtime → Settings**, allow private channels. Live whiteboard annotation uses a private broadcast channel, authorised by the `realtime.messages` policies in migration 0670.
-7. Optional: enable the `pg_cron` extension under **Database → Extensions** **before** you push the migrations. Nightly retention (§20) will then schedule itself. Without it, use the "Apply retention now" button or run `select app.apply_retention_all()` from your own scheduler.
+5. Under **Authentication → Emails → Templates**, change the link in each template so that email links work even when they're opened in a different browser, device or email app. Replace `{{ .ConfirmationURL }}` with the following:
+   - **Confirm signup:** `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup&next=/onboarding`
+   - **Invite user:** `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/onboarding`
+   - **Magic link:** `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink&next=/dashboard`
+   - **Reset password:** `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=%2Faccount%3Freset%3D1`
+   - **Change email address:** `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email_change&next=/account`
+
+   `{{ .SiteURL }}` is the Site URL from step 3. While you're testing on your own computer, set the Site URL to `http://localhost:3000`.
+6. Under **Authentication → SMTP**, configure SMTP for production. The built-in sender is heavily rate-limited, and invites, confirmations and password resets all send email.
+7. Under **Realtime → Settings**, allow private channels. Live whiteboard annotation uses a private broadcast channel, authorised by the `realtime.messages` policies in migration 0670.
+8. Optional: enable the `pg_cron` extension under **Database → Extensions** **before** you push the migrations. Nightly retention (§20) will then schedule itself. Without it, use the "Apply retention now" button or run `select app.apply_retention_all()` from your own scheduler.
 
 ## 2. Environment
 
