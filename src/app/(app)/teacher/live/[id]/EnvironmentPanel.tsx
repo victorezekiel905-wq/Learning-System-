@@ -2,14 +2,17 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Alert, Badge, Button, Card, Select, useToast } from "@/components/ui";
+import { Icon } from "@/components/Icon";
+import { EvidenceButton } from "@/components/live/ScreenRail";
 import { ALERT_LABEL, type SessionState } from "@/components/live/types";
 import { errorText, rpc } from "@/lib/rpc";
 import { timeAgo } from "@/lib/utils";
 
 const SEVERITY_TONE = { info: "cyan", warning: "amber", critical: "red" } as const;
 
-export function EnvironmentPanel({ state, sessionId, envs, scenes, reload }: {
+export function EnvironmentPanel({ state, sessionId, envs, scenes, reload, onView }: {
   state: SessionState; sessionId: string; envs: { id: string; name: string }[]; scenes: { id: string; name: string }[]; reload: () => Promise<void>;
+  onView?: (studentId: string) => void;
 }) {
   const toast = useToast();
   const s = state.session;
@@ -58,6 +61,10 @@ export function EnvironmentPanel({ state, sessionId, envs, scenes, reload }: {
                     {a.confidence !== null && ` · confidence ${Math.round(Number(a.confidence) * 100)}%`}
                     {a.status !== "open" && ` · ${a.status}`}
                   </p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {onView && a.kind !== "connection_lost" && <Button size="sm" variant="secondary" onClick={() => onView(a.student_id)}><Icon name="monitor" className="h-4 w-4" /> View screen</Button>}
+                  {a.has_evidence && <EvidenceButton eventId={a.id} student={a.student} />}
                 </div>
                 {a.status === "open" && (
                   <div className="flex flex-wrap gap-1">

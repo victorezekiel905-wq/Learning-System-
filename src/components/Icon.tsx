@@ -1,7 +1,7 @@
 import {
   Bell, BookOpen, Building2, ChartColumn, Check, ClipboardList, File, HelpCircle, Home, Image as ImageIcon, KeyRound,
   Laptop, Menu, MessageSquare, Presentation, Radio, Settings, Shield, Trophy, Users, Hand, Lock, ExternalLink,
-  X, Monitor, Eye, EyeOff, Plus, Trash2, Upload, Play, Pause, SkipForward, Copy, Megaphone, Wifi, WifiOff, Star
+  X, Monitor, Eye, EyeOff, Plus, Trash2, Upload, Play, Pause, SkipForward, Copy, Megaphone, Wifi, WifiOff, Star, TriangleAlert, Maximize
 } from "lucide-react";
 
 const ICONS = {
@@ -10,7 +10,7 @@ const ICONS = {
   chat: MessageSquare, slides: Presentation, broadcast: Radio, settings: Settings, shield: Shield, trophy: Trophy,
   users: Users, hand: Hand, lock: Lock, external: ExternalLink, x: X, monitor: Monitor, eye: Eye, eyeOff: EyeOff,
   plus: Plus, trash: Trash2, upload: Upload, play: Play, pause: Pause, next: SkipForward, copy: Copy,
-  megaphone: Megaphone, wifi: Wifi, wifiOff: WifiOff, star: Star
+  megaphone: Megaphone, wifi: Wifi, wifiOff: WifiOff, star: Star, alert: TriangleAlert, maximize: Maximize
 } as const;
 
 export type IconName = keyof typeof ICONS;

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Alert, Badge, Button, Field, Input, Modal, Toggle, useToast } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import type { SessionState } from "@/components/live/types";
-import type { Screen } from "@/components/live/ScreenRail";
+import { screenLive, type Screen } from "@/components/live/ScreenRail";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -65,7 +65,7 @@ export function ScreensPanel({ state, sessionId, selected, setSelected, reload, 
           const sc = byStudent[r.student_id];
           const sel = selected.has(r.student_id);
           const alert = r.open_alerts > 0;
-          const live = sc && !sc.stale && r.device?.online;
+          const live = sc && !sc.stale && screenLive(r);
           return (
             <div key={r.student_id} className={cn("overflow-hidden rounded-xl border-2 bg-white text-left transition",
               sel ? "border-brand-500 ring-2 ring-brand-200" : alert ? "border-rose-300" : "border-ink-200",
@@ -75,7 +75,7 @@ export function ScreensPanel({ state, sessionId, selected, setSelected, reload, 
                 <div className="relative aspect-video bg-ink-100">
                   {live ? <img src={sc.image} alt={`${r.name}'s screen`} className="h-full w-full object-cover" />
                     : <div className="grid h-full place-items-center text-center text-xs text-ink-500">
-                        {!r.device ? "No managed device" : !r.device.online ? "Connection lost" : sc?.stale ? "Screen unavailable (stale)" : "Waiting for first frame"}
+                        {!r.device && !r.web?.sharing ? (r.web?.unsupported ? "Device can't share its screen" : "Not sharing screen") : r.device && !r.device.online ? "Connection lost" : sc?.stale ? "Screen unavailable (stale)" : "Waiting for first frame"}
                       </div>}
                   {r.device?.focus_locked && <span className="absolute left-1 top-1"><Badge tone="brand">Focused</Badge></span>}
                   {sc && live && <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[10px] text-white">{timeAgo(sc.captured_at)}</span>}

@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { ActivityPlayer } from "@/components/activities/ActivityPlayer";
 import { ThreadView } from "@/components/chat/ThreadView";
 import { Icon } from "@/components/Icon";
+import { LockdownGate } from "@/components/live/LockdownGate";
 import { StudentReceiver } from "@/components/live/RtcBroadcast";
 import { BOARD_H, BOARD_W, StrokeLayer } from "@/components/slides/Whiteboard";
 import { LessonStage, type LearnerSlide } from "@/components/student/LessonStage";
 import { Alert, Badge, Button, Input, Modal, useToast } from "@/components/ui";
 import { useAnnotations } from "@/lib/annotations";
+import { useClassroomGuard } from "@/lib/classroom-guard";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader, useNetwork, useRealtime, useRpc } from "@/lib/hooks";
 import { useOfflineQueue } from "@/lib/offline-queue";
@@ -49,6 +51,7 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
   const paced = s?.session.mode === "student_paced";
   const slideIndex = paced ? (ownSlide ?? s?.my_slide ?? 0) : s?.session.current_slide ?? 0;
   const ann = useAnnotations(sessionId, slideIndex);
+  const guard = useClassroomGuard(sessionId, { live: s?.session.status === "live", managedDevice: !!s?.device_monitored });
 
   // Presence heartbeat + idle detection (§3.4).
   useEffect(() => {
@@ -88,10 +91,13 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
   }
 
   return (
-    <div className="page max-w-5xl space-y-4">
+    <div className="page max-w-5xl space-y-4 bg-ink-50">
+      <LockdownGate guard={guard} teacher={s.session.teacher} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs text-ink-500">Live with {s.session.teacher}</p><h1 className="text-xl font-bold">{s.session.title}</h1></div>
         <div className="flex flex-wrap items-center gap-2">
+          {guard.sharing && <Badge tone="red"><span className="mr-1 inline-block h-2 w-2 animate-pulse2 rounded-full bg-rose-600" />Sharing screen with your teacher</Badge>}
+          {guard.locked && <Badge tone="gray"><Icon name="lock" className="mr-1 inline h-3 w-3" />Lockdown</Badge>}
           {pending > 0 && <Badge tone="amber">{pending} answer(s) waiting to sync</Badge>}
           {quality === "offline" && <Badge tone="red">Offline</Badge>}
           {s.hand ? <Button variant="secondary" onClick={async () => { await rpc("lower_hand", { p_session: sessionId }); void st.reload(); }}><Icon name="hand" className="h-4 w-4 text-amber-600" /> Lower hand</Button>

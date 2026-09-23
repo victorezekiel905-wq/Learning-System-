@@ -9,13 +9,18 @@ export type RosterEntry = {
     idle_state: string; online: boolean; last_heartbeat_at: string; focus_locked: boolean;
     violation: string | null; violation_since: string | null; snapshot_at: string | null;
   };
+  /** What the lesson page itself reports (screen share + focus), no extension needed. */
+  web: null | {
+    sharing: boolean; unsupported: boolean; surface: string | null; visible: boolean; fullscreen: boolean;
+    away_since: string | null; away_reason: string | null;
+  };
   open_alerts: number;
   hand_raised: boolean;
 };
 
 export type AlertRow = {
   id: string; kind: string; severity: "info" | "warning" | "critical"; rule: string; domain: string | null; confidence: number | null;
-  status: string; student_id: string; student: string; created_at: string; resolved_at: string | null;
+  status: string; student_id: string; student: string; created_at: string; resolved_at: string | null; has_evidence?: boolean;
 };
 
 export type ActivityResults = {
@@ -34,9 +39,12 @@ export type SessionState = {
     id: string; title: string; status: string; mode: string; join_code: string; class_id: string; lesson_id: string | null;
     current_slide: number; active_activity_id: string | null; environment_id: string | null; environment_active: boolean;
     group_chat_enabled: boolean; responses_visible: boolean; class_name: string; lesson_title: string | null; environment_name: string | null;
-    tenant_id: string; started_at: string;
+    tenant_id: string; started_at: string; lockdown: boolean;
   };
-  settings: { allow_spotlight: boolean; allow_group_chat: boolean; allow_screen_capture: boolean; thumbnail_interval_seconds: number };
+  settings: {
+    allow_spotlight: boolean; allow_group_chat: boolean; allow_screen_capture: boolean; thumbnail_interval_seconds: number;
+    store_event_screenshots?: boolean;
+  };
   server_now: string;
   roster: RosterEntry[];
   alerts: AlertRow[];
@@ -47,7 +55,7 @@ export type SessionState = {
 };
 
 export const ALERT_LABEL: Record<string, string> = {
-  environment_left: "Left environment",
+  environment_left: "Left class",
   domain_blocked: "Blocked site",
   off_task: "Possibly off-task",
   idle: "Idle",

@@ -26,7 +26,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
   const toast = useToast();
   const [tab, setTab] = useState<Tab>("lesson");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [sound, setSound] = useState(false);
+  const [sound, setSound] = useState(true);
   const { quality } = useNetwork();
   const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: quality === "slow" ? 10000 : 5000 });
   useRealtime(`live:${sessionId}`, [
@@ -52,15 +52,21 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
     if (!newest || newest.id === lastAlert.current) return;
     if (lastAlert.current !== null) {
       if (sound) {
-        const ctx = new AudioContext(); const o = ctx.createOscillator(); o.frequency.value = newest.severity === "critical" ? 880 : 660;
-        o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.15);
+        try {
+          const ctx = new AudioContext();
+          [0, 0.2].forEach((t) => {
+            const o = ctx.createOscillator(); o.frequency.value = newest.kind === "environment_left" ? 880 : 660;
+            o.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.12);
+          });
+        } catch { /* audio blocked until the teacher interacts with the page */ }
       }
+      if (newest.kind === "environment_left") toast(`${newest.student} left the class: ${newest.rule}`, "error");
       if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
         new Notification(`${newest.student}: ${ALERT_LABEL[newest.kind] ?? newest.kind}`, { body: newest.rule });
       }
     }
     lastAlert.current = newest.id;
-  }, [openAlerts, sound]);
+  }, [openAlerts, sound, toast]);
 
   if (state.error && !s) return <div className="page"><Alert tone="error">{state.error}</Alert></div>;
   if (!s) return <div className="page text-sm text-ink-500">Connecting to the session…</div>;
@@ -87,8 +93,16 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
         </div>
         <div className="text-center"><p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Students</p><p className="text-lg font-bold">{joined}/{s.roster.length}</p></div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant={s.session.lockdown ? "primary" : "secondary"} aria-pressed={s.session.lockdown}
+            title={s.session.lockdown ? "Students must share their screen and stay in the full-screen lesson; leaving alerts you." : "Students can leave the lesson without an alert."}
+            onClick={async () => {
+              try { await rpc("set_session_lockdown", { p_session: sessionId, p_on: !s.session.lockdown }); void state.reload(); toast(s.session.lockdown ? "Lockdown off" : "Lockdown on", "info"); }
+              catch (e) { toast(errorText(e), "error"); }
+            }}><Icon name="lock" className="h-4 w-4" /> Lockdown {s.session.lockdown ? "on" : "off"}</Button>
           <CopyButton value={s.session.join_code} label="Copy code" />
           <Link href={`/present/${sessionId}`} target="_blank" className="btn btn-secondary btn-sm no-underline"><Icon name="monitor" className="h-4 w-4" /> Present</Link>
+          <Link href={`/teacher/challenge/new?class=${s.session.class_id}&session=${sessionId}${s.session.active_activity_id ? `&activity=${s.session.active_activity_id}` : ""}`}
+            className="btn btn-secondary btn-sm no-underline" title="Kahoot-style quiz game with a live leaderboard"><Icon name="trophy" className="h-4 w-4" /> Game</Link>
           <Button size="sm" variant="danger" onClick={end}>End session</Button>
         </div>
       </div>
@@ -96,8 +110,13 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
       {openAlerts.filter((a) => a.kind !== "connection_lost").length > 0 && (
         <div className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-900" role="alert">
           <strong>{openAlerts.length} alert{openAlerts.length > 1 ? "s" : ""}:</strong>{" "}
-          {openAlerts.slice(0, 3).map((a) => `${a.student} (${(ALERT_LABEL[a.kind] ?? a.kind).toLowerCase()})`).join(", ")}
-          <button className="ml-2 font-semibold underline" onClick={() => setTab("environment")}>Review</button>
+          {openAlerts.slice(0, 3).map((a, i) => (
+            <span key={a.id}>{i > 0 && ", "}
+              <button className="font-medium underline decoration-dotted" title="View screen" onClick={() => setFocus(a.student_id)}>{a.student}</button>
+              {` (${(ALERT_LABEL[a.kind] ?? a.kind).toLowerCase()})`}
+            </span>
+          ))}
+          <button className="ml-2 font-semibold underline" onClick={() => { setFocus(null); setTab("environment"); }}>Review</button>
         </div>
       )}
 
@@ -117,7 +136,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
           {tab === "lesson" && <LessonPanel state={s} me={me} reload={state.reload} />}
           {tab === "responses" && <ResponsesPanel state={s} me={me} reload={state.reload} />}
           {tab === "screens" && <ScreensPanel state={s} sessionId={sessionId} selected={selected} setSelected={setSelected} reload={state.reload} screens={screens} />}
-          {tab === "environment" && <EnvironmentPanel state={s} sessionId={sessionId} envs={envs} scenes={scenes} reload={state.reload} />}
+          {tab === "environment" && <EnvironmentPanel state={s} sessionId={sessionId} envs={envs} scenes={scenes} reload={state.reload} onView={setFocus} />}
           {tab === "chat" && <ChatPanel state={s} me={me} />}
           </>}
         </section>

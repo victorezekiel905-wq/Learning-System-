@@ -579,6 +579,75 @@ test("school branding: admins only, logo must stay in the school's folder", asyn
   assert.equal((await db.as(S.adminB, "select brand_name from public.tenant_settings"))[0].brand_name, null, "other schools unaffected");
 });
 
+test("web classroom: screen sharing, lockdown, leave alerts with the screen", async () => {
+  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
+  await db.rpc(S.stu2, "join_session", { p_code: s.join_code });
+  const frame = "data:image/jpeg;base64,AAAA";
+
+  const ok = await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true, p_surface: "monitor" });
+  assert.equal(ok.lockdown, true, "lockdown is on by default");
+  assert.equal(ok.away, false);
+  assert.equal(ok.capture.enabled, true);
+  assert.equal((await db.rpc(S.stu1, "student_screen_frame", { p_session: s.id, p_image: frame, p_width: 480, p_height: 270 })).stored, true);
+  assert.equal((await db.rpc(S.stu1, "student_screen_frame", { p_session: s.id, p_image: frame })).stored, false, "rate limited");
+  const screens = await db.rpc(S.teacherA, "session_screens", { p_session: s.id });
+  assert.equal(screens.length, 1);
+  assert.equal(screens[0].source, "web");
+  let st = await db.rpc(S.teacherA, "teacher_session_state", { p_session: s.id });
+  assert.equal(st.roster.find((r) => r.student_id === S.stu1).web.sharing, true);
+  await rejects(db.rpc(S.adminB, "session_screens", { p_session: s.id }), /not found/);
+  await rejects(db.rpc(S.adminB, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true }), /not found/);
+
+  // Teacher opens Ada's screen: only a request flag for Ada, nobody else's view changes.
+  await db.rpc(S.teacherA, "request_screenshot", { p_session: s.id, p_student: S.stu1 });
+  assert.equal((await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true })).capture.high_quality, true);
+  assert.equal((await db.rpc(S.stu2, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: false, p_unsupported: true })).capture.high_quality, false);
+  await db.rpc(S.teacherA, "spotlight_start", { p_session: s.id, p_student: S.stu1 });
+  await rejects(db.rpc(S.teacherA, "spotlight_start", { p_session: s.id, p_student: S.stu2 }), /isn't sharing/);
+  await db.rpc(S.teacherA, "spotlight_stop", { p_session: s.id });
+
+  // Ada switches tab: away, but no alert inside the grace period.
+  const away = await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: false, p_sharing: true });
+  assert.equal(away.away, true);
+  st = await db.rpc(S.teacherA, "teacher_session_state", { p_session: s.id });
+  assert.equal(st.alerts.length, 0, "grace period");
+  await db.admin("update public.session_participants set away_since = now() - interval '1 minute' where session_id = $1 and user_id = $2", [s.id, S.stu1]);
+  await db.admin("update public.tenant_settings set store_event_screenshots = true where tenant_id = $1", [S.tenantA]);
+  st = await db.rpc(S.teacherA, "teacher_session_state", { p_session: s.id });
+  assert.equal(st.alerts.length, 1);
+  assert.equal(st.alerts[0].kind, "environment_left");
+  assert.match(st.alerts[0].rule, /switched tab/);
+  assert.equal(st.alerts[0].has_evidence, true, "last screen attached");
+  const ev = await db.rpc(S.teacherA, "event_evidence", { p_event: st.alerts[0].id });
+  assert.equal(ev.image, frame);
+  await rejects(db.rpc(S.stu2, "event_evidence", { p_event: st.alerts[0].id }), /not found/);
+  const notes = await db.as(S.teacherA, "select kind, title from public.notifications where kind = 'environment_left'");
+  assert.ok(notes.some((n) => /Ada Lovelace left the class/.test(n.title)));
+  // Only one alert while she stays away.
+  await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: false, p_sharing: true });
+  assert.equal((await db.rpc(S.teacherA, "teacher_session_state", { p_session: s.id })).alerts.length, 1);
+
+  // She comes back: alert resolves and the teacher is told.
+  await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
+  assert.equal((await db.admin("select count(*)::int n from public.environment_events where class_session_id = $1 and resolved_at is null", [s.id]))[0].n, 0);
+  assert.ok((await db.as(S.teacherA, "select 1 from public.notifications where kind = 'student_returned'")).length >= 1);
+
+  // Closing the lesson counts as leaving too.
+  await db.rpc(S.stu1, "leave_session", { p_session: s.id });
+  await db.admin("update public.session_participants set away_since = now() - interval '1 minute' where session_id = $1 and user_id = $2", [s.id, S.stu1]);
+  st = await db.rpc(S.teacherA, "teacher_session_state", { p_session: s.id });
+  assert.ok(st.alerts.some((a) => a.resolved_at === null && a.rule === "Closed the lesson"));
+
+  // Lockdown off: nothing counts as leaving; only the teacher can switch it.
+  await rejects(db.rpc(S.stu1, "set_session_lockdown", { p_session: s.id, p_on: false }), /Not your session/);
+  await db.rpc(S.teacherA, "set_session_lockdown", { p_session: s.id, p_on: false });
+  const free = await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: false, p_sharing: false });
+  assert.equal(free.away, false);
+  assert.equal(free.lockdown, false);
+  await db.rpc(S.teacherA, "end_session", { p_session: s.id });
+});
+
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {
   const before = (await db.admin("select count(*)::int n from public.users where tenant_id = $1", [S.tenantA]))[0].n;
   assert.ok(before > 3);
