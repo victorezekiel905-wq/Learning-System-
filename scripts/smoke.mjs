@@ -64,16 +64,20 @@ try {
 
   const { data: lesson, error: le } = await t.c.from("lessons").insert({ tenant_id: boot.tenant_id, owner_id: t.id, title: "Smoke HTML" }).select("id").single();
   if (le) throw le;
-  const { data: act } = await t.c.from("activities").insert({ tenant_id: boot.tenant_id, lesson_id: lesson.id, owner_id: t.id, kind: "multiple_choice", title: "Links", settings: { show_feedback: "immediately" } }).select("id").single();
-  const { data: q } = await t.c.from("questions").insert({ tenant_id: boot.tenant_id, activity_id: act.id, owner_id: t.id, kind: "mcq", prompt: "Which tag makes a link?", points: 1 }).select("id").single();
-  const { data: opts } = await t.c.from("question_options").insert([
+  const { data: act, error: ae } = await t.c.from("activities").insert({ tenant_id: boot.tenant_id, lesson_id: lesson.id, owner_id: t.id, kind: "multiple_choice", title: "Links", settings: { show_feedback: "immediately" } }).select("id").single();
+  if (ae) throw ae;
+  const { data: q, error: qe } = await t.c.from("questions").insert({ tenant_id: boot.tenant_id, activity_id: act.id, owner_id: t.id, kind: "mcq", prompt: "Which tag makes a link?", points: 1 }).select("id").single();
+  if (qe) throw qe;
+  const { data: opts, error: oe } = await t.c.from("question_options").insert([
     { tenant_id: boot.tenant_id, question_id: q.id, label: "<a>", is_correct: true, position: 0 },
     { tenant_id: boot.tenant_id, question_id: q.id, label: "<p>", is_correct: false, position: 1 }
   ]).select("id,is_correct");
-  await t.c.from("lesson_slides").insert([
+  if (oe) throw oe;
+  const { error: se } = await t.c.from("lesson_slides").insert([
     { tenant_id: boot.tenant_id, lesson_id: lesson.id, position: 0, kind: "title", content: { heading: "HTML" } },
-    { tenant_id: boot.tenant_id, lesson_id: lesson.id, position: 1, kind: "activity", activity_id: act.id }
+    { tenant_id: boot.tenant_id, lesson_id: lesson.id, position: 1, kind: "activity", content: {}, activity_id: act.id }
   ]);
+  if (se) throw se;
   const pub = await call(t.c, "publish_lesson", { p_lesson: lesson.id });
   must(pub.version === 1, "published v1");
   const { data: leaked } = await s.c.from("questions").select("id");
