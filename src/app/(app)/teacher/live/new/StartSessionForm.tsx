@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
@@ -17,7 +18,12 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  if (!classes.length) return <Alert>Create a class first. You need a roster to run a live session.</Alert>;
+  if (!classes.length) return (
+    <Alert title="Create a class first">
+      A live session runs for a class, so students can join with its code.{" "}
+      <Link href="/teacher/classes" className="font-semibold">Create a class →</Link>
+    </Alert>
+  );
 
   return (
     <Card>
