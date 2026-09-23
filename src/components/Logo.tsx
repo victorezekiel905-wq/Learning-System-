@@ -13,7 +13,7 @@ export function Logo({ href = "/", compact = false }: { href?: string; compact?:
         <rect width="64" height="64" rx="14" fill="url(#sc-g)" />
         <path d="M42 20c-3-3-7-4-11-4-7 0-12 4-12 9 0 11 26 6 26 17 0 5-5 9-13 9-5 0-9-2-12-5" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" />
       </svg>
-      {!compact && <span className="text-base font-extrabold tracking-tight">Swift<span className="text-brand-600">Cipher</span></span>}
+      {!compact && <span className="font-display text-base font-extrabold tracking-tight">Swift<span className="text-brand-600">Cipher</span></span>}
     </Link>
   );
 }

@@ -37,7 +37,9 @@ const config: Config = {
         }
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        // Body text: Inter. Headings: Plus Jakarta Sans (loaded with next/font in app/layout.tsx).
+        sans: ["var(--font-inter)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-jakarta)", "'Plus Jakarta Sans'", "var(--font-inter)", "ui-sans-serif", "sans-serif"],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
       },
       keyframes: {

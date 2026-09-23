@@ -19,7 +19,7 @@ function SchoolBrand({ logoPath, name, compact }: { logoPath?: string | null; na
     <Link href="/dashboard" className="flex min-w-0 items-center gap-2 text-ink-900 no-underline">
       {logo ? <img src={logo} alt="" className="h-8 w-8 rounded-lg object-contain" />
         : <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-black text-white">{(name ?? "S")[0]}</span>}
-      {!compact && <span className="truncate text-base font-extrabold tracking-tight">{name ?? "SwiftCipher"}</span>}
+      {!compact && <span className="truncate font-display text-base font-extrabold tracking-tight">{name ?? "SwiftCipher"}</span>}
     </Link>
   );
 }

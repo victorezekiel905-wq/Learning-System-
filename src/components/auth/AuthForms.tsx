@@ -106,6 +106,13 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
       }
     });
     if (error) { setBusy(false); setErr(error.message); return; }
+    // Supabase hides whether an email is registered: for an existing account it
+    // returns a user with no identities and sends no email.
+    if (data.user && (data.user.identities ?? []).length === 0) {
+      setBusy(false);
+      setErr("An account with this email already exists. Sign in instead (use Forgot password if needed).");
+      return;
+    }
     if (!data.session) { setBusy(false); setConfirm(true); return; }
     try {
       await completeIntent(intent, fullName.trim());

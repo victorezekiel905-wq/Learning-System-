@@ -130,7 +130,10 @@ try {
   process.exitCode = 1;
 } finally {
   if (!keep) {
-    for (const id of created.tenants) await admin.from("tenants").delete().eq("id", id);
+    for (const id of created.tenants) {
+      const { error } = await admin.from("tenants").delete().eq("id", id);
+      if (error) console.error(`Cleanup: could not delete test school ${id}: ${error.message}`);
+    }
     for (const id of created.users) await admin.auth.admin.deleteUser(id);
     console.log("Cleaned up smoke-test data.");
   }

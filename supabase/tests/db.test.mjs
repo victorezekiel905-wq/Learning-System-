@@ -578,3 +578,12 @@ test("school branding: admins only, logo must stay in the school's folder", asyn
   await rejects(db.as(S.adminA, "update public.tenant_settings set brand_logo_path = $1", [`${S.tenantB}/x.png`]), /check constraint/);
   assert.equal((await db.as(S.adminB, "select brand_name from public.tenant_settings"))[0].brand_name, null, "other schools unaffected");
 });
+
+test("deleting a school with real data removes everything (no FK ordering errors)", async () => {
+  const before = (await db.admin("select count(*)::int n from public.users where tenant_id = $1", [S.tenantA]))[0].n;
+  assert.ok(before > 3);
+  await db.admin("delete from public.tenants where id = $1", [S.tenantA]);
+  for (const t of ["users", "classes", "lessons", "activities", "questions", "quiz_attempts", "class_sessions", "devices", "game_sessions"]) {
+    assert.equal((await db.admin(`select count(*)::int n from public.${t} where tenant_id = $1`, [S.tenantA]))[0].n, 0, t);
+  }
+});

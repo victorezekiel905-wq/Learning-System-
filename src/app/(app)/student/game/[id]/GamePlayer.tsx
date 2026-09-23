@@ -69,7 +69,7 @@ export function GamePlayer({ gameId }: { gameId: string }) {
     <div className="page max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
         <div><p className="text-xs font-semibold uppercase text-accent-700">Challenge</p><h1 className="text-lg font-bold">{g.title}</h1></div>
-        {g.me && <div className="text-right"><p className="text-xs text-ink-500">{g.me.name}</p><p className="text-2xl font-extrabold tabular-nums">{g.me.score}</p>{g.me.streak > 1 && <p className="text-xs font-semibold text-orange-600">🔥 {g.me.streak} streak</p>}</div>}
+        {g.me && <div className="text-right"><p className="text-xs text-ink-500">{g.me.name}</p><p className="font-display text-2xl font-extrabold tabular-nums">{g.me.score}</p>{g.me.streak > 1 && <p className="text-xs font-semibold text-orange-600">🔥 {g.me.streak} streak</p>}</div>}
       </div>
 
       {g.status === "lobby" && <Card><p className="py-10 text-center text-lg">You're in! Waiting for your teacher to start…</p></Card>}
@@ -99,7 +99,7 @@ export function GamePlayer({ gameId }: { gameId: string }) {
         <Card>
           {g.me?.last ? (
             <div className={cn("rounded-xl p-6 text-center text-white", g.me.last.is_correct ? "bg-emerald-600" : "bg-rose-600")}>
-              <p className="text-3xl font-extrabold">{g.me.last.is_correct ? "Correct!" : "Not this time"}</p>
+              <p className="font-display text-3xl font-extrabold">{g.me.last.is_correct ? "Correct!" : "Not this time"}</p>
               <p className="mt-1 text-lg">+{g.me.last.points} points</p>
             </div>
           ) : <p className="text-center text-ink-500">No answer this round.</p>}

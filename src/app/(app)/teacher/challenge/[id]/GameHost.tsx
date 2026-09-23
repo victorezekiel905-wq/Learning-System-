@@ -38,7 +38,7 @@ export function GameHost({ gameId, school }: { gameId: string; school: string })
         <div><p className="text-xs font-semibold uppercase tracking-wider text-accent-700">SwiftCipher Challenge</p><h1 className="text-2xl font-bold">{g.title}</h1></div>
         <div className="flex items-center gap-4">
           {g.status !== "ended" && <div className="text-center"><p className="text-[10px] font-semibold uppercase text-ink-500">Join code</p><p className="font-mono text-3xl font-extrabold tracking-[0.2em] text-brand-700">{g.join_code}</p></div>}
-          <div className="text-center"><p className="text-[10px] font-semibold uppercase text-ink-500">Players</p><p className="text-2xl font-bold">{g.players}</p></div>
+          <div className="text-center"><p className="text-[10px] font-semibold uppercase text-ink-500">Players</p><p className="font-display text-2xl font-bold">{g.players}</p></div>
           {!!g.flags && <Badge tone="amber" className="self-center">{g.flags} pattern flag(s)</Badge>}
         </div>
       </div>

@@ -148,7 +148,7 @@ export function Stat({ label, value, sub, tone }: { label: ReactNode; value: Rea
   return (
     <div className="card card-pad">
       <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</p>
-      <p className={cn("mt-1 text-2xl font-bold tabular-nums text-ink-900", tone === "red" && "text-rose-600", tone === "green" && "text-emerald-600")}>{value}</p>
+      <p className={cn("mt-1 font-display text-2xl font-bold tabular-nums text-ink-900", tone === "red" && "text-rose-600", tone === "green" && "text-emerald-600")}>{value}</p>
       {sub && <p className="mt-0.5 text-xs text-ink-500">{sub}</p>}
     </div>
   );
