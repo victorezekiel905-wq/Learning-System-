@@ -35,7 +35,10 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(params.get("error") === "suspended" ? "Your account is suspended. Contact your school administrator." : params.get("error"));
+  const [err, setErr] = useState<string | null>(
+    params.get("error") === "suspended" ? "Your account is suspended. Contact your school administrator."
+      : params.get("error") === "school_suspended" ? "Your school's SwiftCipher account is suspended. Please contact your school administrator."
+      : params.get("error"));
   const [info, setInfo] = useState<string | null>(
     params.get("notice") === "confirmed" ? "Your email is confirmed. Sign in to finish setting up." : null
   );

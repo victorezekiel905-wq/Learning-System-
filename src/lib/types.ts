@@ -26,12 +26,18 @@ export type TenantSettings = {
   monitoring_notice: string;
   monitoring_notice_version: number;
   support_access_until: string | null;
+  brand_name: string | null;
+  brand_logo_path: string | null;
+  brand_primary: string | null;
+  brand_accent: string | null;
+  welcome_message: string | null;
 };
 
 export type Me = {
   profile: Profile | null;
   email?: string;
-  tenant?: { id: string; name: string; slug: string; plan_code: string; timezone: string };
+  tenant?: { id: string; name: string; slug: string; plan_code: string; timezone: string; status?: "active" | "suspended" };
+  super_admin?: boolean;
   plan?: { code: string; name: string; limits: Record<string, number | null>; features: Record<string, boolean> };
   settings?: TenantSettings;
   monitoring_consent?: boolean;

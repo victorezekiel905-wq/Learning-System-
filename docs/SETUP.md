@@ -102,3 +102,16 @@ Supabase pauses free projects after 7 days without activity. `.github/workflows/
 2. Open **Actions → Keep Supabase awake → Run workflow** once to test it. The log should say "Supabase is awake".
 
 The workflow also re-enables itself, because GitHub otherwise switches scheduled workflows off after 60 days without commits. To ping by hand or from your own scheduler, run `npm run keep-alive` (it reads `.env.local`). If the project is already paused, restore it from the dashboard first; a ping can't wake a paused project.
+
+## 9. Super admin (platform owner)
+
+1. Sign up in the app with your own email.
+2. Assign yourself the super-admin role, which only one person can hold:
+
+   ```bash
+   node scripts/set-super-admin.mjs you@example.com
+   ```
+
+3. A **Super admin** link appears at the top of your sidebar, and the console is at `/super`. For anyone else, `/super` returns a 404.
+
+If your database was created with `setup.sql` **before 2026-09-23**, first run `supabase/updates/2026-09-23_super_admin_branding.sql` in the SQL Editor. See [ROLES.md](ROLES.md) for what each role can do.

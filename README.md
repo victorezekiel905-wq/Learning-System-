@@ -34,7 +34,7 @@ Then open `/signup` to create a school. Load `extension/` unpacked in Chrome (`c
 | `npm run dev` / `build` / `start` | Next.js app |
 | `npm run type-check` | TypeScript |
 | `npm test` | Database suite and unit tests |
-| `npm run test:db` | Database suite only: applies every migration to an in-process Postgres (PGlite) with a Supabase shim, then runs 11 end-to-end groups covering RLS isolation, grading, games, the policy engine, the device agent, WebRTC, privacy and more |
+| `npm run test:db` | Database suite only: applies every migration to an in-process Postgres (PGlite) with a Supabase shim, then runs 13 end-to-end groups covering RLS isolation, grading, games, the policy engine, the device agent, WebRTC, privacy, the super admin, branding and more |
 | `node scripts/smoke.mjs` | Same core flows against a real Supabase project, then cleans up |
 | `node scripts/make-icons.mjs` | Regenerates the extension icons |
 
@@ -45,7 +45,7 @@ Then open `/signup` to create a school. Load `extension/` unpacked in Chrome (`c
 - **The extension has no user session.** It pairs using a one-time code and receives a per-device secret, which the database stores only as a SHA-256 hash. Outside a live class it sends nothing about browsing.
 - **Policy is evaluated on the server** with a deterministic engine (§14): domain matching respects label boundaries, and grace periods, deduplication and "student returned" are all handled server-side. A lost connection is shown as *connection lost*, never as a violation.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/API.md](docs/API.md), [docs/BLUEPRINT_COVERAGE.md](docs/BLUEPRINT_COVERAGE.md) (including what is *not* built yet) and [SECURITY.md](SECURITY.md).
+See [docs/ROLES.md](docs/ROLES.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/API.md](docs/API.md), [docs/BLUEPRINT_COVERAGE.md](docs/BLUEPRINT_COVERAGE.md) (including what is *not* built yet) and [SECURITY.md](SECURITY.md).
 
 ## Product boundaries
 

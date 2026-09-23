@@ -3,11 +3,10 @@ import { useState } from "react";
 import { Alert, Badge, Button, Field, Input, Modal, Toggle, useToast } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import type { SessionState } from "@/components/live/types";
-import { useRpc } from "@/lib/hooks";
+import type { Screen } from "@/components/live/ScreenRail";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, timeAgo } from "@/lib/utils";
 
-type Screen = { student_id: string; device_id: string; image: string; captured_at: string; url: string | null; stale: boolean };
 type Cmd = "open_tab" | "close_tab" | "redirect" | "focus" | "unfocus" | "lock" | "unlock" | "close_other_tabs" | "message";
 
 /**
@@ -15,13 +14,11 @@ type Cmd = "open_tab" | "close_tab" | "redirect" | "focus" | "unfocus" | "lock" 
  * Thumbnails refresh at the school's configured interval; a frame older than
  * three intervals is shown as unavailable, never as live (§30).
  */
-export function ScreensPanel({ state, sessionId, selected, setSelected, reload }: {
+export function ScreensPanel({ state, sessionId, selected, setSelected, reload, screens: byStudent }: {
   state: SessionState; sessionId: string; selected: Set<string>; setSelected: (s: Set<string>) => void; reload: () => Promise<void>;
+  screens: Record<string, Screen>;
 }) {
   const toast = useToast();
-  const interval = state.settings.thumbnail_interval_seconds;
-  const screens = useRpc<Screen[]>("session_screens", { p_session: sessionId }, [sessionId], { intervalMs: interval * 1000, enabled: state.settings.allow_screen_capture });
-  const byStudent = Object.fromEntries((screens.data ?? []).map((x) => [x.student_id, x]));
   const [cmd, setCmd] = useState<Cmd | null>(null);
   const [url, setUrl] = useState("https://");
   const [text, setText] = useState("");

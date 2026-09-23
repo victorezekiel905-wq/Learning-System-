@@ -5,6 +5,69 @@ import { Alert, Button, Card, Field, Input, Select, Textarea, Toggle, useToast }
 import { createClient } from "@/lib/supabase/client";
 import { errorText, rpc } from "@/lib/rpc";
 import type { Me, TenantSettings } from "@/lib/types";
+import { uploadMedia, useSignedUrl } from "@/lib/media";
+import { contrastWithWhite, paletteVars } from "@/lib/theme";
+
+/** Tenant branding: only this school sees it; other schools are unaffected. */
+function BrandingCard({ s, set, tenantId }: { s: TenantSettings; set: (p: Partial<TenantSettings>) => void; tenantId: string }) {
+  const toast = useToast();
+  const logo = useSignedUrl(s.brand_logo_path);
+  const [busy, setBusy] = useState(false);
+  const primary = s.brand_primary ?? "#4f46e5";
+  const accent = s.brand_accent ?? "#0891b2";
+  const lowContrast = contrastWithWhite(primary) < 4.5;
+  const preview = { ...paletteVars("brand", primary), ...paletteVars("accent", accent) } as React.CSSProperties;
+
+  async function upload(f: File) {
+    if (!f.type.startsWith("image/")) { toast("Choose an image file.", "error"); return; }
+    setBusy(true);
+    try {
+      const { data: { user } } = await createClient().auth.getUser();
+      const m = await uploadMedia(f, { tenantId, userId: user!.id, alt: "School logo", tags: ["branding"] });
+      set({ brand_logo_path: m.storage_path });
+    } catch (e) { toast(errorText(e), "error"); }
+    setBusy(false);
+  }
+
+  return (
+    <Card title="Branding (your school's pages)">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-4">
+          <Field label="Display name" hint="Shown in the sidebar and header instead of SwiftCipher.">
+            <Input value={s.brand_name ?? ""} maxLength={80} onChange={(e) => set({ brand_name: e.target.value || null })} />
+          </Field>
+          <Field label="Logo" hint="Square PNG or SVG works best.">
+            <div className="flex items-center gap-3">
+              {logo ? <img src={logo} alt="School logo" className="h-12 w-12 rounded-lg border border-ink-200 object-contain" /> : <span className="grid h-12 w-12 place-items-center rounded-lg bg-ink-100 text-xs text-ink-400">none</span>}
+              <label className="btn btn-secondary btn-sm cursor-pointer">{busy ? "Uploading…" : "Upload logo"}
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} /></label>
+              {s.brand_logo_path && <Button size="sm" variant="ghost" onClick={() => set({ brand_logo_path: null })}>Remove</Button>}
+            </div>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Main colour"><div className="flex items-center gap-2"><input type="color" value={primary} onChange={(e) => set({ brand_primary: e.target.value })} className="h-9 w-12 cursor-pointer rounded border border-ink-300" /><Input value={primary} onChange={(e) => /^#[0-9a-fA-F]{6}$/.test(e.target.value) && set({ brand_primary: e.target.value })} /></div></Field>
+            <Field label="Accent colour"><div className="flex items-center gap-2"><input type="color" value={accent} onChange={(e) => set({ brand_accent: e.target.value })} className="h-9 w-12 cursor-pointer rounded border border-ink-300" /><Input value={accent} onChange={(e) => /^#[0-9a-fA-F]{6}$/.test(e.target.value) && set({ brand_accent: e.target.value })} /></div></Field>
+          </div>
+          {lowContrast && <Alert tone="warn">This main colour is too light for white button text to be readable. Choose a darker shade.</Alert>}
+          <Field label="Welcome message" hint="Shown at the top of every teacher's and student's home page.">
+            <Textarea rows={2} maxLength={500} value={s.welcome_message ?? ""} onChange={(e) => set({ welcome_message: e.target.value || null })} />
+          </Field>
+          <Button size="sm" variant="ghost" onClick={() => set({ brand_name: null, brand_logo_path: null, brand_primary: null, brand_accent: null, welcome_message: null })}>Reset to SwiftCipher defaults</Button>
+        </div>
+        <div style={preview} className="rounded-xl border border-ink-200 bg-ink-50 p-4">
+          <p className="label">Preview</p>
+          <div className="flex items-center gap-2">
+            {logo ? <img src={logo} alt="" className="h-8 w-8 rounded-lg object-contain" /> : <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-black text-white">{(s.brand_name ?? "S")[0]}</span>}
+            <span className="font-extrabold">{s.brand_name || "SwiftCipher"}</span>
+          </div>
+          {s.welcome_message && <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">{s.welcome_message}</div>}
+          <div className="mt-3 flex flex-wrap gap-2"><span className="btn btn-primary btn-sm">Primary button</span><span className="btn btn-accent btn-sm">Accent</span><span className="badge bg-brand-50 text-brand-700">Badge</span></div>
+          <p className="mt-2 text-xs text-ink-500">Click <strong>Save settings</strong> at the bottom to apply it for everyone in your school.</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 type Tenant = { id: string; name: string; country: string | null; timezone: string; slug: string };
 const KNOWN_FLAGS = [
@@ -45,6 +108,8 @@ export function SettingsClient({ tenant, settings, schools, flags, plan }: {
 
   return (
     <div className="space-y-6">
+      <BrandingCard s={s} set={set} tenantId={t.id} />
+
       <Card title="School profile">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Name"><Input value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} /></Field>

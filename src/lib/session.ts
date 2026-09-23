@@ -1,5 +1,5 @@
 import "server-only";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "./supabase/server";
 import type { Me, Role } from "./types";
@@ -30,12 +30,20 @@ export function homeFor(role: Role | undefined): string {
   }
 }
 
-/** Gate a page: signed in, has a profile, and (optionally) one of the roles. */
+/** Gate a page: signed in, has a profile, school active, and (optionally) one of the roles. */
 export async function requireRole(roles?: Role[]) {
   const me = await getMe();
   if (!me) redirect("/login");
-  if (!me.profile) redirect("/onboarding");
+  if (!me.profile) redirect(me.super_admin ? "/super" : "/onboarding");
   if (me.profile.status !== "active") redirect("/login?error=suspended");
+  if (me.tenant?.status === "suspended") redirect(me.super_admin ? "/super" : "/login?error=school_suspended");
   if (roles && !roles.includes(me.profile.role)) redirect(homeFor(me.profile.role));
   return { me: me as Me & { profile: NonNullable<Me["profile"]> }, sb: createClient() };
+}
+
+/** The platform console. Anyone else gets a plain 404, so it isn't even discoverable. */
+export async function requireSuperAdmin() {
+  const me = await getMe();
+  if (!me?.super_admin) notFound();
+  return { me, sb: createClient() };
 }

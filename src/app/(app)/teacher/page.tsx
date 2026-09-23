@@ -30,6 +30,8 @@ export default async function TeacherHome() {
           <Link href="/teacher/live/new" className="btn btn-primary no-underline">Start live class</Link>
         </>} />
 
+      {me.settings?.welcome_message && <div className="mb-5 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-900">{me.settings.welcome_message}</div>}
+
       {(live.data ?? []).length > 0 && (
         <div className="mb-6 space-y-2">
           {(live.data ?? []).map((s) => (

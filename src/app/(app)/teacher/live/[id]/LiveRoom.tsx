@@ -14,6 +14,7 @@ import { ResponsesPanel } from "./ResponsesPanel";
 import { ScreensPanel } from "./ScreensPanel";
 import { EnvironmentPanel } from "./EnvironmentPanel";
 import { ChatPanel } from "./ChatPanel";
+import { FocusView, ScreenRail, type Screen } from "@/components/live/ScreenRail";
 
 type Tab = "lesson" | "responses" | "screens" | "environment" | "chat";
 export type Me = { id: string; tenantId: string; name: string };
@@ -34,6 +35,12 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
     { table: "session_participants", filter: `session_id=eq.${sessionId}` },
     { table: "quiz_answers" }
   ], () => void state.reload());
+
+  // Thumbnails are fetched once here and shared by the left rail and the Screens tab.
+  const thumbEvery = Math.min(state.data?.settings.thumbnail_interval_seconds ?? 20, 10) * 1000;
+  const screensQ = useRpc<Screen[]>("session_screens", { p_session: sessionId }, [sessionId], { intervalMs: thumbEvery, enabled: !!state.data?.settings.allow_screen_capture });
+  const screens = useMemo(() => Object.fromEntries((screensQ.data ?? []).map((x) => [x.student_id, x])), [screensQ.data]);
+  const [focus, setFocus] = useState<string | null>(null);
 
   const s = state.data;
   const openAlerts = useMemo(() => (s?.alerts ?? []).filter((a) => a.status === "open" && !a.resolved_at), [s]);
@@ -94,8 +101,12 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
         </div>
       )}
 
-      <div className="grid flex-1 xl:grid-cols-[1fr_300px]">
+      <div className="grid flex-1 lg:grid-cols-[220px_1fr] xl:grid-cols-[230px_1fr_300px]">
+        <aside className="max-h-[calc(100vh-7rem)] overflow-y-auto border-r border-ink-200 bg-white p-3 lg:sticky lg:top-14" aria-label="Student screens">
+          <ScreenRail state={s} screens={screens} focus={focus} onFocus={setFocus} />
+        </aside>
         <section className="min-w-0 p-4">
+          {focus ? <FocusView state={s} studentId={focus} sessionId={sessionId} onMinimize={() => setFocus(null)} /> : <>
           <Tabs className="mb-4" value={tab} onChange={setTab} tabs={[
             { id: "lesson", label: "Lesson" },
             { id: "responses", label: "Responses" },
@@ -105,12 +116,13 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
           ]} />
           {tab === "lesson" && <LessonPanel state={s} me={me} reload={state.reload} />}
           {tab === "responses" && <ResponsesPanel state={s} me={me} reload={state.reload} />}
-          {tab === "screens" && <ScreensPanel state={s} sessionId={sessionId} selected={selected} setSelected={setSelected} reload={state.reload} />}
+          {tab === "screens" && <ScreensPanel state={s} sessionId={sessionId} selected={selected} setSelected={setSelected} reload={state.reload} screens={screens} />}
           {tab === "environment" && <EnvironmentPanel state={s} sessionId={sessionId} envs={envs} scenes={scenes} reload={state.reload} />}
           {tab === "chat" && <ChatPanel state={s} me={me} />}
+          </>}
         </section>
 
-        <aside className="space-y-4 border-l border-ink-200 bg-ink-50 p-4">
+        <aside className="space-y-4 border-l border-ink-200 bg-ink-50 p-4 lg:col-span-2 xl:col-span-1">
           {s.hands.length > 0 && (
             <div className="card p-3">
               <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Icon name="hand" className="h-4 w-4 text-amber-600" /> Help queue ({s.hands.length})</p>

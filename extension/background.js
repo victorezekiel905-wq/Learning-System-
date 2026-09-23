@@ -70,6 +70,7 @@ async function activeTab() {
 }
 
 let ticking = false;
+let fastLoop;
 async function tick(kind = "heartbeat") {
   if (ticking) return;
   ticking = true;
@@ -112,11 +113,18 @@ async function applyDirectives(r, cfg) {
   scheduleAlarm(r.state === "active" ? 0.5 : (r.poll_seconds ?? 60) / 60);
 
   if (r.state !== "active") {
+    clearTimeout(fastLoop);
     if (wasActive) await chrome.storage.local.set({ focus: null, lock: false });
     return;
   }
   // Just became active: send real telemetry immediately.
   if (!wasActive) setTimeout(() => tick("tab_changed"), 250);
+
+  // Alarms can't fire faster than 30 s, so during class keep a short loop:
+  // every 10 s, or every 4 s while the teacher has this screen enlarged.
+  // (Each tick calls chrome.* APIs, which keeps the service worker alive.)
+  clearTimeout(fastLoop);
+  fastLoop = setTimeout(() => tick("heartbeat"), r.capture?.high_quality ? 4000 : 10000);
 
   for (const cmd of r.commands ?? []) await runCommand(cmd, cfg);
 

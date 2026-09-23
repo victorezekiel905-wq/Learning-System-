@@ -26,6 +26,8 @@ export default async function StudentHome() {
       <PageHeader title={`Hi, ${me.profile.full_name.split(" ")[0]}`} subtitle="Your classes, live lessons and work."
         actions={<Link href="/student/join" className="btn btn-primary no-underline">Join with code</Link>} />
 
+      {me.settings?.welcome_message && <div className="mb-5 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-900">{me.settings.welcome_message}</div>}
+
       {h.live.map((s) => (
         <Link key={s.id} href={`/student/live/${s.id}`} className="mb-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 no-underline">
           <span className="font-semibold text-emerald-900">● {s.class} is live: {s.title}</span><span className="btn btn-primary btn-sm">Join now</span>

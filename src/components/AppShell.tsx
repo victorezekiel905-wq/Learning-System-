@@ -7,7 +7,22 @@ import { useNetwork, useRealtime } from "@/lib/hooks";
 import type { Me, Role } from "@/lib/types";
 import { ROLE_LABEL } from "@/lib/types";
 import { cn, timeAgo } from "@/lib/utils";
+import { useSignedUrl } from "@/lib/media";
+import { paletteVars } from "@/lib/theme";
 import { Logo } from "./Logo";
+
+/** The school's own logo and name when set (tenant branding), otherwise SwiftCipher's. */
+function SchoolBrand({ logoPath, name, compact }: { logoPath?: string | null; name?: string | null; compact?: boolean }) {
+  const logo = useSignedUrl(logoPath);
+  if (!logoPath && !name) return <Logo href="/dashboard" compact={compact} />;
+  return (
+    <Link href="/dashboard" className="flex min-w-0 items-center gap-2 text-ink-900 no-underline">
+      {logo ? <img src={logo} alt="" className="h-8 w-8 rounded-lg object-contain" />
+        : <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-black text-white">{(name ?? "S")[0]}</span>}
+      {!compact && <span className="truncate text-base font-extrabold tracking-tight">{name ?? "SwiftCipher"}</span>}
+    </Link>
+  );
+}
 import { Avatar } from "./ui";
 import { Icon, type IconName } from "./Icon";
 
@@ -60,8 +75,17 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
     router.refresh();
   }
 
+  const s = me.settings;
+  const themeVars = { ...paletteVars("brand", s?.brand_primary), ...paletteVars("accent", s?.brand_accent) } as React.CSSProperties;
+  const schoolName = s?.brand_name || me.tenant?.name || "SwiftCipher";
+
   const nav = (
     <nav className="flex flex-col gap-0.5" aria-label="Main">
+      {me.super_admin && (
+        <Link href="/super" className="mb-2 flex items-center gap-2.5 rounded-lg bg-ink-900 px-3 py-2 text-sm font-semibold text-white no-underline">
+          <Icon name="shield" className="h-4 w-4" /> Super admin
+        </Link>
+      )}
       {items.map((n) => {
         const active = n.exact ? pathname === n.href : pathname === n.href || pathname.startsWith(n.href + "/");
         return (
@@ -77,9 +101,9 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
   );
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]" style={themeVars}>
       <aside className="hidden border-r border-ink-200 bg-white lg:flex lg:flex-col">
-        <div className="flex h-14 items-center border-b border-ink-100 px-4"><Logo href="/dashboard" /></div>
+        <div className="flex h-14 items-center border-b border-ink-100 px-4"><SchoolBrand logoPath={s?.brand_logo_path} name={s?.brand_name} /></div>
         <div className="flex-1 overflow-y-auto p-3">{nav}</div>
         <div className="border-t border-ink-100 p-3 text-xs text-ink-500">
           <p className="truncate font-medium text-ink-700">{me.tenant?.name}</p>
@@ -93,9 +117,9 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
             <button className="btn btn-ghost btn-sm" onClick={() => setMobileOpen((v) => !v)} aria-label="Menu" aria-expanded={mobileOpen}>
               <Icon name="menu" className="h-5 w-5" />
             </button>
-            <Logo href="/dashboard" compact />
+            <SchoolBrand logoPath={s?.brand_logo_path} name={s?.brand_name} compact />
           </div>
-          <div className="hidden text-sm text-ink-500 lg:block">{me.tenant?.name}</div>
+          <div className="hidden text-sm text-ink-500 lg:block">{schoolName}</div>
           <div className="flex items-center gap-3">
             {quality !== "good" && (
               <span className={cn("badge", quality === "offline" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-800")} title="Connection quality">

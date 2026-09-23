@@ -514,3 +514,67 @@ test("insights, parent portal, privacy, retention (§18, §20)", async () => {
   await db.rpc(S.adminA, "delete_user_data", { p_user: S.stu3 });
   assert.equal((await db.as(S.adminA, "select * from public.users where id = $1", [S.stu3])).length, 0);
 });
+
+// ---------------------------------------------------------------------------
+test("platform super admin: singleton, invisible, cross-tenant control", async () => {
+  S.superA = await db.signUp("owner@platform.test", "Platform Owner");
+  await db.admin("insert into public.platform_admins (user_id) values ($1)", [S.superA]);
+  await rejects(db.admin("insert into public.platform_admins (user_id) values ($1)", [S.adminB]), /duplicate|unique/);
+
+  // Nobody can see or grant it.
+  await rejects(db.as(S.adminA, "select * from public.platform_admins"), /permission denied/);
+  await rejects(db.as(S.adminA, "insert into public.platform_admins (user_id) values ($1)", [S.adminA]), /permission denied/);
+  assert.equal(await db.rpc(S.adminA, "am_super_admin"), false);
+  assert.equal(await db.rpc(S.superA, "am_super_admin"), true);
+  await rejects(db.rpc(S.adminA, "sa_overview"), /Not found/);
+  await rejects(db.rpc(S.teacherA, "sa_list_tenants"), /Not found/);
+  await rejects(db.as(S.adminA, "select * from public.platform_audit"), /permission denied/);
+  await rejects(db.rpc(S.adminA, "admin_set_user_role", { p_user: S.teacherA, p_role: "platform_admin" }), /Unknown role/);
+
+  const ov = await db.rpc(S.superA, "sa_overview");
+  assert.equal(ov.tenants, 2);
+  const list = await db.rpc(S.superA, "sa_list_tenants", {});
+  assert.deepEqual(list.map((t) => t.name).sort(), ["Alpha Academy", "Beta School"]);
+
+  // Suspend a school: everyone in it is locked out, devices stop.
+  await db.rpc(S.superA, "sa_set_tenant_status", { p_tenant: S.tenantB, p_status: "suspended", p_reason: "unpaid" });
+  await rejects(db.rpc(S.adminB, "create_class", { p_name: "X" }), /suspended/);
+  assert.equal((await db.as(S.adminB, "select * from public.tenants")).length, 0);
+  await db.rpc(S.superA, "sa_set_tenant_status", { p_tenant: S.tenantB, p_status: "active" });
+  assert.ok((await db.rpc(S.adminB, "create_class", { p_name: "Back" })).id);
+
+  // Users anywhere.
+  await db.rpc(S.superA, "sa_set_user_status", { p_user: S.stu2, p_status: "suspended" });
+  await rejects(db.rpc(S.stu2, "student_home"), /active SwiftCipher profile/);
+  await db.rpc(S.superA, "sa_set_user_status", { p_user: S.stu2, p_status: "active" });
+  await db.rpc(S.superA, "sa_set_user_role", { p_user: S.itA, p_role: "teacher" });
+  assert.equal((await db.admin("select role from public.users where id = $1", [S.itA]))[0].role, "teacher");
+
+  // Tenant audit shows the platform action without revealing who.
+  const tAudit = await db.as(S.adminA, "select actor_id, action from public.audit_logs where action like 'platform.%'");
+  assert.ok(tAudit.length >= 2);
+  assert.ok(tAudit.every((r) => r.actor_id === null));
+  assert.ok((await db.rpc(S.superA, "sa_audit", {})).length >= 5);
+
+  // Create a school with an admin invite; delete requires the exact name.
+  const created = await db.rpc(S.superA, "sa_create_tenant", { p_name: "Gamma College", p_plan: "school", p_admin_email: "head@gamma.test" });
+  const head = await db.signUp("head@gamma.test", "Gamma Head");
+  assert.equal((await db.rpc(head, "redeem_code", { p_code: created.admin_invite_code })).role, "school_admin");
+  const detail = await db.rpc(S.superA, "sa_tenant_detail", { p_tenant: created.tenant_id });
+  assert.equal(detail.users.length, 1);
+  await rejects(db.rpc(S.superA, "sa_delete_tenant", { p_tenant: created.tenant_id, p_confirm_name: "gamma" }), /exactly/);
+  const removed = await db.rpc(S.superA, "sa_delete_tenant", { p_tenant: created.tenant_id, p_confirm_name: "Gamma College" });
+  assert.deepEqual(removed, [head]);
+  assert.equal((await db.admin("select count(*)::int n from public.tenants where id = $1", [created.tenant_id]))[0].n, 0);
+});
+
+test("school branding: admins only, logo must stay in the school's folder", async () => {
+  await db.as(S.adminA, "update public.tenant_settings set brand_name = 'Alpha', brand_primary = '#0f766e', welcome_message = 'Welcome!'");
+  const [s] = await db.as(S.teacherA, "select brand_name, brand_primary from public.tenant_settings");
+  assert.deepEqual(s, { brand_name: "Alpha", brand_primary: "#0f766e" });
+  const n = await db.as(S.teacherA, "update public.tenant_settings set brand_name = 'Hacked' returning 1");
+  assert.equal(n.length, 0, "teachers cannot change branding");
+  await rejects(db.as(S.adminA, "update public.tenant_settings set brand_primary = 'red'"), /check constraint/);
+  await rejects(db.as(S.adminA, "update public.tenant_settings set brand_logo_path = $1", [`${S.tenantB}/x.png`]), /check constraint/);
+  assert.equal((await db.as(S.adminB, "select brand_name from public.tenant_settings"))[0].brand_name, null, "other schools unaffected");
+});
