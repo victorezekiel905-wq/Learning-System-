@@ -19,6 +19,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: supabase/setup.sql matches the migrations
+        run: npm run build:sql && git diff --exit-code supabase/setup.sql
       - name: Type-check
         run: npm run type-check
       - name: Database tests (migrations + RLS + RPCs on PGlite) and unit tests

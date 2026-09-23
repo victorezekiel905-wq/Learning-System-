@@ -9,7 +9,9 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "test": "node --test \"supabase/tests/*.test.mjs\" \"tests/*.test.mjs\"",
-    "test:db": "node --test \"supabase/tests/*.test.mjs\""
+    "test:db": "node --test \"supabase/tests/*.test.mjs\"",
+    "build:sql": "node scripts/build-setup-sql.mjs",
+    "keep-alive": "node scripts/keep-alive.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

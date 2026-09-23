@@ -22,6 +22,10 @@ Fill in `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_S
 
 ## 3. Database
 
+**Option A: SQL Editor (no tools needed).** In the Supabase dashboard, open **SQL Editor → New query**, paste the whole of `supabase/setup.sql` and click **Run**. Run it once, on an empty project. It ends by listing the 5 plans. If you change a migration, regenerate the file with `npm run build:sql`.
+
+**Option B: Supabase CLI.** Use one option or the other, not both.
+
 ```bash
 npx supabase login
 npx supabase link --project-ref <project-ref>      # asks for the DB password
@@ -79,3 +83,14 @@ Run this with the service role, for example in the SQL editor.
 ## 7. TURN (optional)
 
 Peer-to-peer screen sharing works on most networks. On strict school firewalls, deploy a TURN server (e.g. coturn) and set `NEXT_PUBLIC_TURN_URL`, `_USERNAME` and `_CREDENTIAL`. For large-class group video, put an SFU (e.g. LiveKit) behind the same room model.
+
+## 8. Keep a free-tier project awake
+
+Supabase pauses free projects after 7 days without activity. `.github/workflows/keep-alive.yml` pings the database every 3 days:
+
+1. On GitHub, open the repo's **Settings → Secrets and variables → Actions → New repository secret** and add:
+   - `SUPABASE_URL`: your project URL, e.g. `https://abcd1234.supabase.co`
+   - `SUPABASE_ANON_KEY`: the anon key (Project Settings → API)
+2. Open **Actions → Keep Supabase awake → Run workflow** once to test it. The log should say "Supabase is awake".
+
+The workflow also re-enables itself, because GitHub otherwise switches scheduled workflows off after 60 days without commits. To ping by hand or from your own scheduler, run `npm run keep-alive` (it reads `.env.local`). If the project is already paused, restore it from the dashboard first; a ping can't wake a paused project.
