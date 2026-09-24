@@ -49,7 +49,7 @@ export default async function BillingPage(props: { searchParams: Promise<{ statu
               {Object.entries(p.limits as Record<string, number | null>).map(([k, v]) => <li key={k}>{k.replace(/_/g, " ")}: {v ?? "unlimited"}</li>)}
               {Object.entries(p.features as Record<string, boolean>).filter(([, v]) => v).map(([k]) => <li key={k}>✓ {k.replace(/_/g, " ")}</li>)}
             </ul>
-            <div className="mt-4">{p.code === u.plan.code ? <Badge tone="brand">Current plan</Badge> : p.code === "enterprise" ? <a href={`mailto:${LEGAL.supportEmail}?subject=Enterprise%20plan`} className="btn btn-secondary btn-sm no-underline">Contact sales</a>
+            <div className="mt-4">{p.code === u.plan.code ? <Badge tone="brand">Current plan</Badge> : p.code === "enterprise" ? <a href={`mailto:${LEGAL.infoEmail}?subject=Enterprise%20plan`} className="btn btn-secondary btn-sm no-underline">Contact sales</a>
               : p.price_cents > 0 && <UpgradeButton plan={p.code} disabled={!stripe} />}</div>
           </Card>
         ))}

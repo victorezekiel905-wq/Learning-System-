@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { LEGAL_ENV } from "@/lib/legal";
+import { missingLegalDetails } from "@/lib/legal";
 import { createAnonClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export async function GET() {
   const release = process.env.NEXT_PUBLIC_RELEASE ?? "dev";
   const missing = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_APP_URL"]
     .filter((k) => !process.env[k]);
-  const warnings = LEGAL_ENV.filter((k) => !process.env[k]);
+  const warnings = missingLegalDetails();
   try {
     const { data, error } = await createAnonClient().rpc("health");
     if (error) throw error;

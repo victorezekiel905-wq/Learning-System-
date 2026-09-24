@@ -21,7 +21,7 @@ Recommended stack: **Vercel** (app) + **Supabase Pro** (database, auth, storage)
 
 ## 2. Vercel (app)
 
-1. Import the GitHub repository in Vercel (Framework: Next.js). Choose the same region as your Supabase project, e.g. `fra1` for Supabase `eu-central-1`.
+1. Import the GitHub repository in Vercel (Framework: Next.js). `vercel.json` already pins the servers to Dublin (`dub1`), next to the Supabase project in West EU (Ireland).
 2. **Environment variables** (Production). Every `NEXT_PUBLIC_*` value is built into the pages, so redeploy after changing one.
 
 | Variable | Value |
@@ -29,12 +29,14 @@ Recommended stack: **Vercel** (app) + **Supabase Pro** (database, auth, storage)
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<ref>.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | service-role key (**rotated**) |
-| `NEXT_PUBLIC_APP_URL` | `https://your-domain` |
+| `NEXT_PUBLIC_APP_URL` | `https://synergyswift.com` (or the subdomain the app runs on, e.g. `https://app.synergyswift.com`) |
 | `NEXT_PUBLIC_LEGAL_ENTITY` | Registered company name, e.g. "SwiftCipher Technologies Ltd (RC 1234567)" |
 | `NEXT_PUBLIC_LEGAL_ADDRESS` | Registered address |
-| `NEXT_PUBLIC_SUPPORT_EMAIL` | Support/sales/security inbox |
-| `NEXT_PUBLIC_PRIVACY_EMAIL` | Privacy / Data Protection Officer inbox |
-| `NEXT_PUBLIC_HOSTING_REGION` | e.g. "EU (Frankfurt)", the Supabase region |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | default `support@synergyswift.com` (support and security reports) |
+| `NEXT_PUBLIC_INFO_EMAIL` | default `info@synergyswift.com` (general enquiries and sales) |
+| `NEXT_PUBLIC_SUPPORT_PHONE` | default `+234 816 647 0416` |
+| `NEXT_PUBLIC_PRIVACY_EMAIL` | default `admin@synergyswift.com` (privacy and data requests) |
+| `NEXT_PUBLIC_HOSTING_REGION` | default "European Union: West EU (Ireland)" |
 | `NEXT_PUBLIC_GOVERNING_LAW` | optional; default "the Federal Republic of Nigeria" |
 | `NEXT_PUBLIC_SSO_PROVIDERS` | optional, e.g. `google,azure` (enable them in Supabase Auth first) |
 | `STRIPE_*` | optional, for online payments ([SETUP.md §6](SETUP.md)) |

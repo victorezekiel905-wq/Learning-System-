@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LEGAL, operatorName } from "@/lib/legal";
+import { LEGAL, operatorName, phoneHref } from "@/lib/legal";
 
 /** Shared frame for Terms, Privacy, DPA and Security pages. */
 export function LegalPage({ title, intro, children }: { title: string; intro: React.ReactNode; children: React.ReactNode }) {
@@ -26,6 +26,8 @@ export function Contact() {
       {operatorName()}{LEGAL.address && `, ${LEGAL.address}`}.
       {LEGAL.privacyEmail && <> Privacy and data requests: <a href={`mailto:${LEGAL.privacyEmail}`}>{LEGAL.privacyEmail}</a>.</>}
       {LEGAL.supportEmail && LEGAL.supportEmail !== LEGAL.privacyEmail && <> Support: <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>.</>}
+      {LEGAL.infoEmail && <> General enquiries: <a href={`mailto:${LEGAL.infoEmail}`}>{LEGAL.infoEmail}</a>.</>}
+      {LEGAL.phone && <> Phone: <a href={phoneHref()}>{LEGAL.phone}</a>.</>}
     </p>
   );
 }

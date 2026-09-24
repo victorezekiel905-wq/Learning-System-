@@ -1,5 +1,5 @@
 import { LegalPage } from "@/components/LegalPage";
-import { LEGAL, operatorName } from "@/lib/legal";
+import { LEGAL, operatorName, phoneHref } from "@/lib/legal";
 
 export const metadata = { title: "Terms of Service" };
 
@@ -39,7 +39,7 @@ export default function TermsPage() {
       </ul>
 
       <h2>7. Availability and support</h2>
-      <p>We work to keep SwiftCipher available at all times except for planned maintenance, which we schedule outside school hours where possible and announce in advance. Support is available at {LEGAL.supportEmail ? <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> : "the support address published on this site"}. Any service level commitments for a particular School are set out in its order form.</p>
+      <p>We work to keep SwiftCipher available at all times except for planned maintenance, which we schedule outside school hours where possible and announce in advance. Support is available at <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> and on <a href={phoneHref()}>{LEGAL.phone}</a>. Any service level commitments for a particular School are set out in its order form.</p>
 
       <h2>8. Suspension and termination</h2>
       <ul>
