@@ -180,7 +180,7 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
             <p className="label">Items in the correct order (students get them shuffled)</p>
             {items.map((it, i) => (
               <div key={it.id} className="flex items-center gap-2">
-                <span className="w-6 text-center text-sm font-bold text-ink-400">{i + 1}</span>
+                <span className="w-6 text-center text-sm font-bold text-ink-500">{i + 1}</span>
                 <Input value={it.label} onChange={(e) => setConfig({ items: items.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
                 <Button size="sm" variant="ghost" disabled={items.length <= 2} onClick={() => setConfig({ items: items.filter((_, j) => j !== i) })}>✕</Button>
               </div>

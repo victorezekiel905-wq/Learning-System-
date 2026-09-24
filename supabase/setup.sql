@@ -6762,12 +6762,15 @@ end$$;
 
 -- Fast "contains" search on names and emails (Supabase ships pg_trgm).
 do $$
+declare v_schema text;
 begin
   if exists (select 1 from pg_available_extensions where name = 'pg_trgm') then
     create extension if not exists pg_trgm with schema extensions;
-    execute 'create index if not exists users_name_trgm on public.users using gin (full_name extensions.gin_trgm_ops)';
-    execute 'create index if not exists users_email_trgm on public.users using gin (email extensions.gin_trgm_ops)';
-    execute 'create index if not exists tenants_name_trgm on public.tenants using gin (name extensions.gin_trgm_ops)';
+    -- pg_trgm may already live in another schema (e.g. public) on older projects.
+    select n.nspname into v_schema from pg_extension e join pg_namespace n on n.oid = e.extnamespace where e.extname = 'pg_trgm';
+    execute format('create index if not exists users_name_trgm on public.users using gin (full_name %I.gin_trgm_ops)', v_schema);
+    execute format('create index if not exists users_email_trgm on public.users using gin (email %I.gin_trgm_ops)', v_schema);
+    execute format('create index if not exists tenants_name_trgm on public.tenants using gin (name %I.gin_trgm_ops)', v_schema);
   end if;
 exception when others then
   raise notice 'pg_trgm search indexes skipped: %', sqlerrm;
@@ -6900,21 +6903,6 @@ begin
   end loop;
 end$$;
 
--- Private channel authorisation (Supabase Realtime checks these on join/send).
-do $$
-begin
-  if exists (select 1 from information_schema.tables where table_schema = 'realtime' and table_name = 'messages') then
-    execute 'drop policy if exists "swiftcipher channels: listen" on realtime.messages';
-    execute 'drop policy if exists "swiftcipher channels: send" on realtime.messages';
-    execute $p$
-      create policy "swiftcipher channels: listen" on realtime.messages for select to authenticated
-      using (app.can_listen(realtime.topic()))$p$;
-    execute $p$
-      create policy "swiftcipher channels: send" on realtime.messages for insert to authenticated
-      with check (app.can_send(realtime.topic()))$p$;
-  end if;
-end$$;
-
 -- Topic rules (also unit-tested directly):
 --   session:<s>        students in the class + the session's teachers
 --   staff:<s>          the session's teachers
@@ -6935,8 +6923,13 @@ begin
     when 'thread'  then exists (select 1 from public.chat_threads t where t.id = v_id and t.tenant_id = app.tenant_id()
                                 and (t.student_id = auth.uid() or t.teacher_id = auth.uid()
                                      or (t.kind = 'group' and app.in_session(t.session_id)) or app.can_manage_class(t.class_id)))
-    when 'board'   then exists (select 1 from public.collab_boards b where b.id = v_id and b.tenant_id = app.tenant_id())
-    when 'game'    then exists (select 1 from public.game_sessions g where g.id = v_id and g.tenant_id = app.tenant_id())
+    -- boards and games: exactly the people who can read the row (mirrors their RLS policies)
+    when 'board'   then exists (select 1 from public.collab_boards b where b.id = v_id and b.tenant_id = app.tenant_id()
+                                and (b.owner_id = auth.uid()
+                                     or (b.session_id is not null and (app.can_manage_session(b.session_id) or app.in_session(b.session_id)))
+                                     or (b.session_id is null and app.is_teacher())))
+    when 'game'    then exists (select 1 from public.game_sessions g where g.id = v_id and g.tenant_id = app.tenant_id()
+                                and (app.can_manage_class(g.class_id) or app.in_class(g.class_id)))
     when 'annot'   then app.in_session(v_id) or app.can_manage_session(v_id)
     else false end;
 end$$;
@@ -6956,6 +6949,22 @@ begin
     when 'annot'  then app.can_manage_session(v_id)
     else false end;
 end$$;
+
+-- Private channel authorisation (Supabase Realtime checks these on join/send).
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'realtime' and table_name = 'messages') then
+    execute 'drop policy if exists "swiftcipher channels: listen" on realtime.messages';
+    execute 'drop policy if exists "swiftcipher channels: send" on realtime.messages';
+    execute $p$
+      create policy "swiftcipher channels: listen" on realtime.messages for select to authenticated
+      using (app.can_listen(realtime.topic()))$p$;
+    execute $p$
+      create policy "swiftcipher channels: send" on realtime.messages for insert to authenticated
+      with check (app.can_send(realtime.topic()))$p$;
+  end if;
+end$$;
+
 
 -- ---------------------------------------------------------------------------
 -- 3. The student tick

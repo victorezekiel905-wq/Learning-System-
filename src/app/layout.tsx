@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui";
 import { ErrorReporter } from "@/components/ErrorReporter";
+import { KeyboardScroll } from "@/components/KeyboardScroll";
 
 // Self-hosted at build time by next/font (no runtime requests to Google).
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${jakarta.variable}`}>
       <body className="font-sans">
         <ErrorReporter />
+        <KeyboardScroll />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

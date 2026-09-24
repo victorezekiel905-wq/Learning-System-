@@ -11,7 +11,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">Something went wrong</h1>
         <p className="text-sm text-ink-600">The problem has been reported automatically. Try again, or go back to your dashboard.</p>
-        {error.digest && <p className="font-mono text-xs text-ink-400">Reference: {error.digest}</p>}
+        {error.digest && <p className="font-mono text-xs text-ink-500">Reference: {error.digest}</p>}
         <div className="flex justify-center gap-2">
           <Button onClick={reset}>Try again</Button>
           <Link href="/dashboard" className="btn btn-secondary no-underline">Dashboard</Link>

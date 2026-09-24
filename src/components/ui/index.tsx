@@ -157,7 +157,7 @@ export function Stat({ label, value, sub, tone }: { label: ReactNode; value: Rea
 export function Empty({ title, children, action, icon }: { title: ReactNode; children?: ReactNode; action?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-ink-300 bg-white px-6 py-10 text-center">
-      {icon && <div className="mb-3 text-ink-400">{icon}</div>}
+      {icon && <div className="mb-3 text-ink-500">{icon}</div>}
       <p className="font-semibold text-ink-800">{title}</p>
       {children && <div className="mt-1 max-w-md text-sm text-ink-500">{children}</div>}
       {action && <div className="mt-4">{action}</div>}

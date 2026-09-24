@@ -93,7 +93,7 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
         {slides.map((sl) => (
           <button key={sl.id} onClick={() => update({ p_slide: sl.position })}
             className={`shrink-0 rounded-lg border px-3 py-2 text-left text-xs ${sl.position === s.current_slide ? "border-brand-500 bg-brand-50" : "border-ink-200 bg-white"}`}>
-            <span className="font-bold text-ink-400">{sl.position + 1}</span> <Badge>{sl.kind}</Badge>
+            <span className="font-bold text-ink-500">{sl.position + 1}</span> <Badge>{sl.kind}</Badge>
             <span className="mt-1 block max-w-[9rem] truncate">{sl.activity?.title ?? sl.content.heading ?? ""}</span>
           </button>
         ))}
@@ -109,7 +109,7 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
             label="Class group chat" description={state.settings.allow_group_chat ? "Students can talk in a moderated class thread." : "Turned off by your school's policy."} />
         </div>
       </div>
-      <p className="text-[11px] text-ink-400">Signed in as {me.name}. Slides are version {lesson.data?.lesson ? "as published" : ""}.</p>
+      <p className="text-[11px] text-ink-500">Signed in as {me.name}. Slides are version {lesson.data?.lesson ? "as published" : ""}.</p>
     </div>
   );
 }

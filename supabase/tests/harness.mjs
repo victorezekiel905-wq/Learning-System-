@@ -60,6 +60,22 @@ create table realtime.sent (id bigserial primary key, topic text, event text, pa
 create function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void
   language sql as $$ insert into realtime.sent (topic, event, payload, private) values (topic, event, payload, private) $$;
 
+-- Realtime Authorization, as Supabase runs it: joining a private channel is a
+-- SELECT on realtime.messages and sending is an INSERT, both under RLS, with the
+-- channel name available as realtime.topic(). Tests set 'realtime.topic' first.
+create table realtime.messages (
+  id bigserial primary key, topic text not null, extension text not null default 'broadcast',
+  event text, payload jsonb, private boolean default true, inserted_at timestamptz default now()
+);
+alter table realtime.messages enable row level security;
+create function realtime.topic() returns text language sql stable as $$
+  select nullif(current_setting('realtime.topic', true), '')
+$$;
+grant usage on schema realtime to anon, authenticated, service_role;
+grant select, insert on realtime.messages to authenticated;
+grant usage, select on sequence realtime.messages_id_seq to authenticated;
+grant execute on function realtime.topic() to anon, authenticated;
+
 -- Supabase grants these by default on everything created in public.
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;

@@ -40,7 +40,7 @@ export function ThreadView({ threadId, meId, canModerate, className }: { threadI
               <div className={cn("max-w-[80%] rounded-2xl px-3 py-2 text-sm", mine ? "bg-brand-600 text-white" : "bg-ink-100 text-ink-900", m.hidden && "opacity-50")}>
                 {!mine && <p className="text-[11px] font-semibold opacity-70">{m.users?.full_name}</p>}
                 <p className="whitespace-pre-wrap">{m.hidden && !canModerate && !mine ? "Message hidden by teacher" : m.body}</p>
-                <p className={cn("mt-0.5 text-[10px]", mine ? "text-white/70" : "text-ink-400")}>
+                <p className={cn("mt-0.5 text-[10px]", mine ? "text-white/70" : "text-ink-500")}>
                   {timeAgo(m.created_at)}
                   {canModerate && !mine && !m.hidden && <button className="ml-2 underline" onClick={async () => { await rpc("hide_message", { p_message: m.id }); void msgs.reload(); }}>hide</button>}
                 </p>

@@ -82,14 +82,14 @@ export function SlideView({ slide, activitySlot, overlay, onVideoTime, videoRef 
         </video>
       ) : embedUrl(c.url) ? (
         <iframe src={embedUrl(c.url)!} title={c.heading || "Video"} className="h-full w-full" allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
-      ) : <div className="grid h-full place-items-center text-ink-400">No video set</div>;
+      ) : <div className="grid h-full place-items-center text-ink-500">No video set</div>;
       break;
     }
     case "audio":
       inner = (
         <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
           {c.heading && <h2 className="text-2xl font-bold">{c.heading}</h2>}
-          {src ? <audio controls src={src} className="w-full max-w-lg" /> : <p className="text-ink-400">No audio selected</p>}
+          {src ? <audio controls src={src} className="w-full max-w-lg" /> : <p className="text-ink-500">No audio selected</p>}
           {c.body && <details className="w-full max-w-lg text-sm"><summary className="cursor-pointer font-medium">Transcript</summary><RichText text={c.body} className="mt-2" /></details>}
         </div>
       );
@@ -99,7 +99,7 @@ export function SlideView({ slide, activitySlot, overlay, onVideoTime, videoRef 
       inner = u ? (
         <iframe src={u} title={c.heading || "Embedded content"} className="h-full w-full"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation" referrerPolicy="no-referrer" />
-      ) : <div className="grid h-full place-items-center text-ink-400">Add an https:// link to embed</div>;
+      ) : <div className="grid h-full place-items-center text-ink-500">Add an https:// link to embed</div>;
       break;
     }
     case "link":

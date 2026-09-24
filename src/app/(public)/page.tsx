@@ -42,7 +42,7 @@ export default async function Landing() {
             {["Ada", "Alan", "Grace", "Kat", "Linus", "Tim", "Margaret", "Dennis"].map((n, i) => (
               <div key={n} className={`rounded-lg border p-2 text-center text-[11px] ${i === 2 ? "border-rose-300 bg-rose-50" : "border-ink-200 bg-white"}`}>
                 <div className="mb-1 aspect-video rounded bg-gradient-to-br from-brand-100 to-accent-100" />
-                {n}{i === 2 && <span className="block text-rose-600">left environment</span>}
+                {n}{i === 2 && <span className="block text-rose-700">left environment</span>}
               </div>
             ))}
           </div>

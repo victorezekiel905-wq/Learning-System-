@@ -21,7 +21,7 @@ export default async function NotificationsPage() {
                 <Badge tone={n.severity === "critical" ? "red" : n.severity === "warning" ? "amber" : "gray"}>{n.kind.replace(/_/g, " ")}</Badge>
               </div>
               {n.body && <p className="text-sm text-ink-600">{n.body}</p>}
-              <p className="text-xs text-ink-400">{formatDateTime(n.created_at)}</p>
+              <p className="text-xs text-ink-500">{formatDateTime(n.created_at)}</p>
             </li>
           ))}
         </ul>

@@ -201,7 +201,7 @@ function NotificationBell({ userId, initialUnread }: { userId: string; initialUn
                     {n.title}
                   </p>
                   {n.body && <p className="line-clamp-2 text-xs text-ink-500">{n.body}</p>}
-                  <p className="mt-0.5 text-[11px] text-ink-400">{timeAgo(n.created_at)}</p>
+                  <p className="mt-0.5 text-[11px] text-ink-500">{timeAgo(n.created_at)}</p>
                 </button>
               </li>
             ))}

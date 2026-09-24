@@ -179,7 +179,7 @@ function OrderingInput({ items, order, onChange, disabled }: { items: Item[]; or
         <li key={id} draggable={!disabled} onDragStart={() => setDrag(i)} onDragOver={(e) => e.preventDefault()}
           onDrop={() => { if (drag !== null) move(drag, i); setDrag(null); }}
           className="flex items-center gap-3 rounded-lg border border-ink-200 bg-white px-3 py-2">
-          <span className="w-6 text-center font-bold text-ink-400">{i + 1}</span>
+          <span className="w-6 text-center font-bold text-ink-500">{i + 1}</span>
           <span className="flex-1 cursor-grab">{byId[id]?.label}</span>
           <button type="button" className="btn btn-ghost btn-sm" disabled={disabled || i === 0} onClick={() => move(i, i - 1)} aria-label="Move up">↑</button>
           <button type="button" className="btn btn-ghost btn-sm" disabled={disabled || i === ids.length - 1} onClick={() => move(i, i + 1)} aria-label="Move down">↓</button>

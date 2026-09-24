@@ -135,7 +135,7 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
               return (
                 <li key={key} className="rounded-lg border border-ink-200">
                   <button className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left" onClick={() => setOpenQ(open ? null : key)} aria-expanded={open}>
-                    <span className="truncate text-sm"><span className="mr-2 font-bold text-ink-400">{i + 1}</span>{q.prompt || <em>No prompt</em>}</span>
+                    <span className="truncate text-sm"><span className="mr-2 font-bold text-ink-500">{i + 1}</span>{q.prompt || <em>No prompt</em>}</span>
                     <span className="flex shrink-0 items-center gap-2"><Badge>{KIND_LABEL[q.kind]}</Badge><Badge tone="gray">{q.points} pt</Badge></span>
                   </button>
                   {open && <div className="border-t border-ink-100 p-4">
@@ -207,7 +207,7 @@ function PreviewModal({ activityId, onClose }: { activityId: string; onClose: ()
       <div className="space-y-6">
         {(data.data?.questions ?? []).map((q, i) => (
           <div key={q.id} className="space-y-3 border-b border-ink-100 pb-5">
-            <p className="text-xs font-semibold text-ink-400">Question {i + 1}</p>
+            <p className="text-xs font-semibold text-ink-500">Question {i + 1}</p>
             <Prompt q={q} />
             <QuestionInput q={q} value={answers[q.id]} onChange={(v) => setAnswers((a) => ({ ...a, [q.id]: v }))} />
           </div>

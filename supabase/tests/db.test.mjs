@@ -794,6 +794,48 @@ test("scale: indexes, push signals, write throttling, private channels, batched 
   assert.ok(ov.stats_at && ov.users > 0);
 });
 
+test("realtime authorization: joining and sending on private channels, as Supabase checks it", async () => {
+  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
+  // Realtime seeds a row per topic and checks a SELECT (join) / INSERT (send) under RLS.
+  const join = async (user, topic) => {
+    await db.admin("select set_config('realtime.topic', $1, false)", [topic]);
+    await db.admin("insert into realtime.messages (topic, event) values ($1, 'probe')", [topic]);
+    return (await db.as(user, "select count(*)::int n from realtime.messages where topic = $1", [topic]))[0].n > 0;
+  };
+  const send = async (user, topic) => {
+    await db.admin("select set_config('realtime.topic', $1, false)", [topic]);
+    try { await db.as(user, "insert into realtime.messages (topic, event, payload) values ($1, 'frame', '{}')", [topic]); return true; }
+    catch (e) { if (/row-level security/.test(e.message)) return false; throw e; }
+  };
+  assert.equal(await join(S.stu1, `session:${s.id}`), true, "student joins their class channel");
+  assert.equal(await join(S.stu1, `staff:${s.id}`), false, "student can't join the teacher channel");
+  assert.equal(await join(S.teacherA, `staff:${s.id}`), true);
+  assert.equal(await join(S.teacherA, `screen:${s.id}:${S.stu1}`), true, "teacher watches a student's screen");
+  assert.equal(await join(S.stu2, `screen:${s.id}:${S.stu1}`), false, "classmates can't watch each other");
+  assert.equal(await join(S.adminB, `session:${s.id}`), false, "other schools can't join");
+  assert.equal(await send(S.stu1, `screen:${s.id}:${S.stu1}`), true, "student streams their own screen");
+  assert.equal(await send(S.stu1, `screen:${s.id}:${S.stu2}`), false, "no streaming as someone else");
+  assert.equal(await send(S.stu1, `session:${s.id}`), false, "students can't broadcast to the class");
+  assert.equal(await send(S.teacherA, `annot:${s.id}`), true, "teacher draws on the whiteboard channel");
+  assert.equal(await send(S.stu1, `annot:${s.id}`), false);
+  assert.equal(await join(S.stu1, `annot:${s.id}`), true, "class sees whiteboard strokes");
+  assert.equal(await join(S.stu1, `user:${S.stu1}`), true);
+  assert.equal(await join(S.stu1, `user:${S.teacherA}`), false, "no reading someone else's notifications");
+
+  // Games: class members and teachers only (not the whole school).
+  const [act] = await db.admin("select id from public.activities where tenant_id = $1 limit 1", [S.tenantA]);
+  const [game] = await db.admin(`insert into public.game_sessions (tenant_id, class_id, host_id, activity_id, title, join_code)
+    values ($1, $2, $3, $4, 'Signal game', 'SIG123') returning id`, [S.tenantA, S.classA, S.teacherA, act.id]);
+  assert.equal(await join(S.stu1, `game:${game.id}`), true);
+  const outsider = await db.signUp("outsider@a.test", "Other Student");
+  const cls2 = await db.rpc(S.teacherA, "create_class", { p_name: "Other class" });
+  await db.rpc(outsider, "redeem_code", { p_code: cls2.join_code });
+  assert.equal(await join(outsider, `game:${game.id}`), false, "same school, different class: no game signals");
+  await db.rpc(S.teacherA, "end_session", { p_session: s.id });
+  assert.equal(await send(S.stu1, `screen:${s.id}:${S.stu1}`), false, "no streaming after the class ends");
+});
+
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {
   const before = (await db.admin("select count(*)::int n from public.users where tenant_id = $1", [S.tenantA]))[0].n;
   assert.ok(before > 3);

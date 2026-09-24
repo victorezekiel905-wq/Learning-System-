@@ -165,7 +165,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
           onChange={(e) => setLesson({ ...lesson, title: e.target.value })} onBlur={() => saveLesson({ title: lesson.title })} />
         <Badge tone={lesson.status === "published" ? "green" : "gray"}>{lesson.status}{lesson.current_version ? ` · v${lesson.current_version}` : ""}</Badge>
         {lesson.is_template && <Badge tone="cyan">template</Badge>}
-        <span className="text-xs text-ink-400">{saveState === "saving" ? "Saving…" : saveState === "dirty" ? "Unsaved changes" : "All changes saved"}</span>
+        <span className="text-xs text-ink-500">{saveState === "saving" ? "Saving…" : saveState === "dirty" ? "Unsaved changes" : "All changes saved"}</span>
         <div className="flex flex-wrap gap-2">
           {canEdit ? <>
             <Button size="sm" variant="secondary" onClick={() => setVersions(true)}>Versions</Button>
@@ -186,7 +186,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
               <li key={s.id}>
                 <button onClick={() => { setSelected(s.id); setPanel(s.kind === "activity" ? "activity" : "slide"); }}
                   className={cn("w-full rounded-lg border px-2.5 py-2 text-left text-xs transition", s.id === selected ? "border-brand-400 bg-white shadow-sm" : "border-transparent hover:bg-white")}>
-                  <span className="flex items-center justify-between"><span className="font-bold text-ink-400">{i + 1}</span><span className="text-[10px] uppercase text-ink-400">{s.kind}</span></span>
+                  <span className="flex items-center justify-between"><span className="font-bold text-ink-500">{i + 1}</span><span className="text-[10px] uppercase text-ink-500">{s.kind}</span></span>
                   <span className="mt-0.5 block truncate font-medium text-ink-800">
                     {s.kind === "activity" ? activities.data?.[s.activity_id ?? ""]?.title ?? "Activity" : s.content.heading || s.content.caption || s.content.url || "Untitled"}
                   </span>

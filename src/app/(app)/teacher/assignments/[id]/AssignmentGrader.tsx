@@ -50,7 +50,7 @@ export function AssignmentGrader({ assignment: a, submissions, roster }: { assig
                 const g = one(s.grades);
                 return (
                   <li key={s.id}><button onClick={() => setSel(s.id)} className={`w-full px-4 py-2 text-left text-sm ${sel === s.id ? "bg-brand-50" : "hover:bg-ink-50"}`}>
-                    <p className="font-medium">{s.users?.full_name} <span className="text-xs text-ink-400">#{s.attempt_no}</span></p>
+                    <p className="font-medium">{s.users?.full_name} <span className="text-xs text-ink-500">#{s.attempt_no}</span></p>
                     <p className="flex flex-wrap gap-1 text-xs">{s.is_late && <Badge tone="amber">late</Badge>}{g ? <Badge tone={g.released_at ? "green" : "brand"}>{Number(g.score)} {g.released_at ? "released" : "draft"}</Badge> : <Badge>ungraded</Badge>}</p>
                   </button></li>
                 );

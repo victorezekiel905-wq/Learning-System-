@@ -162,7 +162,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
               <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Icon name="hand" className="h-4 w-4 text-amber-600" /> Help queue ({s.hands.length})</p>
               <ul className="space-y-2">{s.hands.map((h) => (
                 <li key={h.id} className="flex items-start justify-between gap-2 text-sm">
-                  <span><span className="font-medium">{h.student}</span>{h.message && <span className="block text-xs text-ink-500">{h.message}</span>}<span className="block text-[11px] text-ink-400">{timeAgo(h.created_at)}</span></span>
+                  <span><span className="font-medium">{h.student}</span>{h.message && <span className="block text-xs text-ink-500">{h.message}</span>}<span className="block text-[11px] text-ink-500">{timeAgo(h.created_at)}</span></span>
                   <Button size="sm" variant="secondary" onClick={async () => { await rpc("resolve_hand", { p_hand: h.id }); void state.reload(); }}>Done</Button>
                 </li>
               ))}</ul>
@@ -184,8 +184,8 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
                     <span className="min-w-0 flex-1 truncate">{r.name}</span>
                     {r.hand_raised && <Icon name="hand" className="h-3.5 w-3.5 text-amber-600" />}
                     {r.open_alerts > 0 && <Badge tone="red">{r.open_alerts}</Badge>}
-                    {r.device && !r.device.online && <span title="Device connection lost"><Icon name="wifiOff" className="h-3.5 w-3.5 text-ink-400" /></span>}
-                    {s.session.mode === "student_paced" && r.current_slide !== null && <span className="text-[10px] text-ink-400">S{r.current_slide + 1}</span>}
+                    {r.device && !r.device.online && <span title="Device connection lost"><Icon name="wifiOff" className="h-3.5 w-3.5 text-ink-500" /></span>}
+                    {s.session.mode === "student_paced" && r.current_slide !== null && <span className="text-[10px] text-ink-500">S{r.current_slide + 1}</span>}
                   </label>
                 </li>
               ))}

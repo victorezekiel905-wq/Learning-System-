@@ -23,7 +23,7 @@ function SsoButtons({ next }: { next: string }) {
           Continue with {SSO_LABEL[p] ?? p}
         </Button>
       ))}
-      <div className="flex items-center gap-3 py-1 text-[11px] uppercase text-ink-400"><span className="h-px flex-1 bg-ink-200" />or<span className="h-px flex-1 bg-ink-200" /></div>
+      <div className="flex items-center gap-3 py-1 text-[11px] uppercase text-ink-500"><span className="h-px flex-1 bg-ink-200" />or<span className="h-px flex-1 bg-ink-200" /></div>
     </div>
   );
 }

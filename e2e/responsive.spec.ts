@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { admin, call, canSeed, cleanup, dbReady, makeUser, type TestUser } from "./env";
 
@@ -8,6 +9,14 @@ const VIEWPORTS = [
   { name: "tablet", width: 768, height: 1024 },
   { name: "laptop", width: 1280, height: 800 }
 ] as const;
+
+/** WCAG 2.1 A/AA problems rated serious or critical (the ones that block users). */
+async function expectAccessible(page: Page, label: string) {
+  const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  const bad = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical")
+    .map((v) => `${v.id}: ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`);
+  expect(bad, `${label}: ${bad.join("; ")}`).toEqual([]);
+}
 
 async function expectNoSidewaysScroll(page: Page, label: string) {
   const overflow = await page.evaluate(() => {
@@ -34,6 +43,7 @@ test.describe("responsive: public pages", () => {
         await page.setViewportSize({ width: vp.width, height: vp.height });
         await page.goto(path);
         await expectNoSidewaysScroll(page, `${path} @ ${vp.width}px`);
+        if (vp.name !== "tablet") await expectAccessible(page, `${path} @ ${vp.width}px`);
       });
     }
   }
@@ -78,6 +88,7 @@ test.describe("responsive: signed-in pages", () => {
         await page.goto(path);
         await page.waitForLoadState("networkidle").catch(() => {});
         await expectNoSidewaysScroll(page, `${path} @ ${vp.width}px`);
+        if (vp.name !== "tablet") await expectAccessible(page, `${path} @ ${vp.width}px`);
       }
       // The live room's student strip and the join code are on screen at every size.
       await page.goto(`/teacher/live/${sessionId}`);
@@ -93,6 +104,7 @@ test.describe("responsive: signed-in pages", () => {
         await page.goto(path);
         await page.waitForLoadState("networkidle").catch(() => {});
         await expectNoSidewaysScroll(page, `${path} @ ${vp.width}px`);
+        if (vp.name !== "tablet") await expectAccessible(page, `${path} @ ${vp.width}px`);
       }
       // The lockdown gate's buttons are reachable on every screen size.
       await page.goto(`/student/live/${sessionId}`);

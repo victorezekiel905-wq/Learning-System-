@@ -38,7 +38,7 @@ function BrandingCard({ s, set, tenantId }: { s: TenantSettings; set: (p: Partia
           </Field>
           <Field label="Logo" hint="Square PNG or SVG works best.">
             <div className="flex items-center gap-3">
-              {logo ? <img src={logo} alt="School logo" className="h-12 w-12 rounded-lg border border-ink-200 object-contain" /> : <span className="grid h-12 w-12 place-items-center rounded-lg bg-ink-100 text-xs text-ink-400">none</span>}
+              {logo ? <img src={logo} alt="School logo" className="h-12 w-12 rounded-lg border border-ink-200 object-contain" /> : <span className="grid h-12 w-12 place-items-center rounded-lg bg-ink-100 text-xs text-ink-500">none</span>}
               <label className="btn btn-secondary btn-sm cursor-pointer">{busy ? "Uploading…" : "Upload logo"}
                 <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} /></label>
               {s.brand_logo_path && <Button size="sm" variant="ghost" onClick={() => set({ brand_logo_path: null })}>Remove</Button>}

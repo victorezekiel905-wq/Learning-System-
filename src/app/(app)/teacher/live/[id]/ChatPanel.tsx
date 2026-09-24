@@ -28,7 +28,7 @@ export function ChatPanel({ state, me }: { state: SessionState; me: Me }) {
             # Class chat
           </button>
         )}
-        <p className="px-3 py-1 text-[11px] font-semibold uppercase text-ink-400">Private 1:1</p>
+        <p className="px-3 py-1 text-[11px] font-semibold uppercase text-ink-500">Private 1:1</p>
         <ul>
           {state.roster.map((r) => (
             <li key={r.student_id}>
