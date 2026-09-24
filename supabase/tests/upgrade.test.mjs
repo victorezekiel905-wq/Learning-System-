@@ -19,7 +19,7 @@ test("update file upgrades a live database from 0730 and is safe to re-run", asy
     const r = await db.pg.exec(sql);
     assert.deepEqual(r.at(-1).rows[0], { lockdown_ready: true, operations_ready: true, scale_ready: true });
   }
-  assert.equal((await db.rpc(null, "health", {})).schema, "0770");
+  assert.equal((await db.rpc(null, "health", {})).schema, "0780");
   // Existing data still works through the new code paths.
   const s = await db.rpc(admin, "start_session", { p_class: cls.id });
   await db.rpc(student, "join_session", { p_code: s.join_code });
@@ -37,10 +37,10 @@ test("update file upgrades a live database from 0730 and is safe to re-run", asy
   assert.equal(st.roster.find((r) => r.student_id === student).presence, "online");
 });
 
-test("2026-09-25 hotfix applies on a database at 0760 and lets a student join their own screen channel", async () => {
+test("2026-09-25 classroom update applies on a database at 0760 and lets a student join their own screen channel", async () => {
   const db = await createDb("20260901000760_scale.sql");
-  const sql = readFileSync(new URL("../updates/2026-09-25_screen_channel_join.sql", import.meta.url), "utf8");
-  for (let i = 0; i < 2; i++) assert.equal((await db.pg.exec(sql)).at(-1).rows[0].schema, "0770");
+  const sql = readFileSync(new URL("../updates/2026-09-25_classroom_update.sql", import.meta.url), "utf8");
+  for (let i = 0; i < 2; i++) assert.equal((await db.pg.exec(sql)).at(-1).rows[0].schema, "0780");
   const admin = await db.signUp("a@hot.test", "Hot Admin");
   const tenant = (await db.rpc(admin, "bootstrap_school", { p_school_name: "Hot School", p_full_name: "Hot Admin" })).tenant_id;
   await db.admin("update public.tenants set plan_code = 'school' where id = $1", [tenant]);

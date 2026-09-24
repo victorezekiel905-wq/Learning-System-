@@ -81,8 +81,16 @@ test.describe("live classroom", () => {
     await expect(tPage.getByText("Only you can see this")).toHaveCount(0);
 
     // Student leaves the lesson (exits full screen) → gate returns immediately.
+    const leftAt = Date.now();
     await sPage.evaluate(() => document.exitFullscreen());
     await expect(sPage.getByRole("dialog").getByRole("heading", { name: "Return to the lesson" })).toBeVisible();
+
+    // Teacher: INSTANT pop-up and red "LEFT LESSON" tile, before any grace period.
+    await expect(tPage.getByText(/E2E Student left the lesson/).first()).toBeVisible({ timeout: 10_000 });
+    await expect(tile.getByText("LEFT LESSON", { exact: true })).toBeVisible({ timeout: 5_000 });
+    const popupSeconds = (Date.now() - leftAt) / 1000;
+    console.log(`teacher pop-up after ${popupSeconds.toFixed(1)} s`);
+    expect(popupSeconds).toBeLessThan(10);
 
     // Teacher: red LEFT CLASS tile after the grace period, with the student's screen attached.
     await expect(tile.getByText("LEFT CLASS", { exact: true })).toBeVisible({ timeout: 45_000 });
@@ -96,6 +104,7 @@ test.describe("live classroom", () => {
     await sPage.getByRole("dialog").getByRole("button", { name: "Enter full screen" }).click();
     await expect(sPage.getByRole("dialog")).toBeHidden();
     await expect(tile.getByText("LEFT CLASS", { exact: true })).toHaveCount(0, { timeout: 30_000 });
+    await expect(tPage.getByText(/E2E Student is back in the lesson/).first()).toBeVisible({ timeout: 15_000 });
     const { count } = await admin().from("environment_events").select("id", { count: "exact", head: true })
       .eq("class_session_id", sessionId).is("resolved_at", null);
     expect(count).toBe(0);

@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PROTECTED = ["/super", "/teacher", "/student", "/parent", "/admin", "/guard", "/messages", "/notifications", "/present", "/onboarding", "/dashboard", "/account"];
@@ -22,10 +23,15 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // Refreshes the session cookie; must run before any redirect decision.
-  const { data: { user } } = await supabase.auth.getUser();
+  // Refreshes the session cookie when needed and verifies the JWT (locally with
+  // asymmetric signing keys); must run before any redirect decision.
+  const { data, error } = await supabase.auth.getClaims();
+  // If the Auth server can't be reached, don't bounce a signed-in user to the
+  // sign-in page; the page itself re-checks and shows a retryable error instead.
+  if (error && isAuthRetryableFetchError(error)) return response;
+  const signedIn = !!data?.claims?.sub;
   const path = request.nextUrl.pathname;
-  if (!user && PROTECTED.some((p) => path === p || path.startsWith(p + "/"))) {
+  if (!signedIn && PROTECTED.some((p) => path === p || path.startsWith(p + "/"))) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = `?next=${encodeURIComponent(path + request.nextUrl.search)}`;

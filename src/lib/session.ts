@@ -1,16 +1,30 @@
 import "server-only";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { createClient } from "./supabase/server";
 import type { Me, Role } from "./types";
 
-/** me() for Server Components, memoised per request. */
+/**
+ * me() for Server Components, memoised per request.
+ * Identity comes from getClaims(): the session JWT is verified locally (no call to the
+ * Auth server when the project uses asymmetric signing keys). A network failure is
+ * retried once and then shown as an error page. It is never treated as "signed out",
+ * so a Wi-Fi blip can't throw a teacher out of a live lesson.
+ */
 export const getMe = cache(async (): Promise<Me | null> => {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return null;
-  const { data } = await sb.rpc("me");
-  return (data as Me | null) ?? { profile: null, email: user.email ?? undefined };
+  let claims = await sb.auth.getClaims();
+  if (claims.error && isAuthRetryableFetchError(claims.error)) claims = await sb.auth.getClaims();
+  if (claims.error && isAuthRetryableFetchError(claims.error)) {
+    throw new Error("The sign-in service is temporarily unreachable. Please try again in a moment.");
+  }
+  const c = claims.data?.claims;
+  if (!c?.sub) return null;
+  let me = await sb.rpc("me");
+  if (me.error) me = await sb.rpc("me");
+  if (me.error) throw new Error("Couldn't load your profile. Please try again in a moment.");
+  return (me.data as Me | null) ?? { profile: null, email: (c.email as string | undefined) ?? undefined };
 });
 
 export const STAFF: Role[] = ["teacher", "school_admin", "it_admin", "platform_admin"];

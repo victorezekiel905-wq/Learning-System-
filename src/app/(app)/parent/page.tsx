@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/session";
 import { Alert, Badge, Card, Empty, PageHeader, Stat } from "@/components/ui";
 import { formatDate, pct } from "@/lib/utils";
+import { ParentConsent, type ConsentRow } from "./ParentConsent";
 
 export const metadata = { title: "My children" };
 
@@ -22,7 +23,12 @@ export default async function ParentPage(props: { searchParams: Promise<{ child?
   const { data: kids } = await sb.rpc("parent_children");
   const children = (kids as { id: string; name: string }[]) ?? [];
   const childId = searchParams.child ?? children[0]?.id;
-  const { data } = childId ? await sb.rpc("student_summary", { p_student: childId }) : { data: null };
+  const [{ data }, { data: consent }] = childId
+    ? await Promise.all([
+        sb.rpc("student_summary", { p_student: childId }),
+        sb.from("monitoring_consents").select("method,reference,recorded_at,revoked_at").eq("student_id", childId).maybeSingle()
+      ])
+    : [{ data: null }, { data: null }];
   const s = data as Summary | null;
 
   return (
@@ -56,8 +62,9 @@ export default async function ParentPage(props: { searchParams: Promise<{ child?
                   )}
                 </Card>
                 <Card title="Classes"><ul className="text-sm">{s.classes.map((c) => <li key={c.id}>{c.name}{c.subject && ` · ${c.subject}`}</li>)}</ul></Card>
+                <ParentConsent studentId={s.student.id} name={s.student.name} consent={consent as ConsentRow} />
               </div>
-              <p className="text-xs text-ink-500">Screen time only counts managed class sessions on school devices. SwiftCipher never monitors personal devices or time outside class.</p>
+              <p className="text-xs text-ink-500">Monitoring only happens during live lessons, on the device your child uses for the lesson. SwiftCipher never monitors time outside class.</p>
             </div>
           )}
         </>

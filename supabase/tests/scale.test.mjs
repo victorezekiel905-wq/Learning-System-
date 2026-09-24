@@ -56,7 +56,8 @@ before(async () => {
     from public.tenants t cross join generate_series(1, ${USERS_PER_TENANT}) g where t.slug like 'school-%'`);
   await db.admin(`insert into public.classes (id, tenant_id, name, teacher_id, join_code)
     select gen_random_uuid(), t.id, 'Class', (select u.id from public.users u where u.tenant_id = t.id limit 1),
-           upper(substr(md5(t.id::text), 1, 6))
+           -- unique, deterministic 6-character codes (random ones can collide across 2,000 schools)
+           'Z' || to_char(row_number() over (order by t.id), 'FM00000')
     from public.tenants t where t.slug like 'school-%'`);
   await db.admin(`insert into public.notifications (tenant_id, user_id, kind, title)
     select u.tenant_id, u.id, 'info', 'Hello' from public.users u where u.tenant_id <> $1`, [S.tenant]);

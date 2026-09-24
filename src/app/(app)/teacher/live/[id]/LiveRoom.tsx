@@ -60,27 +60,62 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
 
   const openAlerts = useMemo(() => (s?.alerts ?? []).filter((a) => a.status === "open" && !a.resolved_at), [s]);
   const lastAlert = useRef<string | null>(null);
+  const beep = (freq: number) => {
+    if (!sound) return;
+    try {
+      const ctx = new AudioContext();
+      [0, 0.2].forEach((t) => {
+        const o = ctx.createOscillator(); o.frequency.value = freq;
+        o.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.12);
+      });
+    } catch { /* audio blocked until the teacher interacts with the page */ }
+  };
+  const osNotify = (title: string, body?: string) => {
+    if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
+      new Notification(title, { body, tag: `swiftcipher-${title}` });
+    }
+  };
 
-  // Sound + browser notification for new critical/warning alerts (§3.6).
+  // INSTANT: the moment a student's lesson leaves the screen (tab/app switch, game,
+  // minimise, full screen exited, share stopped), pop up, beep and mark the tile red.
+  // The formal alert (bell, log, screenshot) follows after the school's grace period.
+  const awaySeen = useRef<Map<string, string | null> | null>(null);
+  useEffect(() => {
+    if (!s) return;
+    const first = awaySeen.current === null;
+    const prev = awaySeen.current ?? new Map<string, string | null>();
+    for (const r of s.roster) {
+      const now = r.web?.away_since ?? null;
+      const before = prev.get(r.student_id) ?? null;
+      if (!first && now && !before) {
+        const why = r.web?.away_reason ?? "Left the lesson";
+        toast(`${r.name} left the lesson: ${why}`, "error");
+        beep(880);
+        osNotify(`${r.name} left the lesson`, why);
+      } else if (!first && !now && before) {
+        toast(`${r.name} is back in the lesson`, "success");
+      }
+      prev.set(r.student_id, now);
+    }
+    awaySeen.current = prev;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s]);
+
+  // Formal alerts (grace period passed, blocked sites, off-task): sound + browser notification.
   useEffect(() => {
     const newest = openAlerts.find((a) => a.kind !== "connection_lost");
     if (!newest || newest.id === lastAlert.current) return;
     if (lastAlert.current !== null) {
-      if (sound) {
-        try {
-          const ctx = new AudioContext();
-          [0, 0.2].forEach((t) => {
-            const o = ctx.createOscillator(); o.frequency.value = newest.kind === "environment_left" ? 880 : 660;
-            o.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.12);
-          });
-        } catch { /* audio blocked until the teacher interacts with the page */ }
-      }
-      if (newest.kind === "environment_left") toast(`${newest.student} left the class: ${newest.rule}`, "error");
-      if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification(`${newest.student}: ${ALERT_LABEL[newest.kind] ?? newest.kind}`, { body: newest.rule });
+      // Already announced instantly when the student left; don't double-alert.
+      const announced = newest.kind === "environment_left" && !!s?.roster.find((r) => r.student_id === newest.student_id)?.web?.away_since;
+      if (!announced) {
+        beep(newest.kind === "environment_left" || newest.kind === "domain_blocked" ? 880 : 660);
+        toast(`${newest.student}: ${ALERT_LABEL[newest.kind] ?? newest.kind}. ${newest.rule}`, newest.kind === "off_task" ? "info" : "error");
+        osNotify(`${newest.student}: ${ALERT_LABEL[newest.kind] ?? newest.kind}`, newest.rule);
       }
     }
     lastAlert.current = newest.id;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAlerts, sound, toast]);
 
   if (state.error && !s) return <div className="page"><Alert tone="error">{state.error}</Alert></div>;

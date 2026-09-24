@@ -50,7 +50,11 @@ export function LockdownGate({ guard, teacher }: { guard: Guard; teacher: string
           {guard.needFullscreen && (
             <Step n={guard.needShare ? 2 : 1} done={fsDone} title="Open the lesson full screen"
               hint="Stay in full screen. Leaving it, switching tabs or apps, or minimising counts as leaving the class.">
-              <Button disabled={!shareDone} onClick={async () => { await guard.enterFullscreen(); setStarted(true); }}>
+              <Button disabled={!shareDone} onClick={async () => {
+                // Lets the class pop a "Return to your lesson" notice over other apps (e.g. games).
+                if (typeof Notification !== "undefined" && Notification.permission === "default") void Notification.requestPermission();
+                await guard.enterFullscreen(); setStarted(true);
+              }}>
                 <Icon name="maximize" className="h-4 w-4" /> Enter full screen
               </Button>
             </Step>

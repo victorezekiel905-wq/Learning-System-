@@ -838,6 +838,77 @@ test("realtime authorization: joining and sending on private channels, as Supaba
   assert.equal(await send(S.stu1, `screen:${s.id}:${S.stu1}`), false, "no streaming after the class ends");
 });
 
+test("anti-gaming: game sites and game copies are recognised; school sites are not", async () => {
+  const cat = async (url) => (await db.admin("select app.url_category($1) c", [url]))[0].c;
+  for (const url of [
+    "https://www.roblox.com/games/123", "https://poki.com/en/g/subway-surfers", "https://krunker.io/", "https://1v1.lol/",
+    "https://unblocked-games-66.github.io/slope", "https://sites.google.com/view/unblocked-games-premium/retro-bowl",
+    "https://slope-games.io/", "https://retrobowl.me/", "https://now.gg/apps/roblox", "https://play.geforcenow.com/",
+    "https://coolmath-games.com/0-run-3", "https://classroom6x.com/", "https://mygames.netlify.app/games/drift-hunters"
+  ]) assert.equal(await cat(url), "games", url);
+  for (const url of [
+    "https://www.khanacademy.org/math", "https://docs.google.com/document/d/x", "https://sites.google.com/view/year8-maths-lessons",
+    "https://en.wikipedia.org/wiki/Game_theory", "https://classroom.google.com/c/abc", "https://scratch.mit.edu/projects/1",
+    "https://studentname.github.io/portfolio", "https://www.bbc.co.uk/bitesize"
+  ]) assert.notEqual(await cat(url), "games", url);
+  assert.equal(await cat("https://www.bet9ja.com/"), "gambling");
+
+  // Every school gets the ready-made "Lesson focus" environment, and it blocks games.
+  const [pol] = await db.admin("select * from public.environment_policies where tenant_id = $1 and name = 'Lesson focus: no games or social media'", [S.tenantA]);
+  assert.ok(pol, "lesson focus environment exists");
+  assert.ok(pol.blocked_categories.includes("games"));
+  const v = (await db.admin(`select app.evaluate_url(p, 'https://unblocked-games-66.github.io/slope', 1, null) r
+                             from public.environment_policies p where p.id = $1`, [pol.id]))[0].r;
+  assert.equal(v.verdict, "violation");
+  assert.match(v.rule, /games/);
+  const ok = (await db.admin(`select app.evaluate_url(p, 'https://www.khanacademy.org/', 1, null) r
+                              from public.environment_policies p where p.id = $1`, [pol.id]))[0].r;
+  assert.notEqual(ok.verdict, "violation");
+  // A brand-new school gets it too.
+  const newAdmin = await db.signUp("new@c.test", "New Admin");
+  const t = (await db.rpc(newAdmin, "bootstrap_school", { p_school_name: "Gamma School", p_full_name: "New Admin" })).tenant_id;
+  assert.equal((await db.admin("select count(*)::int n from public.environment_policies where tenant_id = $1 and name like 'Lesson focus%'", [t]))[0].n, 1);
+});
+
+test("parental monitoring consent: signed undertakings, parent portal, optional requirement", async () => {
+  await rejects(db.rpc(S.teacherA, "record_monitoring_consent", { p_reference: "x" }), /Administrators only/);
+  await rejects(db.rpc(S.adminA, "record_monitoring_consent", { p_reference: " " }), /reference/);
+  let sum = await db.rpc(S.adminA, "monitoring_consent_summary", {});
+  const students = sum.students;
+  assert.ok(students >= 2);
+  // Only Ada's signed undertaking is on file so far.
+  assert.equal(await db.rpc(S.adminA, "record_monitoring_consent", { p_reference: "Admissions pack 2026", p_students: `{${S.stu1}}` }), 1);
+  sum = await db.rpc(S.adminA, "monitoring_consent_summary", {});
+  assert.equal(sum.with_consent, 1);
+  assert.ok(sum.missing.some((m) => m.id === S.stu2));
+
+  // When the school requires consent, screens are only requested from students with consent.
+  await db.as(S.adminA, "update public.tenant_settings set require_monitoring_consent = true");
+  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  for (const u of [S.stu1, S.stu2]) await db.rpc(u, "join_session", { p_code: s.join_code });
+  const tick = (u) => db.rpc(u, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: false });
+  assert.equal((await tick(S.stu1)).capture.enabled, true, "consent on file: screen requested");
+  const noConsent = await tick(S.stu2);
+  assert.equal(noConsent.capture.enabled, false, "no consent: screen not requested");
+  assert.equal(noConsent.away, false, "not sharing isn't counted as leaving without consent");
+
+  // Parents can see and give consent in the portal; others can't read it.
+  assert.equal((await db.as(S.parentA, "select count(*)::int n from public.monitoring_consents where student_id = $1", [S.stu1]))[0].n, 1);
+  assert.equal((await db.as(S.stu2, "select count(*)::int n from public.monitoring_consents where student_id = $1", [S.stu1]))[0].n, 0);
+  await rejects(db.rpc(S.parentA, "parent_monitoring_consent", { p_student: S.stu2, p_consent: true }), /Not your child/);
+  await db.rpc(S.parentA, "parent_monitoring_consent", { p_student: S.stu1, p_consent: false, p_reason: "Changed my mind" });
+  assert.equal((await tick(S.stu1)).capture.enabled, false, "withdrawn: screen no longer requested");
+  await db.rpc(S.parentA, "parent_monitoring_consent", { p_student: S.stu1, p_consent: true });
+  assert.equal((await tick(S.stu1)).capture.enabled, true);
+
+  // Record for everyone at once (all signed undertakings collected).
+  assert.equal(await db.rpc(S.adminA, "record_monitoring_consent", { p_reference: "Signed undertakings 2026/27" }), students);
+  assert.equal((await tick(S.stu2)).capture.enabled, true);
+  assert.ok((await db.as(S.adminA, "select 1 from public.audit_logs where action = 'privacy.monitoring_consent_recorded'")).length >= 1);
+  await db.as(S.adminA, "update public.tenant_settings set require_monitoring_consent = false");
+  await db.rpc(S.teacherA, "end_session", { p_session: s.id });
+});
+
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {
   const before = (await db.admin("select count(*)::int n from public.users where tenant_id = $1", [S.tenantA]))[0].n;
   assert.ok(before > 3);

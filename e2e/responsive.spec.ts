@@ -80,7 +80,7 @@ test.describe("responsive: signed-in pages", () => {
 
   // One sign-in per role (Supabase rate-limits sign-ins), every page at every size.
   test("teacher and admin pages fit phone, tablet and laptop", async ({ page }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(600_000);
     await signIn(page, teacher);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });

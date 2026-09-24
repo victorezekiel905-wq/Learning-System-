@@ -224,13 +224,26 @@ export function useClassroomGuard(sessionId: string, opts: {
   useEffect(() => {
     if (!opts.live) return;
     let hiddenShot: number | undefined;
+    let nudge: Notification | null = null;
     const onChange = () => {
       const v = lessonInFront(), f = isFullscreen();
       setVisible(v); setFullscreen(f);
       void report({ visible: v, fullscreen: f });
       window.clearTimeout(hiddenShot);
+      const leftLesson = !v || (!f && !!directivesRef.current?.lockdown && canFullscreen());
       // Store what they switched to, as evidence for the teacher's alert.
-      if (!v || (!f && directivesRef.current?.lockdown)) hiddenShot = window.setTimeout(() => void storeFrame("thumbnail"), 1500);
+      if (leftLesson) hiddenShot = window.setTimeout(() => void storeFrame("thumbnail"), 1500);
+      // Under lockdown, pop a system notification over whatever they switched to (e.g. a game).
+      if (leftLesson && directivesRef.current?.lockdown && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        nudge?.close();
+        nudge = new Notification("Return to your lesson", {
+          body: "You left the class. Your teacher has been notified.",
+          tag: `swiftcipher-return-${sessionId}`, requireInteraction: true
+        });
+        nudge.onclick = () => { window.focus(); nudge?.close(); };
+      } else if (!leftLesson) {
+        nudge?.close(); nudge = null;
+      }
     };
     const input = () => { lastInput.current = Date.now(); };
     const events: [EventTarget, string][] = [[document, "visibilitychange"], [document, "fullscreenchange"], [window, "blur"], [window, "focus"]];
@@ -241,9 +254,9 @@ export function useClassroomGuard(sessionId: string, opts: {
     return () => {
       events.forEach(([t, e]) => t.removeEventListener(e, onChange));
       ["pointermove", "keydown", "touchstart"].forEach((e) => window.removeEventListener(e, input));
-      window.clearInterval(tick); window.clearTimeout(hiddenShot);
+      window.clearInterval(tick); window.clearTimeout(hiddenShot); nudge?.close();
     };
-  }, [opts.live, report, storeFrame, tickMs]);
+  }, [opts.live, report, storeFrame, tickMs, sessionId]);
 
   // The slide changed (student-paced): tell the server now.
   useEffect(() => { if (opts.live && opts.slide !== null) void report(); }, [opts.slide, opts.live, report]);

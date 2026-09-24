@@ -71,12 +71,12 @@ export function ScreenRail({ state, screens, focus, onFocus }: {
       <li key={r.student_id}>
         <button type="button" onClick={() => onFocus(r.student_id)} aria-pressed={focus === r.student_id}
           className={cn("block w-full overflow-hidden rounded-lg border-2 bg-white text-left transition hover:shadow-md",
-            focus === r.student_id ? "border-brand-500 ring-2 ring-brand-200" : left ? "border-rose-500 ring-2 ring-rose-200" : alert || stepping ? "border-amber-400" : "border-ink-200")}>
+            focus === r.student_id ? "border-brand-500 ring-2 ring-brand-200" : left || stepping ? "border-rose-500 ring-2 ring-rose-200" : alert ? "border-amber-400" : "border-ink-200")}>
           <div className="relative aspect-video bg-ink-100">
             {live ? <img src={sc.image} alt={`${r.name}'s screen`} className="h-full w-full object-cover" />
               : <span className="grid h-full place-items-center px-1 text-center text-[10px] text-ink-500">{placeholder(r, state.settings.allow_screen_capture)}</span>}
             {left && <span className="absolute inset-x-0 bottom-0 animate-pulse2 bg-rose-600 px-1 py-0.5 text-center text-[10px] font-bold text-white">LEFT CLASS</span>}
-            {stepping && <span className="absolute inset-x-0 bottom-0 bg-amber-500 px-1 py-0.5 text-center text-[10px] font-bold text-white">AWAY</span>}
+            {stepping && <span className="absolute inset-x-0 bottom-0 animate-pulse2 bg-rose-600 px-1 py-0.5 text-center text-[10px] font-bold text-white">LEFT LESSON</span>}
             {live && <span className="absolute left-1 top-1 rounded bg-rose-600 px-1 text-[9px] font-bold text-white">LIVE</span>}
           </div>
           <p className="flex items-center justify-between gap-1 px-2 py-1 text-xs font-medium">

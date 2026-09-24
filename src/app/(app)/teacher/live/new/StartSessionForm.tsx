@@ -13,7 +13,8 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
   const [cls, setCls] = useState(defaultClass ?? classes[0]?.id ?? "");
   const [lesson, setLesson] = useState(defaultLesson ?? "");
   const [mode, setMode] = useState("live_participation");
-  const [env, setEnv] = useState("");
+  // Game/social blocking on by default: the school's ready-made "Lesson focus" environment.
+  const [env, setEnv] = useState(envs.find((e) => e.name.startsWith("Lesson focus"))?.id ?? "");
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
             <option value="front_of_class">Front of class: projector only, students watch</option>
           </Select>
         </Field>
-        <Field label="Environment" hint="Allowed/blocked sites for managed browsers. You can change it during the session.">
+        <Field label="Environment" hint="&quot;Lesson focus&quot; blocks games and social media on school-managed browsers. On any device, leaving the lesson alerts you instantly. You can change it during the session.">
           <Select value={env} onChange={(e) => setEnv(e.target.value)}><option value="">None (monitor only)</option>{envs.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</Select>
         </Field>
         <Field label="Session title (optional)"><Input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>

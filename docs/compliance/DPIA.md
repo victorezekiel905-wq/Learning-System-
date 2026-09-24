@@ -30,6 +30,7 @@ During a **live class**, and only then, the student's lesson page asks the stude
 | Automated decisions harming students (e.g. discipline from alerts) | Low / Medium | Alerts are prompts only. Grace periods, and connection loss is never counted as leaving. The documentation and privacy notice say this. | Low |
 | Unauthorised access across schools | Low / High | Row-level security on every table, isolation tests in CI, a strict CSP, and sandboxed student code. | Low |
 | Retention creep | Low / Medium | Hourly automatic retention; alert screenshots expire with telemetry (default 30 days). | Low |
+| Monitoring without a documented legal basis | Low / High | Signed parental undertakings are recorded per student with a reference; parents can confirm or withdraw in the portal; the school can require consent before any screen is shown; every change is audited. | Low |
 | Children not understanding the processing | Medium / Medium | Plain-language student section in the privacy notice. The school gives notice and obtains parental consent where required. | Low–Medium |
 
 ## 4. Consultation and sign-off

@@ -4,9 +4,67 @@ import { useState } from "react";
 import { Alert, Button, Card, Field, Input, Select, Textarea, Toggle, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { errorText, rpc } from "@/lib/rpc";
+import { useRpc } from "@/lib/hooks";
 import type { Me, TenantSettings } from "@/lib/types";
 import { uploadMedia, useSignedUrl } from "@/lib/media";
 import { contrastWithWhite, paletteVars } from "@/lib/theme";
+
+/**
+ * Parents' signed undertakings that their child's device may be monitored in class.
+ * Recorded in bulk with a reference; parents can also confirm in the parent portal.
+ */
+function ConsentCard() {
+  const toast = useToast();
+  const sum = useRpc<{ required: boolean; students: number; with_consent: number; missing: { id: string; name: string; email: string }[] }>(
+    "monitoring_consent_summary", {}, []);
+  const [reference, setReference] = useState("");
+  const [busy, setBusy] = useState(false);
+  const d = sum.data;
+
+  async function record(onlyMissing: boolean) {
+    if (!reference.trim()) { toast("Enter a reference for the signed undertakings first.", "error"); return; }
+    setBusy(true);
+    try {
+      const n = await rpc<number>("record_monitoring_consent", {
+        p_reference: reference.trim(), p_students: onlyMissing && d ? d.missing.map((m) => m.id) : null
+      });
+      toast(`Recorded signed undertakings for ${n} student${n === 1 ? "" : "s"}`, "success");
+      setReference("");
+      await sum.reload();
+    } catch (e) { toast(errorText(e), "error"); }
+    setBusy(false);
+  }
+
+  return (
+    <Card title="Parental monitoring consent">
+      {!d ? <p className="text-sm text-ink-500">Loading…</p> : (
+        <div className="space-y-4">
+          <p className="text-sm text-ink-600">
+            <strong className="text-ink-900">{d.with_consent.toLocaleString()}</strong> of {d.students.toLocaleString()} students have a parent&apos;s
+            monitoring consent on file.{d.required ? " Screens are only shown for these students." : ""}
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <Field className="flex-1" label="Reference for the signed undertakings" hint={'Where the paper or digital forms are kept, e.g. "Admissions pack 2026/27, Registry file B".'}>
+              <Input value={reference} maxLength={200} onChange={(e) => setReference(e.target.value)} />
+            </Field>
+            <Button loading={busy} onClick={() => record(false)}>Record for all students</Button>
+            {d.missing.length > 0 && d.with_consent > 0 && <Button variant="secondary" loading={busy} onClick={() => record(true)}>Only students missing</Button>}
+          </div>
+          {d.missing.length > 0 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer font-medium text-ink-700">Students without consent on file ({(d.students - d.with_consent).toLocaleString()})</summary>
+              <ul className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-ink-100">
+                {d.missing.map((m) => <li key={m.id} className="border-b border-ink-100 px-3 py-1.5 last:border-0">{m.name} <span className="text-xs text-ink-500">{m.email}</span></li>)}
+              </ul>
+              {d.students - d.with_consent > d.missing.length && <p className="mt-1 text-xs text-ink-500">Showing the first {d.missing.length}.</p>}
+            </details>
+          )}
+          <p className="text-xs text-ink-500">Every recording and withdrawal is kept in the audit log. Parents can also confirm or withdraw consent in the parent portal.</p>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 /** Tenant branding: only this school sees it; other schools are unaffected. */
 function BrandingCard({ s, set, tenantId }: { s: TenantSettings; set: (p: Partial<TenantSettings>) => void; tenantId: string }) {
@@ -48,7 +106,7 @@ function BrandingCard({ s, set, tenantId }: { s: TenantSettings; set: (p: Partia
             <Field label="Main colour"><div className="flex items-center gap-2"><input type="color" value={primary} onChange={(e) => set({ brand_primary: e.target.value })} className="h-9 w-12 cursor-pointer rounded border border-ink-300" /><Input value={primary} onChange={(e) => /^#[0-9a-fA-F]{6}$/.test(e.target.value) && set({ brand_primary: e.target.value })} /></div></Field>
             <Field label="Accent colour"><div className="flex items-center gap-2"><input type="color" value={accent} onChange={(e) => set({ brand_accent: e.target.value })} className="h-9 w-12 cursor-pointer rounded border border-ink-300" /><Input value={accent} onChange={(e) => /^#[0-9a-fA-F]{6}$/.test(e.target.value) && set({ brand_accent: e.target.value })} /></div></Field>
           </div>
-          {lowContrast && <Alert tone="warn">This main colour is too light for white button text to be readable. Choose a darker shade.</Alert>}
+          {lowContrast && <Alert tone="info">This colour is light, so buttons and links will use a slightly darker shade of it to keep white text readable (WCAG AA).</Alert>}
           <Field label="Welcome message" hint="Shown at the top of every teacher's and student's home page.">
             <Textarea rows={2} maxLength={500} value={s.welcome_message ?? ""} onChange={(e) => set({ welcome_message: e.target.value || null })} />
           </Field>
@@ -125,10 +183,11 @@ export function SettingsClient({ tenant, settings, schools, flags, plan }: {
         <div className="grid gap-4 md:grid-cols-2">
           <Toggle checked={s.allow_screen_capture} onChange={(v) => set({ allow_screen_capture: v })} label="Screen thumbnails" description="Low-resolution frames during live sessions only." />
           <Toggle checked={s.allow_spotlight} onChange={(v) => set({ allow_spotlight: v })} label="Student screen spotlight" description="Teachers can show a student's screen to the class; the student is always told." />
-          <Toggle checked={s.store_event_screenshots} onChange={(v) => set({ store_event_screenshots: v })} label="Keep a screenshot with leave alerts" description="Off by default. Kept only for the telemetry retention period." />
+          <Toggle checked={s.store_event_screenshots} onChange={(v) => set({ store_event_screenshots: v })} label="Keep a screenshot with leave alerts" description="Shows the teacher what the student switched to (for example a game). Kept only for the telemetry retention period." />
+          <Toggle checked={s.require_monitoring_consent} onChange={(v) => set({ require_monitoring_consent: v })} label="Require parental consent for screen monitoring" description="Students' screens are only requested when a parent's signed undertaking (or portal consent) is on file. Lockdown and leave alerts still apply to everyone." />
           <div className="grid grid-cols-3 gap-3">
             <Field label="Thumbnail every (s)"><Input type="number" min={5} max={300} value={s.thumbnail_interval_seconds} onChange={(e) => set({ thumbnail_interval_seconds: Number(e.target.value) })} /></Field>
-            <Field label="Default grace (s)"><Input type="number" min={0} max={600} value={s.default_grace_seconds} onChange={(e) => set({ default_grace_seconds: Number(e.target.value) })} /></Field>
+            <Field label="Default grace (s)" hint="Teachers get an instant pop-up either way; this is when the formal alert is logged. 0 = immediately."><Input type="number" min={0} max={600} value={s.default_grace_seconds} onChange={(e) => set({ default_grace_seconds: Number(e.target.value) })} /></Field>
             <Field label="Default idle (s)"><Input type="number" min={30} max={7200} value={s.default_idle_seconds} onChange={(e) => set({ default_idle_seconds: Number(e.target.value) })} /></Field>
           </div>
         </div>
@@ -136,6 +195,8 @@ export function SettingsClient({ tenant, settings, schools, flags, plan }: {
           <Textarea rows={3} value={s.monitoring_notice} onChange={(e) => set({ monitoring_notice: e.target.value })} />
         </Field>
       </Card>
+
+      <ConsentCard />
 
       <Card title="Communication & content moderation">
         <div className="grid gap-4 md:grid-cols-2">

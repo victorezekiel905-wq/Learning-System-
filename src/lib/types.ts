@@ -15,6 +15,7 @@ export type TenantSettings = {
   allow_group_chat: boolean;
   allow_screen_capture: boolean;
   store_event_screenshots: boolean;
+  require_monitoring_consent: boolean;
   parent_portal_enabled: boolean;
   email_alerts_enabled: boolean;
   nickname_mode: "first_name_initial" | "approved_nickname" | "anonymous";

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { messageForError, statusForError, type RpcError } from "./errors";
 import { createClient } from "./supabase/server";
 import { createAnonClient } from "./supabase/service";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import type { Profile } from "./types";
 
 export function ok(data: unknown, init?: ResponseInit) {
@@ -53,9 +54,12 @@ export async function callRpc(sb: SupabaseClient, fn: string, args: Record<strin
 /** Resolve the signed-in user's profile for a Route Handler. */
 export async function requireProfile(roles?: Profile["role"][]) {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return { sb, me: null, response: fail(401, "Sign in first.") } as const;
-  const { data } = await sb.from("users").select("id,tenant_id,email,full_name,nickname,role,status").eq("id", user.id).maybeSingle();
+  // Verified JWT claims (local check with asymmetric keys); an unreachable Auth server is a 503, not a sign-out.
+  const { data: claims, error } = await sb.auth.getClaims();
+  if (error && isAuthRetryableFetchError(error)) return { sb, me: null, response: fail(503, "Sign-in service temporarily unreachable. Try again.") } as const;
+  const uid = claims?.claims?.sub;
+  if (!uid) return { sb, me: null, response: fail(401, "Sign in first.") } as const;
+  const { data } = await sb.from("users").select("id,tenant_id,email,full_name,nickname,role,status").eq("id", uid).maybeSingle();
   const me = data as Profile | null;
   if (!me || me.status !== "active") return { sb, me: null, response: fail(403, "No active SwiftCipher profile.") } as const;
   if (roles && !roles.includes(me.role)) return { sb, me: null, response: fail(403, "You don't have access to this.") } as const;

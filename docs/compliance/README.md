@@ -12,6 +12,7 @@ What SwiftCipher provides for data protection compliance, and what the operating
 | Security overview and vulnerability reporting | `/security`, `SECURITY.md` |
 | Sub-processor list | `src/lib/legal.ts` (rendered in Privacy and DPA) |
 | Consent records (Terms, privacy notice, monitoring notice) | `public.consents`; users who haven't accepted are asked in-app |
+| Parental monitoring consent (signed undertakings) | Admin → Settings → Parental monitoring consent (bulk record with a reference, list of students missing); parents confirm or withdraw in the parent portal; optional "require consent before screens are shown"; all changes audited (`public.monitoring_consents`) |
 | Right of access and portability | Account → Your data → Download my data; Admin → Users → Export |
 | Right to erasure | Admin → Users → Delete; school deletion (super admin) |
 | Retention limits | Per-school settings; enforced hourly by `app.run_maintenance()` |
