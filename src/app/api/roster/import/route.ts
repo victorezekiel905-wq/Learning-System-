@@ -1,4 +1,4 @@
-import { fail, ok, readJson, requireProfile } from "@/lib/api";
+import { fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
 import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
 
 type Row = { email: string; full_name: string; code: string | null; status: string };
@@ -31,7 +31,7 @@ function parseCsv(text: string): string[][] {
  * CSV roster import (§19): one single-use student invite per row, bound to the
  * row's email. Optionally emails a Supabase invite that lands on /join?code=.
  */
-export async function POST(req: Request) {
+export const POST = withErrorLog(async function POST(req: Request) {
   const { sb, response } = await requireProfile(["teacher", "school_admin", "platform_admin"]);
   if (response) return response;
   const body = await readJson<{ class_id?: string; csv?: string; send_email?: boolean }>(req, 500_000);
@@ -69,4 +69,4 @@ export async function POST(req: Request) {
     rows.push({ email, full_name: full, code, status });
   }
   return ok({ rows, emailed });
-}
+});

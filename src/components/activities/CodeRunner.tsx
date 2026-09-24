@@ -5,70 +5,35 @@ import { Button } from "@/components/ui";
 export type RunResult = { stdout: string; error: string | null; ms: number; tests?: { name: string; passed: boolean; got: string }[] };
 
 const TIMEOUT_MS = 5000;
-const MAX_OUTPUT = 20_000;
 
 /**
  * Runs student code in the browser, never on our servers (§3.2 sandboxed execution):
- * - JavaScript: an opaque-origin iframe (sandbox="allow-scripts", no same-origin) with a hard timeout.
- * - HTML/CSS: rendered in the same kind of sandbox for preview.
- * - Python: Pyodide inside a dedicated Worker that is terminated on timeout.
+ * - JavaScript and Python: dedicated Workers (/sandbox/*.js) served with their own
+ *   strict Content-Security-Policy (no access to the SwiftCipher API), terminated
+ *   on timeout so an infinite loop can never freeze the page.
+ * - HTML/CSS: rendered in an opaque-origin iframe (sandbox="allow-scripts") for preview.
  */
-export function runJavaScript(source: string, tests: { name: string; input?: string; expected?: string }[] = []): Promise<RunResult> {
+function runInWorker(script: string, message: unknown, timeoutMs: number, timeoutText: string): Promise<RunResult> {
   return new Promise((resolve) => {
     const started = performance.now();
-    const frame = document.createElement("iframe");
-    frame.setAttribute("sandbox", "allow-scripts");
-    frame.style.display = "none";
-    const token = crypto.randomUUID();
-    const harness = `<script>
-      const out=[];const log=(...a)=>{out.push(a.map(x=>typeof x==='string'?x:JSON.stringify(x)).join(' '))};
-      console.log=log;console.error=log;console.warn=log;
-      const tests=${JSON.stringify(tests)};const results=[];let error=null;
-      try{ (new Function(${JSON.stringify(source)}))();
-        for(const t of tests){ try{ const got=String((new Function('return ('+(t.input||'undefined')+')'))()); results.push({name:t.name,passed:got===String(t.expected),got}); }catch(e){ results.push({name:t.name,passed:false,got:String(e)}); } }
-      }catch(e){ error=String(e&&e.stack||e); }
-      parent.postMessage({token:${JSON.stringify(token)},stdout:out.join('\\n').slice(0,${MAX_OUTPUT}),error,tests:results},'*');
-    <\/script>`;
-    const done = (r: RunResult) => { window.removeEventListener("message", onMsg); clearTimeout(timer); frame.remove(); resolve(r); };
-    const onMsg = (e: MessageEvent) => {
-      if (e.source !== frame.contentWindow || e.data?.token !== token) return;
-      done({ stdout: e.data.stdout, error: e.data.error, tests: e.data.tests, ms: Math.round(performance.now() - started) });
-    };
-    const timer = window.setTimeout(() => done({ stdout: "", error: `Stopped after ${TIMEOUT_MS / 1000}s (infinite loop?)`, ms: TIMEOUT_MS }), TIMEOUT_MS);
-    window.addEventListener("message", onMsg);
-    frame.srcdoc = harness;
-    document.body.appendChild(frame);
+    let worker: Worker;
+    try { worker = new Worker(script); }
+    catch (e) { resolve({ stdout: "", error: `Couldn't start the code sandbox: ${String(e)}`, ms: 0 }); return; }
+    const finish = (r: RunResult) => { clearTimeout(timer); worker.terminate(); resolve(r); };
+    const timer = window.setTimeout(() => finish({ stdout: "", error: timeoutText, ms: timeoutMs }), timeoutMs);
+    worker.onmessage = (e) => finish({ ...e.data, ms: Math.round(performance.now() - started) });
+    worker.onerror = (e) => { e.preventDefault(); finish({ stdout: "", error: e.message || "The code sandbox failed to load.", ms: Math.round(performance.now() - started) }); };
+    worker.postMessage(message);
   });
 }
 
-const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/";
+export function runJavaScript(source: string, tests: { name: string; input?: string; expected?: string }[] = []): Promise<RunResult> {
+  return runInWorker("/sandbox/js-worker.js", { source, tests }, TIMEOUT_MS, `Stopped after ${TIMEOUT_MS / 1000}s (infinite loop?)`);
+}
 
 export function runPython(source: string): Promise<RunResult> {
-  return new Promise((resolve) => {
-    const started = performance.now();
-    const worker = new Worker(URL.createObjectURL(new Blob([`
-      importScripts('${PYODIDE}pyodide.js');
-      onmessage = async (e) => {
-        try {
-          const py = await loadPyodide({ indexURL: '${PYODIDE}' });
-          let out = '';
-          py.setStdout({ batched: (s) => { out += s + '\\n'; } });
-          py.setStderr({ batched: (s) => { out += s + '\\n'; } });
-          await py.runPythonAsync(e.data);
-          postMessage({ stdout: out.slice(0, ${MAX_OUTPUT}), error: null });
-        } catch (err) { postMessage({ stdout: '', error: String(err) }); }
-      };`], { type: "text/javascript" })));
-    const timer = window.setTimeout(() => {
-      worker.terminate();
-      resolve({ stdout: "", error: `Stopped after ${(TIMEOUT_MS * 4) / 1000}s`, ms: TIMEOUT_MS * 4 });
-    }, TIMEOUT_MS * 4); // first run downloads the interpreter
-    worker.onmessage = (e) => {
-      clearTimeout(timer);
-      worker.terminate();
-      resolve({ ...e.data, ms: Math.round(performance.now() - started) });
-    };
-    worker.postMessage(source);
-  });
+  // The first run downloads the interpreter (~10 MB), so allow longer.
+  return runInWorker("/sandbox/py-worker.js", source, TIMEOUT_MS * 4, `Stopped after ${(TIMEOUT_MS * 4) / 1000}s`);
 }
 
 export function CodeRunner({ language, value, onChange, tests, onResult, readOnly }: {

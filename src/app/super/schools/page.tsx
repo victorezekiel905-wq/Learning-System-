@@ -4,7 +4,8 @@ import { SchoolsClient, type TenantRow } from "./SchoolsClient";
 
 export const metadata = { title: "Schools" };
 
-export default async function SchoolsPage({ searchParams }: { searchParams: { q?: string; new?: string } }) {
+export default async function SchoolsPage(props: { searchParams: Promise<{ q?: string; new?: string }> }) {
+  const searchParams = await props.searchParams;
   const { sb } = await requireSuperAdmin();
   const [{ data }, { data: plans }] = await Promise.all([
     sb.rpc("sa_list_tenants", { p_search: searchParams.q || null }),

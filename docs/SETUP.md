@@ -116,4 +116,4 @@ The workflow also re-enables itself, because GitHub otherwise switches scheduled
 
 If your database was created with `setup.sql` **before 2026-09-23**, first run `supabase/updates/2026-09-23_super_admin_branding.sql` in the SQL Editor. See [ROLES.md](ROLES.md) for what each role can do.
 
-If your database was created before the **web classroom lockdown** (students' screens without the extension, "left the class" alerts with the screen), also run `supabase/updates/2026-09-23b_web_classroom_lockdown.sql` once. To attach the student's screen to each leave alert, turn on **Keep a screenshot with leave alerts** in Admin → Settings.
+If your database was created before the **web classroom lockdown** (students' screens without the extension, "left the class" alerts with the screen), also run `supabase/updates/2026-09-24_production_release.sql` once. To attach the student's screen to each leave alert, turn on **Keep a screenshot with leave alerts** in Admin → Settings.

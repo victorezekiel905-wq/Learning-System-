@@ -11,7 +11,12 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://example.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'ci-anon-key' }}
+      NEXT_PUBLIC_APP_URL: http://localhost:3100
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,19 +24,29 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: supabase/setup.sql matches the migrations
-        run: npm run build:sql && git diff --exit-code supabase/setup.sql
+      - name: Generated SQL matches the migrations
+        run: npm run build:sql && git diff --exit-code supabase/setup.sql supabase/updates/
+      - name: Lint
+        run: npm run lint
       - name: Type-check
         run: npm run type-check
       - name: Database tests (migrations + RLS + RPCs on PGlite) and unit tests
         run: npm test
-      - name: Production build
-        run: npm run build
-        env:
-          NEXT_TELEMETRY_DISABLED: "1"
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
-          NEXT_PUBLIC_APP_URL: http://localhost:3000
-      - name: Dependency audit (production deps)
+      - name: Dependency audit (production dependencies)
         run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true
+      - name: Production build
+        run: npm run build:e2e
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npm run test:e2e
+        env:
+          # Optional: set this secret to also run the live-classroom test against
+          # your Supabase project (it creates and deletes a throwaway school).
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

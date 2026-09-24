@@ -1,4 +1,4 @@
-import { fail, ok, readJson, requireProfile } from "@/lib/api";
+import { fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
 
 const PRICE_ENV: Record<string, string> = {
   teacher_pro: "STRIPE_PRICE_TEACHER_PRO",
@@ -7,7 +7,7 @@ const PRICE_ENV: Record<string, string> = {
 };
 
 /** Creates a Stripe Checkout session (subscription). Plan changes are applied only by the verified webhook. */
-export async function POST(req: Request) {
+export const POST = withErrorLog(async function POST(req: Request) {
   const { me, response } = await requireProfile(["school_admin", "platform_admin"]);
   if (response) return response;
   const key = process.env.STRIPE_SECRET_KEY;
@@ -39,4 +39,4 @@ export async function POST(req: Request) {
   const json = await res.json();
   if (!res.ok) return fail(502, json?.error?.message ?? "Payment provider error.");
   return ok({ url: json.url });
-}
+});

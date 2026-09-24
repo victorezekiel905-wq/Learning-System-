@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Card, CopyButton, Field, Input, Modal, Select, Tabs, useToast } from "@/components/ui";
+import { Alert, Badge, Button, CopyButton, Field, Input, Modal, Select, Tabs, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { api, errorText, rpc } from "@/lib/rpc";
 import { ROLE_LABEL, type Role } from "@/lib/types";

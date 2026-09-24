@@ -3,8 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 /** RLS-bound client for Server Components and Route Handlers (acts as the caller). */
-export function createClient(): SupabaseClient {
-  const cookieStore = cookies();
+export async function createClient(): Promise<SupabaseClient> {
+  const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -17,7 +17,7 @@ export function createClient(): SupabaseClient {
           try {
             toSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
           } catch {
-            // Called from a Server Component: the middleware refreshes cookies instead.
+            // Called from a Server Component: the proxy refreshes cookies instead.
           }
         }
       }

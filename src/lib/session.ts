@@ -6,7 +6,7 @@ import type { Me, Role } from "./types";
 
 /** me() for Server Components, memoised per request. */
 export const getMe = cache(async (): Promise<Me | null> => {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
   const { data } = await sb.rpc("me");
@@ -38,12 +38,12 @@ export async function requireRole(roles?: Role[]) {
   if (me.profile.status !== "active") redirect("/login?error=suspended");
   if (me.tenant?.status === "suspended") redirect(me.super_admin ? "/super" : "/login?error=school_suspended");
   if (roles && !roles.includes(me.profile.role)) redirect(homeFor(me.profile.role));
-  return { me: me as Me & { profile: NonNullable<Me["profile"]> }, sb: createClient() };
+  return { me: me as Me & { profile: NonNullable<Me["profile"]> }, sb: await createClient() };
 }
 
 /** The platform console. Anyone else gets a plain 404, so it isn't even discoverable. */
 export async function requireSuperAdmin() {
   const me = await getMe();
   if (!me?.super_admin) notFound();
-  return { me, sb: createClient() };
+  return { me, sb: await createClient() };
 }

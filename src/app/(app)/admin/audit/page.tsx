@@ -6,7 +6,8 @@ import { formatDateTime } from "@/lib/utils";
 export const metadata = { title: "Audit log" };
 const PAGE = 100;
 
-export default async function AuditPage({ searchParams }: { searchParams: { action?: string; page?: string } }) {
+export default async function AuditPage(props: { searchParams: Promise<{ action?: string; page?: string }> }) {
+  const searchParams = await props.searchParams;
   const { sb } = await requireRole(ADMINS);
   const page = Math.max(Number(searchParams.page ?? 0), 0);
   let q = sb.from("audit_logs").select("id,action,target_type,target_id,meta,created_at,actor_id", { count: "exact" })

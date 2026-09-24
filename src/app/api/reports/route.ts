@@ -1,4 +1,4 @@
-import { callRpc, fail, ok, readJson, requireProfile } from "@/lib/api";
+import { callRpc, fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
 import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
 
 /**
@@ -6,7 +6,7 @@ import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
  * Data is computed by RLS-bound RPCs as the caller; only the final insert into
  * `reports` (which has no client insert policy) uses the service role.
  */
-export async function POST(req: Request) {
+export const POST = withErrorLog(async function POST(req: Request) {
   const { sb, me, response } = await requireProfile(["teacher", "school_admin", "it_admin", "platform_admin"]);
   if (response) return response;
   const body = await readJson<{ kind?: string; class_id?: string; days?: number }>(req);
@@ -41,4 +41,4 @@ export async function POST(req: Request) {
     .select("id").single();
   if (error) return fail(500, error.message);
   return ok({ id: data.id });
-}
+});

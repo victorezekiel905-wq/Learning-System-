@@ -4,7 +4,8 @@ import { MessagesClient } from "./MessagesClient";
 
 export const metadata = { title: "Messages" };
 
-export default async function MessagesPage({ searchParams }: { searchParams: { thread?: string; class?: string } }) {
+export default async function MessagesPage(props: { searchParams: Promise<{ thread?: string; class?: string }> }) {
+  const searchParams = await props.searchParams;
   const { me, sb } = await requireRole(["student", "teacher", "school_admin", "platform_admin"]);
   const [{ data: threads }, classes] = await Promise.all([
     sb.from("chat_threads").select("id,kind,class_id,student_id,teacher_id,created_at,classes(name),student:users!chat_threads_student_id_tenant_id_fkey(full_name),teacher:users!chat_threads_teacher_id_tenant_id_fkey(full_name)")

@@ -1,5 +1,6 @@
 import { createClient as createBase, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { logServerError } from "@/lib/api";
 import { messageForError, statusForError, type RpcError } from "@/lib/errors";
 import { createClient as cookieClient } from "@/lib/supabase/server";
 
@@ -16,7 +17,7 @@ const json = (data: unknown, status = 200) => NextResponse.json(data ?? null, { 
 const err = (e: RpcError | { message: string; code?: string }, fallback = 400) =>
   json({ error: messageForError(e as RpcError), code: e.code }, e.code ? statusForError(e as RpcError) : fallback);
 
-function clientFor(req: Request): SupabaseClient {
+async function clientFor(req: Request): Promise<SupabaseClient> {
   const auth = req.headers.get("authorization");
   if (auth?.startsWith("Bearer ")) {
     return createBase(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -199,8 +200,9 @@ function match(method: string, path: string[]): { handler: Handler; params: stri
   return null;
 }
 
-async function handle(req: Request, { params }: { params: { path: string[] } }) {
-  const route = match(req.method, params.path);
+async function handle(req: Request, { params }: { params: Promise<{ path: string[] }> }) {
+  const { path } = await params;
+  const route = match(req.method, path);
   if (!route) return json({ error: "Not found", see: "/docs/API.md" }, 404);
   let body: Record<string, unknown> = {};
   if (req.method !== "GET" && req.method !== "DELETE") {
@@ -209,9 +211,11 @@ async function handle(req: Request, { params }: { params: { path: string[] } }) 
     try { body = text ? JSON.parse(text) : {}; } catch { return json({ error: "Invalid JSON" }, 400); }
   }
   try {
-    return await route.handler({ sb: clientFor(req), params: route.params, body, url: new URL(req.url), req });
+    return await route.handler({ sb: await clientFor(req), params: route.params, body, url: new URL(req.url), req });
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "Server error" }, 500);
+    const err = e instanceof Error ? e : new Error(String(e));
+    logServerError(`${err.name}: ${err.message}`, err.stack, "api", new URL(req.url).pathname);
+    return json({ error: "Something went wrong. The problem has been reported." }, 500);
   }
 }
 

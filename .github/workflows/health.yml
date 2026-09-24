@@ -1,0 +1,31 @@
+name: Uptime
+
+# Checks the live site every 15 minutes. A failed run emails the repository
+# owner (GitHub → Settings → Notifications → Actions). Secret/variable:
+#   APP_URL  e.g. https://app.swiftcipher.com  (repository variable)
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: ${{ vars.APP_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: GET /api/health
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o body.json -w "%{http_code}" --max-time 20 "$APP_URL/api/health" || true)
+            cat body.json 2>/dev/null; echo
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "::error::$APP_URL/api/health returned $code"
+          exit 1
+        env:
+          APP_URL: ${{ vars.APP_URL }}

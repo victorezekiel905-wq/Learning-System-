@@ -92,16 +92,18 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!agreed) { setErr("Please accept the Terms of Service and Privacy Notice to continue."); return; }
     setBusy(true); setErr(null);
     const intent: Intent = mode === "school" ? { intent: "school", school_name: school.trim() } : { intent: "code", code: code.trim().toUpperCase() };
     const sb = createClient();
     const { data, error } = await sb.auth.signUp({
       email, password,
       options: {
-        data: { full_name: fullName.trim(), ...intent },
+        data: { full_name: fullName.trim(), ...intent, terms_accepted_at: new Date().toISOString() },
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`
       }
     });
@@ -149,11 +151,17 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
       <Field label="Password" hint="At least 8 characters." htmlFor="password">
         <Input id="password" type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
       </Field>
+      <label className="flex items-start gap-2 text-sm text-ink-700">
+        <input type="checkbox" className="mt-1" required checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+        <span>
+          I agree to the <Link href="/terms" target="_blank">Terms of Service</Link> and have read the <Link href="/privacy" target="_blank">Privacy Notice</Link>
+          {mode === "school"
+            ? <>. For my school I also accept the <Link href="/dpa" target="_blank">Data Processing Agreement</Link>.</>
+            : <>, and I will follow my school's acceptable-use policy.</>}
+        </span>
+      </label>
       {err && <Alert tone="error">{err}</Alert>}
-      <Button type="submit" className="w-full" loading={busy}>{mode === "school" ? "Create school workspace" : "Create account and join"}</Button>
-      <p className="text-center text-xs text-ink-500">
-        By continuing you agree to your school's acceptable-use policy and the <Link href="/privacy">privacy notice</Link>.
-      </p>
+      <Button type="submit" className="w-full" loading={busy} disabled={!agreed}>{mode === "school" ? "Create school workspace" : "Create account and join"}</Button>
     </form>
   );
 }
@@ -164,4 +172,9 @@ export async function completeIntent(intent: Intent, fullName: string) {
   } else {
     await rpc("redeem_code", { p_code: intent.code, p_full_name: fullName });
   }
+  // The profile exists now: record the acceptance given on the signup form.
+  await Promise.all([
+    rpc("accept_notice", { p_kind: "terms_of_service" }),
+    rpc("accept_notice", { p_kind: "privacy_notice" })
+  ]).catch(() => { /* consent is re-asked on the account page if this fails */ });
 }

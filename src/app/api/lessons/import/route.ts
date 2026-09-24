@@ -1,11 +1,11 @@
-import { fail, ok, requireProfile } from "@/lib/api";
+import { fail, ok, requireProfile, withErrorLog } from "@/lib/api";
 import { importLessonFromUpload } from "@/lib/lesson-import";
 
 export const runtime = "nodejs";
 const MAX_BYTES = 20 * 1024 * 1024;
 
 /** POST multipart {file, title?} → a new draft lesson with one editable slide per section/slide. */
-export async function POST(req: Request) {
+export const POST = withErrorLog(async function POST(req: Request) {
   const { sb, me, response } = await requireProfile(["teacher", "school_admin", "platform_admin"]);
   if (response) return response;
 
@@ -36,4 +36,4 @@ export async function POST(req: Request) {
   const { error: slideErr } = await sb.from("lesson_slides").insert(rows);
   if (slideErr) return fail(400, slideErr.message);
   return ok({ lesson_id: lesson.id, slides: rows.length, source: parsed.sourceType });
-}
+});

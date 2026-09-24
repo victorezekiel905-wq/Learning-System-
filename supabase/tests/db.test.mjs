@@ -585,6 +585,16 @@ test("web classroom: screen sharing, lockdown, leave alerts with the screen", as
   await db.rpc(S.stu2, "join_session", { p_code: s.join_code });
   const frame = "data:image/jpeg;base64,AAAA";
 
+  // Just joined, still on the setup screen: not "away" for the first 2 minutes...
+  const setup = await db.rpc(S.stu2, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: false, p_sharing: false });
+  assert.equal(setup.away, false);
+  assert.equal(setup.setting_up, true);
+  // ...but never starting the lesson counts once that window has passed.
+  await db.admin("update public.session_participants set joined_at = now() - interval '3 minutes' where session_id = $1 and user_id = $2", [s.id, S.stu2]);
+  const late = await db.rpc(S.stu2, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: false, p_sharing: false });
+  assert.equal(late.away, true);
+  assert.match(late.reason, /Did not start the lesson/);
+
   const ok = await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true, p_surface: "monitor" });
   assert.equal(ok.lockdown, true, "lockdown is on by default");
   assert.equal(ok.away, false);
@@ -646,6 +656,44 @@ test("web classroom: screen sharing, lockdown, leave alerts with the screen", as
   assert.equal(free.away, false);
   assert.equal(free.lockdown, false);
   await db.rpc(S.teacherA, "end_session", { p_session: s.id });
+});
+
+test("operations: thumbnails deleted at session end, error log, health, maintenance, terms consent", async () => {
+  // Live thumbnails go the moment a session ends.
+  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
+  await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
+  await db.rpc(S.stu1, "student_screen_frame", { p_session: s.id, p_image: "data:image/jpeg;base64,BBBB" });
+  const count = async () => (await db.admin("select count(*)::int n from public.screen_snapshots where class_session_id = $1", [s.id]))[0].n;
+  assert.equal(await count(), 1);
+  await db.rpc(S.teacherA, "end_session", { p_session: s.id });
+  assert.equal(await count(), 0);
+
+  // Error log: anyone may report, repeats are counted, only the super admin reads.
+  await db.rpc(null, "log_error", { p_source: "client", p_message: "TypeError: x is undefined", p_stack: "Error\n at a.js:1", p_url: "/login" });
+  await db.rpc(S.stu1, "log_error", { p_source: "client", p_message: "TypeError: x is undefined", p_stack: "Error\n at a.js:1" });
+  await rejects(db.anon("select * from public.error_events"), /permission denied/);
+  await rejects(db.as(S.adminA, "select * from public.error_events"), /permission denied/);
+  await rejects(db.rpc(S.adminA, "sa_errors", {}), /not found|super|permission/i);
+  const errs = await db.rpc(S.superA, "sa_errors", {});
+  assert.equal(errs.length, 1);
+  assert.equal(errs[0].count, 2);
+  await db.rpc(S.superA, "sa_resolve_error", { p_id: errs[0].id });
+  assert.equal((await db.rpc(S.superA, "sa_errors", {})).length, 0);
+
+  // Health for uptime monitors; maintenance only for the service role.
+  assert.equal((await db.rpc(null, "health", {})).ok, true);
+  await rejects(db.rpc(S.adminA, "run_maintenance", {}), /permission denied/);
+  await db.admin("update public.class_sessions set started_at = now() - interval '13 hours' where id = $1", [s.id]);
+  const stale = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  await db.admin("update public.class_sessions set started_at = now() - interval '13 hours' where id = $1", [stale.id]);
+  await db.admin("update public.session_participants set last_seen_at = now() - interval '3 hours' where session_id = $1", [stale.id]);
+  const m = (await db.admin("select app.run_maintenance() r"))[0].r;
+  assert.equal(m.sessions_auto_ended, 1);
+
+  // Terms of service acceptance is recorded.
+  await db.rpc(S.teacherA, "accept_notice", { p_kind: "terms_of_service" });
+  assert.equal((await db.as(S.teacherA, "select 1 from public.consents where kind = 'terms_of_service'")).length, 1);
 });
 
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {

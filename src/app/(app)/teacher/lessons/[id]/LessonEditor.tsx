@@ -49,7 +49,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
   const latest = useRef<SlideRow[]>([]);
   const setLocal = (next: SlideRow[] | ((prev: SlideRow[]) => SlideRow[])) =>
     setLocalState((prev) => { const v = typeof next === "function" ? next(prev) : next; latest.current = v; return v; });
-  useEffect(() => { if (slides.data) setLocal(slides.data); // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (slides.data) setLocal(slides.data);
   }, [slides.data]);
   useEffect(() => { if (!selected && local[0]) setSelected(local[0].id); }, [local, selected]);
   const current = local.find((s) => s.id === selected) ?? null;

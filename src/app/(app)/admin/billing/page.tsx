@@ -1,3 +1,4 @@
+import { LEGAL } from "@/lib/legal";
 import { requireRole, ADMINS } from "@/lib/session";
 import { Alert, Badge, Card, PageHeader, Stat } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
@@ -7,7 +8,8 @@ export const metadata = { title: "Plan & billing" };
 
 type Usage = { active_teachers_30d: number; active_students_30d: number; max_students_per_class: number; classes: number; storage_mb: number; managed_devices: number; monitoring_minutes_30d: number; retention: { learning_days: number; telemetry_days: number }; plan: { code: string; name: string; limits: Record<string, number | null> } };
 
-export default async function BillingPage({ searchParams }: { searchParams: { status?: string } }) {
+export default async function BillingPage(props: { searchParams: Promise<{ status?: string }> }) {
+  const searchParams = await props.searchParams;
   const { sb } = await requireRole(ADMINS);
   const [{ data: usage }, { data: plans }, { data: subs }, { data: invoices }] = await Promise.all([
     sb.rpc("usage_metrics"),
@@ -47,7 +49,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { st
               {Object.entries(p.limits as Record<string, number | null>).map(([k, v]) => <li key={k}>{k.replace(/_/g, " ")}: {v ?? "unlimited"}</li>)}
               {Object.entries(p.features as Record<string, boolean>).filter(([, v]) => v).map(([k]) => <li key={k}>✓ {k.replace(/_/g, " ")}</li>)}
             </ul>
-            <div className="mt-4">{p.code === u.plan.code ? <Badge tone="brand">Current plan</Badge> : p.code === "enterprise" ? <a href="mailto:sales@swiftcipher.app" className="btn btn-secondary btn-sm no-underline">Contact sales</a>
+            <div className="mt-4">{p.code === u.plan.code ? <Badge tone="brand">Current plan</Badge> : p.code === "enterprise" ? <a href={`mailto:${LEGAL.supportEmail}?subject=Enterprise%20plan`} className="btn btn-secondary btn-sm no-underline">Contact sales</a>
               : p.price_cents > 0 && <UpgradeButton plan={p.code} disabled={!stripe} />}</div>
           </Card>
         ))}

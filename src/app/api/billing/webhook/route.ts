@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { fail, ok } from "@/lib/api";
+import { fail, ok, withErrorLog } from "@/lib/api";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ function verify(payload: string, header: string | null, secret: string): boolean
 
 const STATUS: Record<string, string> = { active: "active", trialing: "trialing", past_due: "past_due", unpaid: "past_due", canceled: "canceled", incomplete_expired: "canceled" };
 
-export async function POST(req: Request) {
+export const POST = withErrorLog(async function POST(req: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) return fail(501, "Webhook not configured.");
   const payload = await req.text();
@@ -49,4 +49,4 @@ export async function POST(req: Request) {
     }
   }
   return ok({ received: true });
-}
+});

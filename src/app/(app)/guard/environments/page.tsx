@@ -5,7 +5,8 @@ import type { EnvironmentPolicy } from "@/lib/types";
 
 export const metadata = { title: "Environments" };
 
-export default async function EnvironmentsPage({ searchParams }: { searchParams: { tab?: string } }) {
+export default async function EnvironmentsPage(props: { searchParams: Promise<{ tab?: string }> }) {
+  const searchParams = await props.searchParams;
   const { me, sb } = await requireRole(STAFF);
   const [{ data: policies }, { data: scenes }] = await Promise.all([
     sb.from("environment_policies").select("*").order("name"),

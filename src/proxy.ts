@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PROTECTED = ["/super", "/teacher", "/student", "/parent", "/admin", "/guard", "/messages", "/notifications", "/present", "/onboarding", "/dashboard", "/account"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,5 +36,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // Skip static assets and the device-agent gateway (it authenticates by device secret).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|api/devices|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|api/devices|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"]
 };

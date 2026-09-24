@@ -25,16 +25,18 @@ npm run dev                       # http://localhost:3000
 node scripts/smoke.mjs            # end-to-end check against your project
 ```
 
-Then open `/signup` to create a school. Load `extension/` unpacked in Chrome (`chrome://extensions`, Developer mode) to try device monitoring. Full instructions are in [docs/SETUP.md](docs/SETUP.md).
+Then open `/signup` to create a school. Load `extension/` unpacked in Chrome (`chrome://extensions`, Developer mode) to try device monitoring. Full instructions are in [docs/SETUP.md](docs/SETUP.md). To deploy to production, follow [docs/DEPLOY.md](docs/DEPLOY.md). The compliance pack (DPIA, records of processing, incident response) is in [docs/compliance](docs/compliance/README.md).
 
 ## Scripts
 
 | Command | Purpose |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js app |
-| `npm run type-check` | TypeScript |
+| `npm run lint` / `type-check` | ESLint (Next.js + TypeScript rules) and TypeScript |
 | `npm test` | Database suite and unit tests |
-| `npm run test:db` | Database suite only: applies every migration to an in-process Postgres (PGlite) with a Supabase shim, then runs 13 end-to-end groups covering RLS isolation, grading, games, the policy engine, the device agent, WebRTC, privacy, the super admin, branding and more |
+| `npm run test:db` | Database suite only: applies every migration to an in-process Postgres (PGlite) with a Supabase shim, then runs 16 end-to-end groups covering RLS isolation, grading, games, the policy engine, the device agent, WebRTC, privacy, the super admin, branding, the web classroom lockdown, operations and more |
+| `npm run build:e2e` then `npm run test:e2e` | Playwright browser tests: public pages, security headers, the code sandbox, and (with a service-role key) the full live classroom: screen strip, teacher-only focus, leave alert and return |
+| `npm run build:sql` | Regenerates `supabase/setup.sql` and the latest `supabase/updates` file from the migrations |
 | `node scripts/smoke.mjs` | Same core flows against a real Supabase project, then cleans up |
 | `node scripts/make-icons.mjs` | Regenerates the extension icons |
 

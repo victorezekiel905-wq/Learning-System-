@@ -1,0 +1,27 @@
+name: Maintenance
+
+# Backup for the hourly pg_cron job inside the database (retention, abandoned
+# sessions, expired codes, old error logs). Safe to run any time.
+# Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+on:
+  schedule:
+    - cron: "41 2 * * *"   # daily 02:41 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run maintenance
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$KEY" ]; then echo "::notice::Not configured (see docs/DEPLOY.md). Skipping."; exit 0; fi
+          res=$(curl -sS --fail-with-body -X POST "$SUPABASE_URL/rest/v1/rpc/run_maintenance" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}')
+          echo "$res"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

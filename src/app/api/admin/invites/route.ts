@@ -1,8 +1,8 @@
-import { callRpc, fail, ok, readJson, requireProfile } from "@/lib/api";
+import { callRpc, fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
 import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
 
 /** Create a staff/parent invite; email it through Supabase Auth when the service role is configured. */
-export async function POST(req: Request) {
+export const POST = withErrorLog(async function POST(req: Request) {
   const { sb, response } = await requireProfile(["school_admin", "platform_admin", "teacher"]);
   if (response) return response;
   const body = await readJson<{ role?: string; email?: string | null; student_id?: string | null; class_id?: string | null; max_uses?: number }>(req);
@@ -24,4 +24,4 @@ export async function POST(req: Request) {
     emailed = !error;
   }
   return ok({ code, emailed });
-}
+});

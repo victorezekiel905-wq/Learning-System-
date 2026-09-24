@@ -8,7 +8,10 @@ export const metadata = { title: "Lessons" };
 
 type Lesson = { id: string; title: string; status: string; subject: string | null; is_template: boolean; owner_id: string; updated_at: string; current_version: number; users: { full_name: string } | null };
 
-export default async function LessonsPage({ searchParams }: { searchParams: { tab?: string; q?: string; new?: string } }) {
+export default async function LessonsPage(
+  props: { searchParams: Promise<{ tab?: string; q?: string; new?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const { me, sb } = await requireRole(TEACHERS);
   const tab = searchParams.tab ?? "mine";
   let query = sb.from("lessons").select("id,title,status,subject,is_template,owner_id,updated_at,current_version,users(full_name)")

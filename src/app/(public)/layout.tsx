@@ -14,7 +14,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <div className="flex-1">{children}</div>
       <footer className="mx-auto w-full max-w-6xl px-6 py-8 text-xs text-ink-500">
         © {new Date().getFullYear()} SwiftCipher · Device monitoring only runs on school-managed browsers during active class sessions.
-        {" "}<Link href="/privacy">Privacy</Link>
+        <span className="mt-2 flex flex-wrap gap-4"><Link href="/terms">Terms</Link><Link href="/privacy">Privacy</Link><Link href="/dpa">DPA</Link><Link href="/security">Security</Link></span>
       </footer>
     </div>
   );

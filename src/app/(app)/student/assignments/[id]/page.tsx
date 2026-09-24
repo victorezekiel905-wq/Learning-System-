@@ -4,7 +4,8 @@ import { AssignmentView } from "./AssignmentView";
 
 export const metadata = { title: "Assignment" };
 
-export default async function StudentAssignment({ params }: { params: { id: string } }) {
+export default async function StudentAssignment(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { me, sb } = await requireRole(["student"]);
   const { data: a } = await sb.from("assignments").select("id,title,instructions,due_at,allow_late,max_resubmissions,points_possible,activity_id,classes(name)").eq("id", params.id).maybeSingle();
   if (!a) notFound();

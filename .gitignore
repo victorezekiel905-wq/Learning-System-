@@ -9,3 +9,7 @@ next-env.d.ts
 coverage/
 supabase/.temp/
 supabase/.branches/
+.next-*/
+test-results/
+playwright-report/
+e2e/.auth/

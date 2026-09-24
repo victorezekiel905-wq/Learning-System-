@@ -4,7 +4,8 @@ import { ClassDetail } from "./ClassDetail";
 
 export const metadata = { title: "Class" };
 
-export default async function ClassPage({ params }: { params: { id: string } }) {
+export default async function ClassPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { me, sb } = await requireRole(STAFF);
   const { data: cls } = await sb.from("classes").select("*").eq("id", params.id).maybeSingle();
   if (!cls) notFound();

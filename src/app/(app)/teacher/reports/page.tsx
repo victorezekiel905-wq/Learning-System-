@@ -14,7 +14,8 @@ type SessionReport = {
   students: { student_id: string; name: string; joined: boolean; answers: number; correct: number; alerts: number }[];
 };
 
-export default async function ReportsPage({ searchParams }: { searchParams: { session?: string; id?: string } }) {
+export default async function ReportsPage(props: { searchParams: Promise<{ session?: string; id?: string }> }) {
+  const searchParams = await props.searchParams;
   const { sb } = await requireRole(STAFF);
   const { data: reports } = await sb.from("reports").select("id,kind,title,created_at,scope_id").order("created_at", { ascending: false }).limit(100);
   const list = reports ?? [];

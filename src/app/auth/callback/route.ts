@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (linkError) return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(linkError)}`, url));
   if (!code) return NextResponse.redirect(new URL("/login?error=Missing%20sign-in%20code", url));
 
-  const { error } = await createClient().auth.exchangeCodeForSession(code);
+  const { error } = await (await createClient()).auth.exchangeCodeForSession(code);
   if (error) {
     // The link was opened in a different browser from the one that started the
     // flow. Supabase has already verified the email by this point, so the user

@@ -4,7 +4,8 @@ import { AssignmentGrader } from "./AssignmentGrader";
 
 export const metadata = { title: "Assignment" };
 
-export default async function AssignmentPage({ params }: { params: { id: string } }) {
+export default async function AssignmentPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { sb } = await requireRole(TEACHERS);
   const { data: a } = await sb.from("assignments").select("*,classes(name),rubrics(id,title,criteria)").eq("id", params.id).maybeSingle();
   if (!a) notFound();

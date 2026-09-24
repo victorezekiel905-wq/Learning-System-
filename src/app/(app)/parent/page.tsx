@@ -13,7 +13,8 @@ type Summary = {
   screen_time: { managed_minutes_30d: number; focus_alerts_30d: number };
 };
 
-export default async function ParentPage({ searchParams }: { searchParams: { child?: string } }) {
+export default async function ParentPage(props: { searchParams: Promise<{ child?: string }> }) {
+  const searchParams = await props.searchParams;
   const { me, sb } = await requireRole(["parent"]);
   if (!me.settings?.parent_portal_enabled) {
     return <div className="page max-w-xl"><Alert title="The parent portal is not switched on">Your school hasn't enabled parent summaries yet. Please contact the school office.</Alert></div>;

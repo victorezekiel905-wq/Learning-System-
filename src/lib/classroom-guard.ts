@@ -14,6 +14,7 @@ export type GuardDirectives = {
   lockdown: boolean;
   away: boolean;
   reason: string | null;
+  setting_up?: boolean;
   capture: { enabled: boolean; interval_seconds: number; high_quality: boolean };
 };
 

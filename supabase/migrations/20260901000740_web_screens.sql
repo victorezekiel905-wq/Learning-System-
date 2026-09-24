@@ -33,7 +33,9 @@ alter table public.session_participants
   add column if not exists screen_surface    text,
   add column if not exists away_since        timestamptz,
   add column if not exists away_reason       text,
-  add column if not exists hq_requested_at   timestamptz;
+  add column if not exists hq_requested_at   timestamptz,
+  -- first moment the student was fully "in class" (sharing + full screen + lesson in front)
+  add column if not exists ready_at          timestamptz;
 
 alter table public.class_sessions add column if not exists lockdown boolean not null default true;
 
@@ -77,6 +79,8 @@ begin
            from public.session_participants p
            where p.session_id = p_s.id
              and (p.away_since is not null or p.left_at is not null or p.last_seen_at < now() - interval '30 seconds')
+             -- a student still setting up (first 2 minutes, never fully in class) hasn't left
+             and (p.ready_at is not null or p.joined_at < now() - interval '2 minutes')
              -- students monitored by the extension are covered by its own leave rules
              and not exists (select 1 from public.browser_sessions b where b.class_session_id = p_s.id
                              and b.student_id = p.user_id and b.last_heartbeat_at > now() - interval '45 seconds') loop
@@ -102,6 +106,7 @@ declare
   v_p        public.session_participants;
   v_set      public.tenant_settings;
   v_reason   text;
+  v_setup    boolean := false;
   v_returned int;
 begin
   select * into v_s from public.class_sessions where id = p_session;
@@ -120,18 +125,33 @@ begin
   insert into public.session_participants (session_id, user_id, tenant_id, status)
     values (p_session, auth.uid(), v_s.tenant_id, 'online')
     on conflict (session_id, user_id) do nothing;
+  select * into v_p from public.session_participants where session_id = p_session and user_id = auth.uid();
+
+  -- A student who has never been fully in class is still setting up: give them
+  -- two minutes to share and go full screen before that counts as not attending.
+  if v_reason is not null and v_p.ready_at is null then
+    if v_p.joined_at > now() - interval '2 minutes' then
+      v_reason := null; v_setup := true;
+    else
+      v_reason := 'Did not start the lesson (screen share and full screen are required)';
+    end if;
+  end if;
+
   update public.session_participants set
     last_seen_at = now(), left_at = null,
     status = case when status = 'offline' then 'online' else status end,
     tab_visible = coalesce(p_visible, true), fullscreen = coalesce(p_fullscreen, false),
     screen_sharing = coalesce(p_sharing, false), share_unsupported = coalesce(p_unsupported, false),
     screen_surface = left(p_surface, 20),
+    ready_at = case when v_reason is null and not v_setup then coalesce(ready_at, now()) else ready_at end,
     away_since = case when v_reason is null then null else coalesce(away_since, now()) end,
     away_reason = v_reason
   where session_id = p_session and user_id = auth.uid()
   returning * into v_p;
 
-  if v_reason is null then
+  if v_setup then
+    null; -- nothing to resolve or raise yet
+  elsif v_reason is null then
     update public.environment_events set resolved_at = now()
      where class_session_id = p_session and student_id = auth.uid() and resolved_at is null
        and kind = 'environment_left' and device_id is null;
@@ -150,6 +170,7 @@ begin
     'lockdown', v_s.lockdown,
     'away', v_reason is not null,
     'reason', v_reason,
+    'setting_up', v_setup,
     'capture', jsonb_build_object(
       'enabled', v_set.allow_screen_capture,
       'interval_seconds', least(v_set.thumbnail_interval_seconds, 5),

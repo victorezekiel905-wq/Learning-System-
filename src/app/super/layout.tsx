@@ -4,7 +4,7 @@ import { requireSuperAdmin } from "@/lib/session";
 export const dynamic = "force-dynamic";
 export const metadata = { title: { default: "Platform", template: "%s · Platform" }, robots: { index: false } };
 
-const NAV = [["/super", "Overview"], ["/super/schools", "Schools"], ["/super/users", "Users"], ["/super/audit", "Platform audit"]] as const;
+const NAV = [["/super", "Overview"], ["/super/schools", "Schools"], ["/super/users", "Users"], ["/super/audit", "Platform audit"], ["/super/errors", "Errors"]] as const;
 
 export default async function SuperLayout({ children }: { children: React.ReactNode }) {
   const { me } = await requireSuperAdmin();

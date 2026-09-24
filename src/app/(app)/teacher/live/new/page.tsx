@@ -4,7 +4,8 @@ import { StartSessionForm } from "./StartSessionForm";
 
 export const metadata = { title: "Start a live class" };
 
-export default async function NewLive({ searchParams }: { searchParams: { class?: string; lesson?: string } }) {
+export default async function NewLive(props: { searchParams: Promise<{ class?: string; lesson?: string }> }) {
+  const searchParams = await props.searchParams;
   const { sb } = await requireRole(TEACHERS);
   const [{ data: classes }, { data: lessons }, { data: envs }] = await Promise.all([
     sb.rpc("my_teaching_classes"),

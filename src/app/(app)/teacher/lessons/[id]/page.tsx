@@ -4,7 +4,8 @@ import { LessonEditor } from "./LessonEditor";
 
 export const metadata = { title: "Lesson editor" };
 
-export default async function LessonPage({ params }: { params: { id: string } }) {
+export default async function LessonPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { me, sb } = await requireRole(TEACHERS);
   const { data: lesson } = await sb.from("lessons").select("*").eq("id", params.id).maybeSingle();
   if (!lesson) notFound();

@@ -4,7 +4,8 @@ import { LiveRoom } from "./LiveRoom";
 
 export const metadata = { title: "Live classroom" };
 
-export default async function LivePage({ params }: { params: { id: string } }) {
+export default async function LivePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { me, sb } = await requireRole(TEACHERS);
   const { data: session } = await sb.from("class_sessions").select("id,status,class_id,lesson_id,tenant_id").eq("id", params.id).maybeSingle();
   if (!session) notFound();

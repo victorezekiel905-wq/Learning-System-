@@ -1,11 +1,12 @@
-import { fail, requireProfile } from "@/lib/api";
+import { fail, requireProfile, withErrorLog } from "@/lib/api";
 import { toCsv } from "@/lib/utils";
 
 /** CSV export of a report the caller may read (RLS decides). */
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export const GET = withErrorLog(async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { sb, response } = await requireProfile();
   if (response) return response;
-  const { data: r } = await sb.from("reports").select("kind,title,payload,created_at").eq("id", params.id).maybeSingle();
+  const { data: r } = await sb.from("reports").select("kind,title,payload,created_at").eq("id", id).maybeSingle();
   if (!r) return fail(404, "Report not found.");
   const p = r.payload as Record<string, unknown>;
 
@@ -21,4 +22,4 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return new Response("﻿" + csv, {
     headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${name}.csv"`, "Cache-Control": "no-store" }
   });
-}
+});

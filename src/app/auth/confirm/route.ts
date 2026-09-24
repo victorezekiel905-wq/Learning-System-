@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   if (!tokenHash || !type || !TYPES.has(type)) {
     return NextResponse.redirect(new URL("/login?error=This%20link%20is%20incomplete.%20Request%20a%20new%20one.", url));
   }
-  const { error } = await createClient().auth.verifyOtp({ token_hash: tokenHash, type });
+  const { error } = await (await createClient()).auth.verifyOtp({ token_hash: tokenHash, type });
   if (error) {
     const msg = /expired|invalid/i.test(error.message)
       ? "This link has expired or was already used. Sign in, or request a new link."

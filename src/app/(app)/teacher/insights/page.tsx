@@ -15,7 +15,8 @@ type Analytics = {
   per_student: { student_id: string; name: string; sessions_joined: number; accuracy: number | null; submissions: number; alerts: number }[];
 };
 
-export default async function InsightsPage({ searchParams }: { searchParams: { class?: string; days?: string } }) {
+export default async function InsightsPage(props: { searchParams: Promise<{ class?: string; days?: string }> }) {
+  const searchParams = await props.searchParams;
   const { sb } = await requireRole(TEACHERS);
   const { data: classes } = await sb.rpc("my_teaching_classes");
   const list = (classes as { id: string; name: string }[]) ?? [];

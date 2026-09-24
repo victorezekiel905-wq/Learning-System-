@@ -4,7 +4,10 @@ import { NewGameForm } from "./NewGameForm";
 
 export const metadata = { title: "New Challenge" };
 
-export default async function NewGame({ searchParams }: { searchParams: { class?: string; activity?: string; session?: string } }) {
+export default async function NewGame(
+  props: { searchParams: Promise<{ class?: string; activity?: string; session?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const { sb } = await requireRole(TEACHERS);
   const [{ data: classes }, { data: activities }] = await Promise.all([
     sb.rpc("my_teaching_classes"),

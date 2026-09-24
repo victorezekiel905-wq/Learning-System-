@@ -4,7 +4,8 @@ import { UsersTable, type SaUser } from "./UsersTable";
 
 export const metadata = { title: "Users" };
 
-export default async function SuperUsers({ searchParams }: { searchParams: { q?: string } }) {
+export default async function SuperUsers(props: { searchParams: Promise<{ q?: string }> }) {
+  const searchParams = await props.searchParams;
   const { sb } = await requireSuperAdmin();
   const { data } = await sb.rpc("sa_list_users", { p_search: searchParams.q || null, p_tenant: null });
   return (

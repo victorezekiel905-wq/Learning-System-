@@ -15,7 +15,8 @@ type Detail = {
   invites: { code: string; role: string; email: string | null; uses: number; max_uses: number; expires_at: string; revoked_at: string | null }[];
 };
 
-export default async function SchoolDetail({ params }: { params: { id: string } }) {
+export default async function SchoolDetail(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { sb } = await requireSuperAdmin();
   const { data, error } = await sb.rpc("sa_tenant_detail", { p_tenant: params.id });
   if (error || !data) notFound();
