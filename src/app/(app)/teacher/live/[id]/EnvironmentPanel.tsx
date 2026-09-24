@@ -31,7 +31,7 @@ export function EnvironmentPanel({ state, sessionId, envs, scenes, reload, onVie
             {s.environment_active ? <>Active: <strong>{s.environment_name}</strong></> : "No environment active. Devices are monitored but no rules apply."}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Select className="max-w-xs" value={env} onChange={(e) => setEnv(e.target.value)}>{envs.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</Select>
+            <Select aria-label="Environment" className="max-w-xs" value={env} onChange={(e) => setEnv(e.target.value)}>{envs.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</Select>
             <Button disabled={!env} onClick={() => call("start_environment", { p_session: sessionId, p_policy: env }, "Environment started")}>{s.environment_active ? "Switch" : "Start"}</Button>
             {s.environment_active && <Button variant="secondary" onClick={() => call("stop_environment", { p_session: sessionId }, "Environment stopped")}>Stop</Button>}
           </div>
@@ -41,7 +41,7 @@ export function EnvironmentPanel({ state, sessionId, envs, scenes, reload, onVie
         <Card title="Scenes">
           {scenes.length ? (
             <div className="flex flex-wrap gap-2">
-              <Select className="max-w-xs" value={scene} onChange={(e) => setScene(e.target.value)}>{scenes.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>
+              <Select aria-label="Scene" className="max-w-xs" value={scene} onChange={(e) => setScene(e.target.value)}>{scenes.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>
               <Button variant="accent" onClick={() => call("apply_scene", { p_session: sessionId, p_scene: scene }, "Scene applied")}>Apply scene</Button>
             </div>
           ) : <p className="text-sm text-ink-500">Scenes bundle an environment with actions such as opening the lesson tab. <Link href="/guard/environments?tab=scenes">Create one</Link>.</p>}

@@ -57,7 +57,7 @@ export function MediaLibrary({ me }: { me: { id: string; tenantId: string } }) {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Input placeholder="Search title, alt text, tags" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
-          <Select className="w-36" value={kind} onChange={(e) => setKind(e.target.value)}><option value="">All kinds</option>{["image", "video", "audio", "document", "other"].map((k) => <option key={k} value={k}>{k}</option>)}</Select>
+          <Select aria-label="Filter by kind" className="w-36" value={kind} onChange={(e) => setKind(e.target.value)}><option value="">All kinds</option>{["image", "video", "audio", "document", "other"].map((k) => <option key={k} value={k}>{k}</option>)}</Select>
           <label className="btn btn-primary ml-auto cursor-pointer">{busy ? "Uploading…" : "Upload"}<input type="file" multiple className="sr-only" disabled={busy} onChange={(e) => { if (e.target.files?.length) void upload(e.target.files); e.target.value = ""; }} /></label>
         </div>
         {(media.data ?? []).length === 0 ? <Empty title="No media here" /> : (

@@ -60,7 +60,7 @@ export function DevicesClient({ devices, students, isIt, appUrl }: { devices: De
 
       <div className="flex flex-wrap gap-2">
         <Input placeholder="Search device or student" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
-        <Select value={filter} onChange={(e) => setFilter(e.target.value)} className="w-40">
+        <Select aria-label="Filter devices" value={filter} onChange={(e) => setFilter(e.target.value)} className="w-40">
           <option value="all">All</option><option value="online">Online</option><option value="active">Enrolled</option><option value="disabled">Disabled</option><option value="unenrolled">Unenrolled</option>
         </Select>
       </div>
@@ -73,7 +73,7 @@ export function DevicesClient({ devices, students, isIt, appUrl }: { devices: De
               <tr key={d.id}>
                 <td><p className="font-medium">{d.label}</p><p className="text-xs text-ink-500">{[d.os, d.browser].filter(Boolean).join(" · ")}</p></td>
                 <td>{isIt ? (
-                  <Select className="py-1 text-xs" value={d.student_id ?? ""} onChange={(e) => e.target.value && act("device_assign", { p_device: d.id, p_student: e.target.value }, "Reassigned")}>
+                  <Select aria-label={`Assign ${d.label} to a student`} className="py-1 text-xs" value={d.student_id ?? ""} onChange={(e) => e.target.value && act("device_assign", { p_device: d.id, p_student: e.target.value }, "Reassigned")}>
                     <option value="">Unassigned</option>{students.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
                   </Select>
                 ) : d.users?.full_name ?? "—"}</td>

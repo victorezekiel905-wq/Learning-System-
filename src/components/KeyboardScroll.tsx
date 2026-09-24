@@ -15,13 +15,16 @@ export function KeyboardScroll() {
         if (scrolls && !el.hasAttribute("tabindex")) {
           el.tabIndex = 0;
           el.dataset.kbdScroll = "1";
-          if (!el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby") && el.tagName !== "TABLE") {
+          // Never override an element's own role (e.g. a tab list that scrolls on phones).
+          if (!el.hasAttribute("role") && !el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby") && el.tagName !== "TABLE") {
             el.setAttribute("role", "region");
             el.setAttribute("aria-label", "Scrollable content");
+            el.dataset.kbdRole = "1";
           }
         } else if (!scrolls && el.dataset.kbdScroll) {
           el.removeAttribute("tabindex");
           delete el.dataset.kbdScroll;
+          if (el.dataset.kbdRole) { el.removeAttribute("role"); el.removeAttribute("aria-label"); delete el.dataset.kbdRole; }
         }
       });
     };

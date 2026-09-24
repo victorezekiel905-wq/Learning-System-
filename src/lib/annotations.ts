@@ -26,8 +26,8 @@ export function useAnnotations(sessionId: string, slide: number) {
           if (payload.slide === slide) setStrokes((s) => [...s, payload.stroke as Stroke]);
         })
         .on("broadcast", { event: "clear" }, ({ payload }) => { if (payload.slide === slide) setStrokes([]); })
-        .subscribe();
-      channel.current = ch;
+        // Strokes are sent only once the channel is joined (not via the REST fallback).
+        .subscribe((status) => { if (!cancelled) channel.current = status === "SUBSCRIBED" ? ch : null; });
     })();
     return () => { cancelled = true; if (ch) void sb.removeChannel(ch); channel.current = null; };
   }, [sessionId, slide]);

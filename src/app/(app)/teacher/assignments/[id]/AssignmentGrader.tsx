@@ -37,7 +37,7 @@ export function AssignmentGrader({ assignment: a, submissions, roster }: { assig
       <PageHeader eyebrow={<Link href="/teacher/assignments">Assignments</Link>} title={a.title}
         subtitle={<>{a.classes?.name} · {a.due_at ? `due ${formatDateTime(a.due_at)}` : "no due date"} · {a.points_possible} pts{a.rubrics && ` · rubric: ${a.rubrics.title}`}</>}
         actions={<>
-          <Select className="w-40" value={a.status} onChange={(e) => setStatus(e.target.value)}><option value="draft">Draft</option><option value="published">Published</option><option value="closed">Closed</option></Select>
+          <Select aria-label="Assignment status" className="w-40" value={a.status} onChange={(e) => setStatus(e.target.value)}><option value="draft">Draft</option><option value="published">Published</option><option value="closed">Closed</option></Select>
           <Button onClick={async () => { try { const n = await rpc<number>("release_grades", { p_assignment: a.id }); toast(`Released ${n} grade(s)`, "success"); router.refresh(); } catch (e) { toast(errorText(e), "error"); } }}>Release all grades</Button>
         </>} />
       {a.instructions && <Card><RichText text={a.instructions} /></Card>}

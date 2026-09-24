@@ -71,7 +71,8 @@ export function useClassroomGuard(sessionId: string, opts: {
   const stream = useRef<MediaStream | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
   const grabber = useRef<FrameGrabber | null>(null);
-  const channel = useRef<RealtimeChannel | null>(null);
+  const channel = useRef<RealtimeChannel | null>(null);      // joined socket channel
+  const restChannel = useRef<RealtimeChannel | null>(null);  // same topic, for httpSend fallback
   const lastThumb = useRef(0);
   const lastInput = useRef(Date.now());
   const directivesRef = useRef<GuardDirectives | null>(null);
@@ -128,9 +129,12 @@ export function useClassroomGuard(sessionId: string, opts: {
   const sendLive = useCallback(async (quality: "thumbnail" | "spotlight") => {
     try {
       const f = await grab(quality === "spotlight" ? 1280 : 480, MAX_LIVE_FRAME);
-      if (!f || !channel.current) return;
+      if (!f) return;
       const payload: LiveFrame = { ...f, quality, at: Date.now() };
-      await channel.current.send({ type: "broadcast", event: "frame", payload });
+      // Normally over the joined socket; if the channel couldn't be joined (e.g. a
+      // network that blocks WebSockets), use Realtime's explicit HTTP send instead.
+      if (channel.current) await channel.current.send({ type: "broadcast", event: "frame", payload });
+      else if (restChannel.current) await restChannel.current.httpSend("frame", payload);
     } catch { /* a missed frame is fine */ }
   }, [grab]);
 
@@ -196,15 +200,22 @@ export function useClassroomGuard(sessionId: string, opts: {
   useEffect(() => {
     if (!sharing || !opts.userId) return;
     let cancelled = false;
+    let opened: RealtimeChannel | null = null;
     void openChannel(`screen:${sessionId}:${opts.userId}`).then((c) => {
-      if (cancelled) return;
-      channel.current = c;
-      c.subscribe();
+      if (cancelled) { void createClient().removeChannel(c); return; }
+      opened = c;
+      restChannel.current = c;
+      // Frames are only sent once the channel is actually joined (never via the REST fallback).
+      c.subscribe((status) => {
+        if (cancelled) return;
+        channel.current = status === "SUBSCRIBED" ? c : null;
+      });
     });
     return () => {
       cancelled = true;
-      if (channel.current) void createClient().removeChannel(channel.current);
+      if (opened) void createClient().removeChannel(opened);
       channel.current = null;
+      restChannel.current = null;
     };
   }, [sharing, sessionId, opts.userId]);
 

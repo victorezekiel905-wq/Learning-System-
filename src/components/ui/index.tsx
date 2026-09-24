@@ -48,13 +48,25 @@ export function Spinner({ className }: { className?: string }) {
 export function Field({ label, hint, error, children, className, htmlFor }: {
   label?: ReactNode; hint?: ReactNode; error?: string | null; children: ReactNode; className?: string; htmlFor?: string;
 }) {
+  if (htmlFor || !label) {
+    return (
+      <div className={className}>
+        {label && <label className="label" htmlFor={htmlFor}>{label}</label>}
+        {children}
+        {hint && !error && <p className="hint">{hint}</p>}
+        {error && <p className="mt-1 text-xs text-rose-600" role="alert">{error}</p>}
+      </div>
+    );
+  }
+  // No explicit id: the whole field is the <label>, so its text names the control
+  // inside it (screen readers, voice control; clicking the text focuses the input).
   return (
-    <div className={className}>
-      {label && <label className="label" htmlFor={htmlFor}>{label}</label>}
+    <label className={cn("block", className)}>
+      <span className="label">{label}</span>
       {children}
-      {hint && !error && <p className="hint">{hint}</p>}
-      {error && <p className="mt-1 text-xs text-rose-600" role="alert">{error}</p>}
-    </div>
+      {hint && !error && <span className="hint block">{hint}</span>}
+      {error && <span className="mt-1 block text-xs text-rose-600" role="alert">{error}</span>}
+    </label>
   );
 }
 

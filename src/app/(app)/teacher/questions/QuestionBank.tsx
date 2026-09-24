@@ -44,9 +44,9 @@ export function QuestionBank({ me }: { me: { id: string; tenantId: string } }) {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         <Input placeholder="Search" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
-        <Select value={kind} onChange={(e) => setKind(e.target.value)} className="w-52"><option value="">All types</option>{(Object.keys(KIND_LABEL) as QuestionKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}</Select>
+        <Select aria-label="Filter by question type" value={kind} onChange={(e) => setKind(e.target.value)} className="w-52"><option value="">All types</option>{(Object.keys(KIND_LABEL) as QuestionKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}</Select>
         <Input placeholder="Tag" value={tag} onChange={(e) => setTag(e.target.value)} className="w-36" />
-        <Select className="ml-auto w-auto" value="" onChange={(e) => e.target.value && setEditing({ ...blankQuestion(e.target.value as QuestionKind), in_bank: true })}>
+        <Select aria-label="Add a question" className="ml-auto w-auto" value="" onChange={(e) => e.target.value && setEditing({ ...blankQuestion(e.target.value as QuestionKind), in_bank: true })}>
           <option value="">+ New question…</option>{(Object.keys(KIND_LABEL) as QuestionKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
         </Select>
       </div>

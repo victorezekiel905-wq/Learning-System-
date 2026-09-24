@@ -50,3 +50,16 @@ test("lesson importer turns markdown into safe text slides", async () => {
   assert.equal(tags.body, "- <a> links\n- <p> paragraphs", "bullets preserved, markup left as plain text (rendered escaped)");
   await assert.rejects(importer.importLessonFromUpload({ filename: "x.exe", mimeType: "", bytes: new Uint8Array() }), /Unsupported file type/);
 });
+
+test("school brand colours are made readable (white text >= 4.5:1), strong colours untouched", async () => {
+  const theme = await load("src/lib/theme.ts");
+  const hex = (t) => "#" + t.split(" ").map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+  for (const pick of ["#ffff00", "#7dd3fc", "#f9a8d4", "#22c55e", "#ffffff", "#0891b2"]) {
+    const v = theme.paletteVars("brand", pick);
+    const c = theme.contrastWithWhite(hex(v["--brand-600"]));
+    assert.ok(c >= 4.5, `${pick} → ${hex(v["--brand-600"])} contrast ${c.toFixed(2)}`);
+  }
+  // Already-dark brand colours are kept exactly as chosen.
+  assert.equal(theme.paletteVars("brand", "#4f46e5")["--brand-600"], "79 70 229");
+  assert.equal(theme.paletteVars("brand", "#1e3a8a")["--brand-600"], "30 58 138");
+});

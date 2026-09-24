@@ -33,6 +33,26 @@ export async function makeUser(tag: string, role: string, created: { users: stri
   return { id: data.user.id, email, password, client };
 }
 
+/**
+ * Puts the user's existing session into a browser context exactly as @supabase/ssr
+ * stores it after a sign-in (cookie sb-<ref>-auth-token, "base64-" JSON, chunked
+ * over ~3 KB). Avoids a fresh sign-in per test, which Supabase rate-limits.
+ */
+export async function sessionCookies(u: TestUser, baseURL: string) {
+  const { data } = await u.client.auth.getSession();
+  if (!data.session) throw new Error("no session");
+  const ref = new URL(SUPABASE_URL).hostname.split(".")[0];
+  const name = `sb-${ref}-auth-token`;
+  const value = "base64-" + Buffer.from(JSON.stringify(data.session)).toString("base64url");
+  const url = new URL(baseURL);
+  const common = { domain: url.hostname, path: "/", httpOnly: false, secure: url.protocol === "https:", sameSite: "Lax" as const };
+  const MAX = 3180;
+  if (value.length <= MAX) return [{ name, value, ...common }];
+  const out = [];
+  for (let i = 0; i * MAX < value.length; i++) out.push({ name: `${name}.${i}`, value: value.slice(i * MAX, (i + 1) * MAX), ...common });
+  return out;
+}
+
 export async function call<T = unknown>(c: SupabaseClient, fn: string, args: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await c.rpc(fn, args);
   if (error) throw new Error(`${fn}: ${error.message}`);
@@ -42,8 +62,15 @@ export async function call<T = unknown>(c: SupabaseClient, fn: string, args: Rec
 /** True when the database has the schema this build expects (the update SQL has been applied). */
 export async function dbReady(minSchema = "0760"): Promise<boolean> {
   if (!SUPABASE_URL || !ANON) return false;
-  const { data } = await createClient(SUPABASE_URL, ANON, opts).rpc("health");
-  return !!data && String((data as { schema?: string }).schema ?? "") >= minSchema;
+  // Retries: a single dropped request must not silently skip the live tests.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const { data, error } = await createClient(SUPABASE_URL, ANON, opts).rpc("health");
+      if (!error) return !!data && String((data as { schema?: string }).schema ?? "") >= minSchema;
+    } catch { /* network blip */ }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
 }
 
 export async function cleanup(created: { users: string[]; tenants: string[] }) {

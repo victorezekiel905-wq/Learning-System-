@@ -24,7 +24,7 @@ export function UsersTable({ users, hideTenant }: { users: SaUser[]; hideTenant?
           <tr key={u.id}>
             <td><p className="font-medium">{u.full_name}</p><p className="text-xs text-ink-500">{u.email}</p></td>
             {!hideTenant && <td className="text-sm"><Link href={`/super/schools/${u.tenant_id}`}>{u.tenant}</Link>{u.tenant_status !== "active" && <Badge tone="red" className="ml-1">suspended</Badge>}</td>}
-            <td><Select className="py-1 text-xs" value={u.role} onChange={(e) => act("sa_set_user_role", { p_user: u.id, p_role: e.target.value }, "Role changed")}>
+            <td><Select aria-label={`Role for ${u.full_name}`} className="py-1 text-xs" value={u.role} onChange={(e) => act("sa_set_user_role", { p_user: u.id, p_role: e.target.value }, "Role changed")}>
               {ROLES.map((r) => <option key={r} value={r}>{r.replace("_", " ")}</option>)}</Select></td>
             <td><Badge tone={u.status === "active" ? "green" : "red"}>{u.status}</Badge></td>
             <td className="text-xs text-ink-500">{formatDate(u.created_at)}</td>

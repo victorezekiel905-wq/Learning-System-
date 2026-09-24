@@ -33,7 +33,7 @@ export function SchoolsClient({ tenants, plans, q, openNew }: { tenants: TenantR
           <tbody>{tenants.map((t) => (
             <tr key={t.id}>
               <td><Link href={`/super/schools/${t.id}`} className="font-medium">{t.name}</Link><p className="text-xs text-ink-500">{t.slug}{t.country && ` · ${t.country}`}</p></td>
-              <td><Select className="py-1 text-xs" value={t.plan_code} onChange={(e) => act("sa_update_tenant", { p_tenant: t.id, p_plan: e.target.value }, "Plan changed")}>
+              <td><Select aria-label={`Plan for ${t.name}`} className="py-1 text-xs" value={t.plan_code} onChange={(e) => act("sa_update_tenant", { p_tenant: t.id, p_plan: e.target.value }, "Plan changed")}>
                 {plans.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</Select></td>
               <td>{t.status === "active" ? <Badge tone="green">active</Badge> : <Badge tone="red" >suspended</Badge>}{t.suspended_reason && <p className="text-[11px] text-ink-500">{t.suspended_reason}</p>}</td>
               <td className="text-xs">{t.staff} staff · {t.students} students</td>

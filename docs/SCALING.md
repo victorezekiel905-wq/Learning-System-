@@ -101,6 +101,8 @@ Use a **staging** project on the same plan and compute as production:
 node scripts/load/classroom-load.mjs --students 1000 --class-size 30 --minutes 10 --frames
 ```
 
+Run it from a machine close to the database (for example a cloud VM in Ireland). From a distant or busy connection the numbers mostly measure that connection: from an office PC in Nigeria, a bare round trip took 300–400 ms, while the database itself answers each classroom call in milliseconds.
+
 It creates a throwaway school, simulates exactly what the pages do, prints request rates and p50/p95/p99 latency per call, then deletes everything. For bigger numbers, run several copies from different machines.
 
 **Pass criteria:**

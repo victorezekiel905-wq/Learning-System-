@@ -48,7 +48,7 @@ export function UsersClient({ users, total, page, pageSize, q, role, invites, me
         <>
           <form className="flex flex-wrap gap-2" action="/admin/users">
             <Input name="q" placeholder="Search name or email" defaultValue={q} className="w-full sm:max-w-xs" />
-            <Select name="role" className="w-full sm:w-44" defaultValue={role} onChange={(e) => e.currentTarget.form?.requestSubmit()}><option value="">All roles</option>{Object.entries(ROLE_LABEL).filter(([k]) => k !== "platform_admin").map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
+            <Select name="role" aria-label="Filter by role" className="w-full sm:w-44" defaultValue={role} onChange={(e) => e.currentTarget.form?.requestSubmit()}><option value="">All roles</option>{Object.entries(ROLE_LABEL).filter(([k]) => k !== "platform_admin").map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
             <Button type="submit" variant="secondary">Search</Button>
           </form>
           <div className="card overflow-x-auto"><table className="table">
@@ -57,7 +57,7 @@ export function UsersClient({ users, total, page, pageSize, q, role, invites, me
               <tr key={u.id}>
                 <td><p className="font-medium">{u.full_name}</p><p className="text-xs text-ink-500">{u.email}</p></td>
                 <td>{u.id === meId ? <Badge tone="brand">{ROLE_LABEL[u.role]}</Badge> : (
-                  <Select className="py-1 text-xs" value={u.role} onChange={(e) => call("admin_set_user_role", { p_user: u.id, p_role: e.target.value }, "Role updated")}>
+                  <Select aria-label={`Role for ${u.full_name}`} className="py-1 text-xs" value={u.role} onChange={(e) => call("admin_set_user_role", { p_user: u.id, p_role: e.target.value }, "Role updated")}>
                     {(["student", "teacher", "it_admin", "school_admin", "parent"] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
                   </Select>)}</td>
                 <td><Badge tone={u.status === "active" ? "green" : "red"}>{u.status}</Badge></td>

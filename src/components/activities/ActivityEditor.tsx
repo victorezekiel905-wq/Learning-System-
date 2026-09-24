@@ -121,7 +121,7 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={() => setBankOpen(true)}>From question bank</Button>
             {allowed.length === 1 ? <Button size="sm" onClick={() => addQuestion(allowed[0]!)}>Add question</Button> : (
-              <Select className="w-auto py-1 text-xs" value="" onChange={(e) => e.target.value && addQuestion(e.target.value as QuestionKind)}>
+              <Select aria-label="Add a question" className="w-auto py-1 text-xs" value="" onChange={(e) => e.target.value && addQuestion(e.target.value as QuestionKind)}>
                 <option value="">+ Add question…</option>{allowed.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
               </Select>
             )}

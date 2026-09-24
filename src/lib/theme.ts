@@ -17,9 +17,28 @@ const STEPS: [number, "w" | "b", number][] = [
   [600, "w", 0], [700, "b", 0.16], [800, "b", 0.32], [900, "b", 0.46], [950, "b", 0.64]
 ];
 
+const relLum = (c: RGB) => {
+  const [r, g, b] = c.map((v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }) as RGB;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+/** WCAG AA for normal text: white on the button colour must reach 4.5:1. */
+const AA = 4.5;
+
+/**
+ * A school may pick any colour, but buttons and links must stay readable: if
+ * white text on the chosen colour is below 4.5:1, it is darkened (same hue)
+ * until it passes. Most brand colours pass unchanged.
+ */
+export function accessibleBase(c: RGB): RGB {
+  let out = c;
+  for (let i = 0; i < 30 && 1.05 / (relLum(out) + 0.05) < AA; i++) out = mix(out, [0, 0, 0], 0.06);
+  return out;
+}
+
 export function paletteVars(name: "brand" | "accent", hex: string | null | undefined): Record<string, string> {
-  const base = hex ? hexToRgb(hex) : null;
-  if (!base) return {};
+  const picked = hex ? hexToRgb(hex) : null;
+  if (!picked) return {};
+  const base = accessibleBase(picked);
   const out: Record<string, string> = {};
   for (const [step, dir, t] of STEPS) {
     if (name === "accent" && step === 950) continue;

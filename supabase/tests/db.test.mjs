@@ -772,7 +772,8 @@ test("scale: indexes, push signals, write throttling, private channels, batched 
   const can = async (u, fn, topic) => (await db.as(u, `select app.${fn}($1) ok`, [topic]))[0].ok;
   assert.equal(await can(S.stu1, "can_listen", `session:${s.id}`), true);
   assert.equal(await can(S.stu1, "can_listen", `staff:${s.id}`), false);
-  assert.equal(await can(S.stu1, "can_listen", `screen:${s.id}:${S.stu1}`), false, "students can't watch screens");
+  assert.equal(await can(S.stu1, "can_listen", `screen:${s.id}:${S.stu1}`), true, "a student may join their own screen channel (to send)");
+  assert.equal(await can(S.stu1, "can_listen", `screen:${s.id}:${S.stu2}`), false, "students cannot watch other screens");
   assert.equal(await can(S.teacherA, "can_listen", `screen:${s.id}:${S.stu1}`), true);
   assert.equal(await can(S.teacherA, "can_listen", `staff:${s.id}`), true);
   assert.equal(await can(S.stu1, "can_send", `screen:${s.id}:${S.stu1}`), true);
@@ -813,6 +814,7 @@ test("realtime authorization: joining and sending on private channels, as Supaba
   assert.equal(await join(S.teacherA, `staff:${s.id}`), true);
   assert.equal(await join(S.teacherA, `screen:${s.id}:${S.stu1}`), true, "teacher watches a student's screen");
   assert.equal(await join(S.stu2, `screen:${s.id}:${S.stu1}`), false, "classmates can't watch each other");
+  assert.equal(await join(S.stu1, `screen:${s.id}:${S.stu1}`), true, "a student joins their own screen channel to stream");
   assert.equal(await join(S.adminB, `session:${s.id}`), false, "other schools can't join");
   assert.equal(await send(S.stu1, `screen:${s.id}:${S.stu1}`), true, "student streams their own screen");
   assert.equal(await send(S.stu1, `screen:${s.id}:${S.stu2}`), false, "no streaming as someone else");

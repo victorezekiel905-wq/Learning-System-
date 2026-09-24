@@ -176,7 +176,7 @@ function SceneEditor({ value, policies, me, onClose, onSaved }: { value: Partial
             const meta = RULE_TYPES.find((t) => t.v === r.rule_type);
             return (
               <div key={i} className="flex gap-2">
-                <Select className="w-44" value={r.rule_type} onChange={(e) => setRules(rules.map((x, j) => j === i ? { ...x, rule_type: e.target.value } : x))}>{RULE_TYPES.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}</Select>
+                <Select aria-label={`Rule ${i + 1} type`} className="w-44" value={r.rule_type} onChange={(e) => setRules(rules.map((x, j) => j === i ? { ...x, rule_type: e.target.value } : x))}>{RULE_TYPES.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}</Select>
                 {meta?.needs && <Input placeholder={meta.needs} value={r.value} onChange={(e) => setRules(rules.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />}
                 <Button size="sm" variant="ghost" onClick={() => setRules(rules.filter((_, j) => j !== i))}>✕</Button>
               </div>

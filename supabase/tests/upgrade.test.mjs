@@ -19,7 +19,7 @@ test("update file upgrades a live database from 0730 and is safe to re-run", asy
     const r = await db.pg.exec(sql);
     assert.deepEqual(r.at(-1).rows[0], { lockdown_ready: true, operations_ready: true, scale_ready: true });
   }
-  assert.equal((await db.rpc(null, "health", {})).schema, "0760");
+  assert.equal((await db.rpc(null, "health", {})).schema, "0770");
   // Existing data still works through the new code paths.
   const s = await db.rpc(admin, "start_session", { p_class: cls.id });
   await db.rpc(student, "join_session", { p_code: s.join_code });
@@ -35,4 +35,22 @@ test("update file upgrades a live database from 0730 and is safe to re-run", asy
   await db.admin("update public.session_participants set last_seen_at = now() - interval '60 seconds' where session_id = $1 and user_id = $2", [s.id, student]);
   const st = await db.rpc(admin, "teacher_session_state", { p_session: s.id });
   assert.equal(st.roster.find((r) => r.student_id === student).presence, "online");
+});
+
+test("2026-09-25 hotfix applies on a database at 0760 and lets a student join their own screen channel", async () => {
+  const db = await createDb("20260901000760_scale.sql");
+  const sql = readFileSync(new URL("../updates/2026-09-25_screen_channel_join.sql", import.meta.url), "utf8");
+  for (let i = 0; i < 2; i++) assert.equal((await db.pg.exec(sql)).at(-1).rows[0].schema, "0770");
+  const admin = await db.signUp("a@hot.test", "Hot Admin");
+  const tenant = (await db.rpc(admin, "bootstrap_school", { p_school_name: "Hot School", p_full_name: "Hot Admin" })).tenant_id;
+  await db.admin("update public.tenants set plan_code = 'school' where id = $1", [tenant]);
+  const cls = await db.rpc(admin, "create_class", { p_name: "Hot 1" });
+  const stu = await db.signUp("s@hot.test", "Hot Student");
+  const other = await db.signUp("o@hot.test", "Other Student");
+  for (const u of [stu, other]) await db.rpc(u, "redeem_code", { p_code: cls.join_code });
+  const s = await db.rpc(admin, "start_session", { p_class: cls.id });
+  const can = async (u, topic) => (await db.as(u, "select app.can_listen($1) ok", [topic]))[0].ok;
+  assert.equal(await can(stu, `screen:${s.id}:${stu}`), true);
+  assert.equal(await can(other, `screen:${s.id}:${stu}`), false);
+  assert.equal(await can(admin, `screen:${s.id}:${stu}`), true);
 });

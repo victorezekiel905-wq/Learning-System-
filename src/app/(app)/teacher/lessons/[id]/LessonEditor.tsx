@@ -196,7 +196,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
           </ol>
           {canEdit && (
             <div className="mt-3">
-              <Select value="" onChange={(e) => { const k = e.target.value as SlideKind; if (!k) return; if (k === "activity") setAddKind(k); else void addSlide(k); }}>
+              <Select aria-label="Add a slide" value="" onChange={(e) => { const k = e.target.value as SlideKind; if (!k) return; if (k === "activity") setAddKind(k); else void addSlide(k); }}>
                 <option value="">+ Add slide…</option>
                 {SLIDE_KINDS.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}
               </Select>

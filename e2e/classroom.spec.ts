@@ -85,8 +85,9 @@ test.describe("live classroom", () => {
     await expect(sPage.getByRole("dialog").getByRole("heading", { name: "Return to the lesson" })).toBeVisible();
 
     // Teacher: red LEFT CLASS tile after the grace period, with the student's screen attached.
-    await expect(tile.getByText("LEFT CLASS")).toBeVisible({ timeout: 45_000 });
-    await expect(tPage.getByRole("alert")).toContainText("E2E Student");
+    await expect(tile.getByText("LEFT CLASS", { exact: true })).toBeVisible({ timeout: 45_000 });
+    // The alert bar across the top of the live room names the student.
+    await expect(tPage.getByRole("alert").filter({ hasText: "E2E Student" }).first()).toBeVisible({ timeout: 20_000 });
     const { data: ev } = await admin().from("environment_events").select("rule, evidence_image")
       .eq("class_session_id", sessionId).is("resolved_at", null).single();
     expect(ev?.rule).toMatch(/full-screen/);
@@ -94,7 +95,7 @@ test.describe("live classroom", () => {
     // Student comes back → alert resolves.
     await sPage.getByRole("dialog").getByRole("button", { name: "Enter full screen" }).click();
     await expect(sPage.getByRole("dialog")).toBeHidden();
-    await expect(tile.getByText("LEFT CLASS")).toHaveCount(0, { timeout: 30_000 });
+    await expect(tile.getByText("LEFT CLASS", { exact: true })).toHaveCount(0, { timeout: 30_000 });
     const { count } = await admin().from("environment_events").select("id", { count: "exact", head: true })
       .eq("class_session_id", sessionId).is("resolved_at", null);
     expect(count).toBe(0);

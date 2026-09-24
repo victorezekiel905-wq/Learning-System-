@@ -215,7 +215,7 @@ function Groups({ cls, canManage, students, policies }: { cls: Cls; canManage: b
           return (
             <Card key={g.id} title={g.name} actions={canManage && <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => del(g)}>Delete</Button>}>
               <Field label="Auto-start environment">
-                <Select disabled={!canManage} value={g.auto_start_policy_id ?? ""} onChange={(e) => setPolicy(g, e.target.value)}>
+                <Select aria-label={`Environment that starts automatically for ${g.name}`} disabled={!canManage} value={g.auto_start_policy_id ?? ""} onChange={(e) => setPolicy(g, e.target.value)}>
                   <option value="">None</option>
                   {policies.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </Select>

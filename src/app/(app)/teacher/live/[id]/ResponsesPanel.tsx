@@ -42,7 +42,7 @@ export function ResponsesPanel({ state, me, reload }: { state: SessionState; me:
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Select className="max-w-sm" value={activityId} onChange={(e) => setPicked(e.target.value)}>
+        <Select aria-label="Activity" className="max-w-sm" value={activityId} onChange={(e) => setPicked(e.target.value)}>
           <option value="">Choose an activity…</option>
           {(activities.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.title}{a.id === s.active_activity_id ? " (open)" : ""}</option>)}
         </Select>

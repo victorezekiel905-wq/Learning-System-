@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { admin, call, canSeed, cleanup, dbReady, makeUser, type TestUser } from "./env";
+import { admin, call, canSeed, cleanup, dbReady, makeUser, sessionCookies, type TestUser } from "./env";
 
 // Every page must fit a phone (360 px), a tablet (768 px) and a laptop (1280 px)
 // with no sideways scrolling, and keep its main controls reachable.
@@ -70,23 +70,27 @@ test.describe("responsive: signed-in pages", () => {
   });
   test.afterAll(async () => { await cleanup(created); });
 
+  // Reuse the test user's session (the sign-in form itself is covered by the classroom test).
   async function signIn(page: Page, u: TestUser) {
-    await page.goto("/login");
-    await page.locator("#email").fill(u.email);
-    await page.locator("#password").fill(u.password);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 30_000 });
+    const base = test.info().project.use.baseURL ?? "http://localhost:3100";
+    await page.context().addCookies(await sessionCookies(u, base));
+    await page.goto("/dashboard");
+    await expect(page).not.toHaveURL(/\/login/);
   }
 
-  for (const vp of VIEWPORTS) {
-    test(`teacher and admin pages fit a ${vp.name}`, async ({ page }) => {
+  // One sign-in per role (Supabase rate-limits sign-ins), every page at every size.
+  test("teacher and admin pages fit phone, tablet and laptop", async ({ page }) => {
+    test.setTimeout(300_000);
+    await signIn(page, teacher);
+    for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await signIn(page, teacher);
       for (const path of ["/teacher", "/teacher/classes", `/teacher/classes/${classId}`, "/teacher/lessons", "/teacher/live/new",
                           `/teacher/live/${sessionId}`, "/teacher/challenge", "/teacher/reports", "/admin", "/admin/users", "/admin/settings",
                           "/messages", "/notifications", "/account"]) {
         await page.goto(path);
-        await page.waitForLoadState("networkidle").catch(() => {});
+        // Live pages hold a realtime socket open, so they never go "network idle".
+        await page.waitForLoadState("load");
+        await page.waitForTimeout(1200);
         await expectNoSidewaysScroll(page, `${path} @ ${vp.width}px`);
         if (vp.name !== "tablet") await expectAccessible(page, `${path} @ ${vp.width}px`);
       }
@@ -95,20 +99,25 @@ test.describe("responsive: signed-in pages", () => {
       await expect(page.getByRole("complementary", { name: "Student screens" })).toBeVisible();
       await expect(page.getByText("Join code")).toBeVisible();
       if (vp.width < 1024) await expect(page.getByRole("button", { name: "Menu" })).toBeVisible();
-    });
+    }
+  });
 
-    test(`student pages fit a ${vp.name}`, async ({ page }) => {
+  test("student pages fit phone, tablet and laptop", async ({ page }) => {
+    test.setTimeout(180_000);
+    await signIn(page, student);
+    for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await signIn(page, student);
       for (const path of ["/student", "/student/work", `/student/live/${sessionId}`, "/account"]) {
         await page.goto(path);
-        await page.waitForLoadState("networkidle").catch(() => {});
+        // Live pages hold a realtime socket open, so they never go "network idle".
+        await page.waitForLoadState("load");
+        await page.waitForTimeout(1200);
         await expectNoSidewaysScroll(page, `${path} @ ${vp.width}px`);
         if (vp.name !== "tablet") await expectAccessible(page, `${path} @ ${vp.width}px`);
       }
       // The lockdown gate's buttons are reachable on every screen size.
       await page.goto(`/student/live/${sessionId}`);
       await expect(page.getByRole("dialog").getByRole("button").first()).toBeInViewport();
-    });
-  }
+    }
+  });
 });

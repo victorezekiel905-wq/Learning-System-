@@ -101,7 +101,13 @@ try {
         const { data } = await s.c.auth.getSession();
         await s.c.realtime.setAuth(data.session.access_token);
         ch = s.c.channel(`screen:${s.session}:${s.id}`, { config: { private: true } });
-        ch.subscribe();
+        // Like the app: frames go over the joined socket, never the REST fallback.
+        const joined = await new Promise((res) => {
+          const t = setTimeout(() => res(false), 15_000);
+          ch.subscribe((status) => { if (status === "SUBSCRIBED") { clearTimeout(t); res(true); } else if (status !== "SUBSCRIBED" && status !== "JOINING") { clearTimeout(t); res(false); } });
+        });
+        rec("realtime_join", 0, !joined);
+        if (!joined) { await s.c.removeChannel(ch); ch = null; }
       }
       let lastFrame = 0;
       while (!stop) {
