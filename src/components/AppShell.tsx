@@ -3,7 +3,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useNetwork, useRealtime } from "@/lib/hooks";
+import { useNetwork } from "@/lib/hooks";
+import { useSignal } from "@/lib/realtime";
 import type { Me, Role } from "@/lib/types";
 import { ROLE_LABEL } from "@/lib/types";
 import { cn, timeAgo } from "@/lib/utils";
@@ -159,7 +160,7 @@ function NotificationBell({ userId, initialUnread }: { userId: string; initialUn
   }
 
   useEffect(() => { void load(); }, []);
-  useRealtime(`notif:${userId}`, [{ table: "notifications", filter: `user_id=eq.${userId}` }], () => {
+  useSignal(`user:${userId}`, ["notification"], () => {
     void load();
     // Browser notification for critical alerts when the tab is in the background (§3.6).
     if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {

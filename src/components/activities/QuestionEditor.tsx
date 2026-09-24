@@ -231,7 +231,7 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
               <div className="space-y-2">
                 <p className="label">Self-check tests (students can see these; the final mark is yours)</p>
                 {tests.map((t, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2">
+                  <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
                     <Input placeholder="Name" value={t.name} onChange={(e) => setConfig({ tests: tests.map((x, j) => j === i ? { ...x, name: e.target.value } : x) })} />
                     <Input placeholder="Expression, e.g. add(2,3)" className="font-mono text-xs" value={t.input} onChange={(e) => setConfig({ tests: tests.map((x, j) => j === i ? { ...x, input: e.target.value } : x) })} />
                     <Input placeholder="Expected, e.g. 5" className="font-mono text-xs" value={t.expected} onChange={(e) => setConfig({ tests: tests.map((x, j) => j === i ? { ...x, expected: e.target.value } : x) })} />

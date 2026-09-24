@@ -39,6 +39,13 @@ export async function call<T = unknown>(c: SupabaseClient, fn: string, args: Rec
   return data as T;
 }
 
+/** True when the database has the schema this build expects (the update SQL has been applied). */
+export async function dbReady(minSchema = "0760"): Promise<boolean> {
+  if (!SUPABASE_URL || !ANON) return false;
+  const { data } = await createClient(SUPABASE_URL, ANON, opts).rpc("health");
+  return !!data && String((data as { schema?: string }).schema ?? "") >= minSchema;
+}
+
 export async function cleanup(created: { users: string[]; tenants: string[] }) {
   const a = admin();
   for (const id of created.tenants) await a.from("tenants").delete().eq("id", id);

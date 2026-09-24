@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useLoader, useRealtime } from "@/lib/hooks";
+import { useLoader } from "@/lib/hooks";
+import { useSignal } from "@/lib/realtime";
 import { Alert, Badge, Button, Textarea, useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +50,7 @@ export function CollabBoard({ activityId, sessionId, title, tenantId, userId, ma
       .eq("board_id", board.id).order("created_at");
     return (data ?? []) as unknown as Post[];
   }, [board?.id]);
-  useRealtime(`board:${board?.id}`, [{ table: "collab_posts", filter: `board_id=eq.${board?.id}` }], () => void posts.reload(), !!board);
+  useSignal(board ? `board:${board.id}` : null, ["post"], () => void posts.reload(), { minGapMs: 1000 });
 
   if (!board) return <Alert>{manage ? "Setting up the board…" : "Waiting for your teacher to open the board."}</Alert>;
 

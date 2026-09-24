@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, call, canSeed, cleanup, makeUser, type TestUser } from "./env";
+import { admin, call, canSeed, cleanup, dbReady, makeUser, type TestUser } from "./env";
 
 // The core promise of SwiftCipher, in a real browser:
 //  1. a student joins a live class, shares their entire screen and goes full screen;
@@ -9,6 +9,7 @@ import { admin, call, canSeed, cleanup, makeUser, type TestUser } from "./env";
 //     LEFT CLASS alert; the student comes back → the alert clears.
 test.describe("live classroom", () => {
   test.skip(!canSeed, "needs NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY");
+  test.beforeAll(async () => { test.skip(!(await dbReady()), "database update not applied yet (supabase/updates/2026-09-24_production_release.sql)"); });
 
   const created = { users: [] as string[], tenants: [] as string[] };
   const tag = Date.now().toString(36);

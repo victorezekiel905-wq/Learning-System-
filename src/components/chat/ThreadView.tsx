@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Textarea, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
-import { useLoader, useRealtime } from "@/lib/hooks";
+import { useLoader } from "@/lib/hooks";
+import { useSignal } from "@/lib/realtime";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -18,7 +19,7 @@ export function ThreadView({ threadId, meId, canModerate, className }: { threadI
       .eq("thread_id", threadId).order("created_at").limit(300);
     return (data ?? []) as unknown as Msg[];
   }, [threadId]);
-  useRealtime(`thread:${threadId}`, [{ table: "chat_messages", filter: `thread_id=eq.${threadId}` }], () => void msgs.reload());
+  useSignal(`thread:${threadId}`, ["message"], () => void msgs.reload(), { debounceMs: 100 });
   useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [msgs.data?.length]);
 
   async function send() {

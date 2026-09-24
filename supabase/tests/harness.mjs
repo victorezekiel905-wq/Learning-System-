@@ -54,6 +54,12 @@ grant select on storage.buckets to anon, authenticated, service_role;
 
 create publication supabase_realtime;
 
+-- Realtime "Broadcast from Database": records what would be sent.
+create schema realtime;
+create table realtime.sent (id bigserial primary key, topic text, event text, payload jsonb, private boolean, at timestamptz default now());
+create function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void
+  language sql as $$ insert into realtime.sent (topic, event, payload, private) values (topic, event, payload, private) $$;
+
 -- Supabase grants these by default on everything created in public.
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
@@ -65,10 +71,11 @@ export function migrationFiles() {
   return readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();
 }
 
-export async function createDb() {
+/** `upTo`: apply only migrations whose file name sorts at or before it (to test upgrade paths). */
+export async function createDb(upTo) {
   const db = new PGlite();
   await db.exec(SUPABASE_SHIM);
-  for (const file of migrationFiles()) {
+  for (const file of migrationFiles().filter((f) => !upTo || f <= upTo)) {
     const sql = readFileSync(join(migrationsDir, file), "utf8");
     try {
       await db.exec(sql);

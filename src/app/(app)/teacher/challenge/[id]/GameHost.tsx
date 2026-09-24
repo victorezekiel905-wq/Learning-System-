@@ -4,16 +4,17 @@ import { Countdown } from "@/components/game/Countdown";
 import { BADGE, OPTION_COLORS, type GameState, type Leaderboard } from "@/components/game/types";
 import { RichText } from "@/components/RichText";
 import { Alert, Badge, Button, Card, useToast } from "@/components/ui";
-import { useRealtime, useRpc } from "@/lib/hooks";
+import { useRpc } from "@/lib/hooks";
+import { useSignal } from "@/lib/realtime";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn } from "@/lib/utils";
 
 export function GameHost({ gameId, school }: { gameId: string; school: string }) {
   const toast = useToast();
   const [fetchedAt, setFetchedAt] = useState(Date.now());
-  const state = useRpc<GameState>("game_state", { p_game: gameId }, [gameId], { intervalMs: 2000 });
+  const state = useRpc<GameState>("game_state", { p_game: gameId }, [gameId], { intervalMs: 10000 });
   const board = useRpc<Leaderboard>("game_leaderboard", { p_game: gameId, p_limit: 50 }, [gameId, state.data?.status, state.data?.current_index]);
-  useRealtime(`game:${gameId}`, [{ table: "game_sessions", filter: `id=eq.${gameId}` }, { table: "game_players", filter: `game_id=eq.${gameId}` }], () => { void state.reload(); void board.reload(); });
+  useSignal(`game:${gameId}`, ["state", "players"], () => { void state.reload(); void board.reload(); }, { debounceMs: 100, minGapMs: 1000 });
   useEffect(() => setFetchedAt(Date.now()), [state.data?.server_now]);
   const g = state.data;
 

@@ -3,14 +3,15 @@ import { SlideView, type SlideData } from "@/components/slides/SlideView";
 import { BOARD_H, BOARD_W, StrokeLayer } from "@/components/slides/Whiteboard";
 import type { SessionState } from "@/components/live/types";
 import { useAnnotations } from "@/lib/annotations";
-import { useLoader, useRealtime, useRpc } from "@/lib/hooks";
+import { useLoader, useRpc } from "@/lib/hooks";
+import { useSignal } from "@/lib/realtime";
 import { rpc } from "@/lib/rpc";
 
 export function Presenter({ sessionId }: { sessionId: string }) {
-  const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: 4000 });
+  const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: 15000 });
   const lesson = useLoader(() => rpc<{ slides: SlideData[] }>("session_lesson", { p_session: sessionId }), [sessionId]);
-  const spot = useRpc<{ student: string; image: string | null; stale: boolean } | null>("spotlight_view", { p_session: sessionId }, [sessionId], { intervalMs: 3000 });
-  useRealtime(`present:${sessionId}`, [{ table: "class_sessions", filter: `id=eq.${sessionId}` }, { table: "spotlights", filter: `session_id=eq.${sessionId}` }], () => { void state.reload(); void spot.reload(); });
+  const spot = useRpc<{ student: string; image: string | null; stale: boolean } | null>("spotlight_view", { p_session: sessionId }, [sessionId], { intervalMs: 3000, enabled: !!state.data?.spotlight?.show_to_class });
+  useSignal(`staff:${sessionId}`, ["state"], () => { void state.reload(); void spot.reload(); }, { debounceMs: 100 });
   const s = state.data?.session;
   const ann = useAnnotations(sessionId, s?.current_slide ?? 0);
   const slide = (lesson.data?.slides ?? []).find((x) => x.position === s?.current_slide);

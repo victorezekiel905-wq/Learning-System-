@@ -5,15 +5,17 @@ import { BADGE, OPTION_COLORS, type GameState, type Leaderboard } from "@/compon
 import { RichText } from "@/components/RichText";
 import { Alert, Button, Card, Field, Input, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
-import { useRealtime, useRpc } from "@/lib/hooks";
+import { useRpc } from "@/lib/hooks";
+import { useSignal } from "@/lib/realtime";
 import { ActionError, errorText, rpc } from "@/lib/rpc";
 import { cn } from "@/lib/utils";
 
 export function GamePlayer({ gameId }: { gameId: string }) {
   const toast = useToast();
-  const state = useRpc<GameState>("game_state", { p_game: gameId }, [gameId], { intervalMs: 2500 });
+  const state = useRpc<GameState>("game_state", { p_game: gameId }, [gameId], { intervalMs: 10000 });
   const board = useRpc<Leaderboard>("game_leaderboard", { p_game: gameId, p_limit: 10 }, [gameId, state.data?.status, state.data?.current_index]);
-  useRealtime(`play:${gameId}`, [{ table: "game_sessions", filter: `id=eq.${gameId}` }], () => { void state.reload(); void board.reload(); });
+  // Phase changes are pushed; the slow poll is only a safety net.
+  useSignal(`game:${gameId}`, ["state"], () => { void state.reload(); void board.reload(); }, { debounceMs: 50 });
   const [fetchedAt, setFetchedAt] = useState(Date.now());
   const [picked, setPicked] = useState<string[]>([]);
   const [sent, setSent] = useState<number | null>(null);

@@ -534,7 +534,20 @@ test("platform super admin: singleton, invisible, cross-tenant control", async (
   const ov = await db.rpc(S.superA, "sa_overview");
   assert.equal(ov.tenants, 2);
   const list = await db.rpc(S.superA, "sa_list_tenants", {});
-  assert.deepEqual(list.map((t) => t.name).sort(), ["Alpha Academy", "Beta School"]);
+  assert.deepEqual(list.rows.map((t) => t.name).sort(), ["Alpha Academy", "Beta School"]);
+  assert.equal(list.next_cursor, null);
+  // Keyset pages: one school per page, the cursor walks to the other, then stops.
+  const p1 = await db.rpc(S.superA, "sa_list_tenants", { p_limit: 1 });
+  const p2 = await db.rpc(S.superA, "sa_list_tenants", { p_limit: 1, p_cursor: p1.next_cursor });
+  assert.equal(p1.rows.length, 1); assert.equal(p2.rows.length, 1);
+  assert.notEqual(p1.rows[0].id, p2.rows[0].id);
+  assert.equal(p2.next_cursor, null);
+  assert.equal((await db.rpc(S.superA, "sa_list_tenants", { p_search: "beta" })).rows[0].name, "Beta School");
+  const users = await db.rpc(S.superA, "sa_list_users", { p_limit: 2 });
+  assert.equal(users.rows.length, 2);
+  assert.ok(users.next_cursor);
+  const more = await db.rpc(S.superA, "sa_list_users", { p_limit: 2, p_cursor: users.next_cursor });
+  assert.ok(!more.rows.some((u) => users.rows.some((v) => v.id === u.id)), "pages don't overlap");
 
   // Suspend a school: everyone in it is locked out, devices stop.
   await db.rpc(S.superA, "sa_set_tenant_status", { p_tenant: S.tenantB, p_status: "suspended", p_reason: "unpaid" });
@@ -694,6 +707,91 @@ test("operations: thumbnails deleted at session end, error log, health, maintena
   // Terms of service acceptance is recorded.
   await db.rpc(S.teacherA, "accept_notice", { p_kind: "terms_of_service" });
   assert.equal((await db.as(S.teacherA, "select 1 from public.consents where kind = 'terms_of_service'")).length, 1);
+});
+
+test("scale: indexes, push signals, write throttling, private channels, batched retention", async () => {
+  // Every foreign key (incl. every tenant_id) is backed by an index.
+  const unindexed = await db.admin(`
+    select c.conrelid::regclass::text t, a.attname c from pg_constraint c
+    join pg_namespace n on n.oid = c.connamespace
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
+    where c.contype = 'f' and n.nspname = 'public' and c.confrelid not in ('public.plans'::regclass, 'public.roles'::regclass)
+      and not exists (select 1 from pg_index i where i.indrelid = c.conrelid and i.indkey[0] = c.conkey[1])`);
+  assert.deepEqual(unindexed, [], "foreign keys without an index");
+  // postgres_changes is not used any more.
+  assert.equal((await db.admin("select count(*)::int n from pg_publication_tables where pubname = 'supabase_realtime'"))[0].n, 0);
+
+  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
+  await db.admin("delete from realtime.sent");
+  const sent = async () => db.admin("select topic, event, payload from realtime.sent order by id");
+
+  // Teacher moves the slide: students get a 'state' signal with the new version.
+  const r0 = await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
+  await db.rpc(S.teacherA, "set_session_state", { p_session: s.id, p_slide: 1 });
+  let msgs = await sent();
+  const st = msgs.find((m) => m.topic === `session:${s.id}` && m.event === "state");
+  assert.ok(st, "session state signal");
+  const r1 = await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
+  assert.ok(r1.state_version > r0.state_version, "tick reports the new version");
+  assert.equal(r1.current_slide, 1);
+
+  // Raised hand and leave alert reach the teacher's staff channel; notifications reach the user.
+  await db.admin("delete from realtime.sent");
+  await db.as(S.stu1, "insert into public.raise_hands (tenant_id, session_id, student_id) values ($1,$2,$3)", [S.tenantA, s.id, S.stu1]);
+  await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: true, p_sharing: true });
+  await db.admin("update public.session_participants set away_since = now() - interval '1 minute' where session_id = $1 and user_id = $2", [s.id, S.stu1]);
+  await db.rpc(S.teacherA, "teacher_session_state", { p_session: s.id });
+  msgs = await sent();
+  for (const [topic, event] of [[`staff:${s.id}`, "hand"], [`staff:${s.id}`, "roster"], [`staff:${s.id}`, "alert"], [`user:${S.teacherA}`, "notification"]]) {
+    assert.ok(msgs.some((m) => m.topic === topic && m.event === event), `${topic} ${event}`);
+  }
+  // Signals carry no personal data, only "something changed".
+  assert.ok(msgs.every((m) => JSON.stringify(m.payload).length < 40));
+  await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
+
+  // Presence ticks don't write when nothing changed (at most every 15 s).
+  const seen = async () => (await db.admin("select last_seen_at::text t from public.session_participants where session_id = $1 and user_id = $2", [s.id, S.stu1]))[0].t;
+  const before = await seen();
+  await db.admin("delete from realtime.sent");
+  await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
+  assert.equal(await seen(), before, "no write for an unchanged tick");
+  assert.equal((await sent()).length, 0, "no signal for an unchanged tick");
+  await db.admin("update public.session_participants set last_seen_at = now() - interval '20 seconds' where session_id = $1 and user_id = $2", [s.id, S.stu1]);
+  await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
+  assert.notEqual(await seen(), before, "presence refreshed after 15 s");
+  assert.equal((await sent()).length, 0, "a presence refresh is not broadcast");
+
+  // Frames are only sent while a teacher has the live room open.
+  await db.admin("update public.class_sessions set teacher_seen_at = null where id = $1", [s.id]);
+  assert.equal((await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true })).capture.send, false);
+  await db.rpc(S.teacherA, "teacher_session_state", { p_session: s.id });
+  assert.equal((await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true })).capture.send, true);
+
+  // Private channels: who may listen / send.
+  const can = async (u, fn, topic) => (await db.as(u, `select app.${fn}($1) ok`, [topic]))[0].ok;
+  assert.equal(await can(S.stu1, "can_listen", `session:${s.id}`), true);
+  assert.equal(await can(S.stu1, "can_listen", `staff:${s.id}`), false);
+  assert.equal(await can(S.stu1, "can_listen", `screen:${s.id}:${S.stu1}`), false, "students can't watch screens");
+  assert.equal(await can(S.teacherA, "can_listen", `screen:${s.id}:${S.stu1}`), true);
+  assert.equal(await can(S.teacherA, "can_listen", `staff:${s.id}`), true);
+  assert.equal(await can(S.stu1, "can_send", `screen:${s.id}:${S.stu1}`), true);
+  assert.equal(await can(S.stu1, "can_send", `screen:${s.id}:${S.stu2}`), false, "no sending as another student");
+  assert.equal(await can(S.adminB, "can_listen", `session:${s.id}`), false, "other schools can't listen");
+  assert.equal(await can(S.stu1, "can_listen", `user:${S.stu1}`), true);
+  assert.equal(await can(S.stu1, "can_listen", `user:${S.teacherA}`), false);
+  assert.equal(await can(S.stu1, "can_listen", "session:not-a-uuid"), false);
+  await db.rpc(S.teacherA, "end_session", { p_session: s.id });
+  assert.equal(await can(S.stu1, "can_send", `screen:${s.id}:${S.stu1}`), false, "no frames after the class ends");
+
+  // Retention runs set-based across schools.
+  await db.admin("update public.notifications set created_at = now() - interval '100 days' where tenant_id = $1", [S.tenantA]);
+  await db.admin("select app.apply_retention_all()");
+  assert.equal((await db.admin("select count(*)::int n from public.notifications where tenant_id = $1 and created_at < now() - interval '90 days'", [S.tenantA]))[0].n, 0);
+
+  // Platform stats are cached for the console.
+  const ov = await db.rpc(S.superA, "sa_overview");
+  assert.ok(ov.stats_at && ov.users > 0);
 });
 
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {

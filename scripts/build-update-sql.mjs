@@ -1,4 +1,4 @@
-// Builds supabase/updates/2026-09-24_production_release.sql from migrations 0740 + 0750,
+// Builds supabase/updates/2026-09-24_production_release.sql from migrations 0740 + 0750 + 0760,
 // for databases created from an earlier setup.sql. Run: npm run build:sql
 import { readFileSync, writeFileSync } from "node:fs";
 
@@ -8,6 +8,9 @@ const header = `-- =============================================================
 --     "left the class" alerts with the screen (migration 0740).
 --   * Operations: thumbnails deleted when a class ends, error log, health
 --     check, hourly maintenance (pg_cron), Terms of Service consent (0750).
+--   * Scale for 5,000,000 users / 50,000 schools: indexes on every foreign key,
+--     push signals instead of polling, live screens over private channels,
+--     batched retention, paginated platform console (0760).
 --
 -- For a database that already ran supabase/setup.sql AND
 -- supabase/updates/2026-09-23_super_admin_branding.sql.
@@ -17,11 +20,12 @@ const header = `-- =============================================================
 
 `;
 const footer = `
--- Done. Should return one row: lockdown_ready = true, operations_ready = true.
+-- Done. Should return one row with three trues.
 select exists (select 1 from information_schema.columns where table_name = 'class_sessions' and column_name = 'lockdown') as lockdown_ready,
-       exists (select 1 from information_schema.tables where table_name = 'error_events') as operations_ready;
+       exists (select 1 from information_schema.tables where table_name = 'error_events') as operations_ready,
+       exists (select 1 from information_schema.columns where table_name = 'class_sessions' and column_name = 'state_version') as scale_ready;
 `;
-const body = ["20260901000740_web_screens.sql", "20260901000750_operations.sql"]
+const body = ["20260901000740_web_screens.sql", "20260901000750_operations.sql", "20260901000760_scale.sql"]
   .map((f) => readFileSync(`supabase/migrations/${f}`, "utf8").replace(/\r\n/g, "\n")).join("\n");
 writeFileSync("supabase/updates/2026-09-24_production_release.sql", header + body + footer);
 console.log("supabase/updates/2026-09-24_production_release.sql written");

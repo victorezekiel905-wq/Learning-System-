@@ -1,6 +1,7 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Badge, Button, CopyButton, Field, Input, Modal, Select, Tabs, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { api, errorText, rpc } from "@/lib/rpc";
@@ -10,14 +11,16 @@ import { formatDate, timeAgo } from "@/lib/utils";
 type U = { id: string; full_name: string; email: string; role: Role; status: string; created_at: string; last_seen_at: string | null };
 type Inv = { id: string; code: string; role: Role; email: string | null; uses: number; max_uses: number; expires_at: string; revoked_at: string | null; created_at: string };
 
-export function UsersClient({ users, invites, students, meId }: { users: U[]; invites: Inv[]; students: { id: string; full_name: string }[]; meId: string }) {
+export function UsersClient({ users, total, page, pageSize, q, role, invites, meId }: {
+  users: U[]; total: number; page: number; pageSize: number; q: string; role: string; invites: Inv[]; meId: string;
+}) {
   const router = useRouter();
   const toast = useToast();
   const [tab, setTab] = useState<"people" | "invites">("people");
-  const [q, setQ] = useState("");
-  const [role, setRole] = useState("");
   const [invite, setInvite] = useState(false);
-  const rows = useMemo(() => users.filter((u) => (!role || u.role === role) && (!q || `${u.full_name} ${u.email}`.toLowerCase().includes(q.toLowerCase()))), [users, q, role]);
+  const rows = users;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const href = (p: number) => `/admin/users?${new URLSearchParams({ ...(q && { q }), ...(role && { role }), ...(p > 1 && { page: String(p) }) })}`;
 
   async function call(fn: string, args: Record<string, unknown>, msg: string) {
     try { await rpc(fn, args); toast(msg, "success"); router.refresh(); } catch (e) { toast(errorText(e), "error"); }
@@ -37,14 +40,17 @@ export function UsersClient({ users, invites, students, meId }: { users: U[]; in
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tabs value={tab} onChange={setTab} tabs={[{ id: "people", label: `People (${users.length})` }, { id: "invites", label: `Invites (${invites.filter((i) => !i.revoked_at && new Date(i.expires_at) > new Date() && i.uses < i.max_uses).length} active)` }]} />
+        <Tabs value={tab} onChange={setTab} tabs={[{ id: "people", label: `People (${total.toLocaleString()})` }, { id: "invites", label: `Invites (${invites.filter((i) => !i.revoked_at && new Date(i.expires_at) > new Date() && i.uses < i.max_uses).length} active)` }]} />
         <Button onClick={() => setInvite(true)}>Invite people</Button>
       </div>
 
       {tab === "people" && (
         <>
-          <div className="flex gap-2"><Input placeholder="Search name or email" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
-            <Select className="w-44" value={role} onChange={(e) => setRole(e.target.value)}><option value="">All roles</option>{Object.entries(ROLE_LABEL).filter(([k]) => k !== "platform_admin").map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></div>
+          <form className="flex flex-wrap gap-2" action="/admin/users">
+            <Input name="q" placeholder="Search name or email" defaultValue={q} className="w-full sm:max-w-xs" />
+            <Select name="role" className="w-full sm:w-44" defaultValue={role} onChange={(e) => e.currentTarget.form?.requestSubmit()}><option value="">All roles</option>{Object.entries(ROLE_LABEL).filter(([k]) => k !== "platform_admin").map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
+            <Button type="submit" variant="secondary">Search</Button>
+          </form>
           <div className="card overflow-x-auto"><table className="table">
             <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Joined</th><th>Last seen</th><th className="text-right">Actions</th></tr></thead>
             <tbody>{rows.map((u) => (
@@ -67,6 +73,14 @@ export function UsersClient({ users, invites, students, meId }: { users: U[]; in
               </tr>
             ))}</tbody>
           </table></div>
+          {rows.length === 0 && <p className="text-sm text-ink-500">No one matches.</p>}
+          <nav className="flex items-center justify-between text-sm" aria-label="Pages">
+            <span className="text-ink-500">Page {page} of {pages.toLocaleString()}</span>
+            <span className="flex gap-2">
+              {page > 1 && <Link href={href(page - 1)} className="btn btn-secondary btn-sm no-underline">← Previous</Link>}
+              {page < pages && <Link href={href(page + 1)} className="btn btn-secondary btn-sm no-underline">Next →</Link>}
+            </span>
+          </nav>
         </>
       )}
 
@@ -84,12 +98,39 @@ export function UsersClient({ users, invites, students, meId }: { users: U[]; in
         </table></div>
       )}
 
-      {invite && <InviteModal students={students} onClose={() => { setInvite(false); router.refresh(); }} />}
+      {invite && <InviteModal onClose={() => { setInvite(false); router.refresh(); }} />}
     </div>
   );
 }
 
-function InviteModal({ students, onClose }: { students: { id: string; full_name: string }[]; onClose: () => void }) {
+/** Type-to-search picker: works the same for 30 students or 30,000. */
+function StudentPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const [q, setQ] = useState("");
+  const [options, setOptions] = useState<{ id: string; full_name: string; email: string }[]>([]);
+  useEffect(() => {
+    const term = q.trim().replace(/[%_,()*]/g, " ");
+    if (term.length < 2) { setOptions([]); return; }
+    const t = window.setTimeout(async () => {
+      const { data } = await createClient().from("users").select("id,full_name,email").eq("role", "student")
+        .or(`full_name.ilike.*${term}*,email.ilike.*${term}*`).order("full_name").limit(20);
+      setOptions(data ?? []);
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [q]);
+  return (
+    <div className="space-y-2">
+      <Input placeholder="Type at least 2 letters of the student's name or email" value={q} onChange={(e) => setQ(e.target.value)} />
+      {options.length > 0 && (
+        <Select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Choose…</option>
+          {options.map((s) => <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>)}
+        </Select>
+      )}
+    </div>
+  );
+}
+
+function InviteModal({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const [role, setRole] = useState<Role>("teacher");
   const [email, setEmail] = useState("");
@@ -120,7 +161,7 @@ function InviteModal({ students, onClose }: { students: { id: string; full_name:
           <Field label="Role"><Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
             <option value="teacher">Teacher</option><option value="it_admin">IT / device admin</option><option value="school_admin">School administrator</option><option value="parent">Parent / guardian</option>
           </Select></Field>
-          {role === "parent" && <Field label="Student"><Select value={student} onChange={(e) => setStudent(e.target.value)}><option value="">Choose…</option>{students.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}</Select></Field>}
+          {role === "parent" && <Field label="Student"><StudentPicker value={student} onChange={setStudent} /></Field>}
           <Field label="Email (recommended)" hint="The invite then only works for this address, and we'll email it if email is set up."><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
           {!email && <Field label="How many people can use it"><Input type="number" min={1} max={200} value={uses} onChange={(e) => setUses(Number(e.target.value))} /></Field>}
           {role === "school_admin" && <Alert tone="warn">Administrators can see and change everything in your school.</Alert>}

@@ -95,11 +95,12 @@ export function ScreenRail({ state, screens, focus, onFocus }: {
         <span>Screens</span><span>{joined.length} in class</span>
       </p>
       {joined.length === 0 && <p className="text-xs text-ink-500">Students appear here as soon as they join with the code.</p>}
-      <ul className="space-y-2">{joined.map(tile)}</ul>
+      {/* Phones/tablets: a swipeable row above the lesson; laptops: a column on the left. */}
+      <ul className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 lg:mx-0 lg:block lg:space-y-2 lg:overflow-visible lg:px-0 lg:pb-0 [&>li]:w-40 [&>li]:shrink-0 [&>li]:snap-start lg:[&>li]:w-auto">{joined.map(tile)}</ul>
       {away.length > 0 && (
         <div>
           <button className="text-xs font-medium text-ink-500" onClick={() => setShowAway((v) => !v)}>{showAway ? "▾" : "▸"} Not in class ({away.length})</button>
-          {showAway && <ul className="mt-2 space-y-2 opacity-70">{away.map(tile)}</ul>}
+          {showAway && <ul className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 opacity-70 lg:mx-0 lg:block lg:space-y-2 lg:px-0 [&>li]:w-40 [&>li]:shrink-0 lg:[&>li]:w-auto">{away.map(tile)}</ul>}
         </div>
       )}
     </div>
@@ -107,13 +108,19 @@ export function ScreenRail({ state, screens, focus, onFocus }: {
 }
 
 /** One student's screen, large, on the teacher's screen only. */
-export function FocusView({ state, studentId, sessionId, onMinimize }: {
+export function FocusView({ state, studentId, sessionId, onMinimize, live }: {
   state: SessionState; studentId: string; sessionId: string; onMinimize: () => void;
+  /** Latest frame from the student's live channel (web screen sharing). */
+  live?: Screen;
 }) {
   const toast = useToast();
   const r = state.roster.find((x) => x.student_id === studentId);
-  const frame = useRpc<{ image: string; captured_at: string; url: string | null; quality: string; stale: boolean } | null>(
-    "session_screen", { p_session: sessionId, p_student: studentId }, [sessionId, studentId], { intervalMs: 3000 });
+  // Managed browsers upload frames to the database; web sharing streams them live.
+  const stored = useRpc<{ image: string; captured_at: string; url: string | null; quality: string; stale: boolean } | null>(
+    "session_screen", { p_session: sessionId, p_student: studentId }, [sessionId, studentId], { intervalMs: 3000, enabled: !!r?.device });
+  const f = live && (!stored.data || stored.data.captured_at < live.captured_at)
+    ? { image: live.image, captured_at: live.captured_at, url: null, quality: "live", stale: live.stale }
+    : stored.data;
   const alert = alertFor(state, studentId);
 
   // Ask the student's page/extension for sharper frames while this view is open.
@@ -126,7 +133,6 @@ export function FocusView({ state, studentId, sessionId, onMinimize }: {
   }, [sessionId, studentId, state.settings.allow_screen_capture]);
 
   if (!r) return null;
-  const f = frame.data;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">

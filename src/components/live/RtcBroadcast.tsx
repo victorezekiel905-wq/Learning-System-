@@ -1,7 +1,9 @@
 "use client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { openChannel } from "@/lib/realtime";
 import { useNetwork } from "@/lib/hooks";
 import { errorText, rpc } from "@/lib/rpc";
 
@@ -129,9 +131,15 @@ export function StudentReceiver({ sessionId }: { sessionId: string }) {
       setRoom(data as { id: string; purpose: string } | null);
     };
     void find();
-    const ch = sb.channel(`rtc:${sessionId}`).on("postgres_changes" as never, { event: "*", schema: "public", table: "rtc_rooms", filter: `session_id=eq.${sessionId}` } as never, () => void find()).subscribe();
-    const id = setInterval(find, 15000);
-    return () => { clearInterval(id); void sb.removeChannel(ch); };
+    // Room changes bump the session's state signal (migration 0760).
+    let ch: RealtimeChannel | null = null;
+    let cancelled = false;
+    void openChannel(`session:${sessionId}`).then((c) => {
+      if (cancelled) return;
+      ch = c.on("broadcast", { event: "state" }, () => void find()).subscribe();
+    });
+    const id = setInterval(find, 30000);
+    return () => { cancelled = true; clearInterval(id); if (ch) void sb.removeChannel(ch); };
   }, [sessionId]);
 
   // §33: video is off by default on poor connections until the student opts in.

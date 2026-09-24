@@ -49,6 +49,16 @@
   .slide-surface { @apply relative aspect-video w-full overflow-hidden rounded-xl border border-ink-200 bg-white shadow-sm; }
 }
 
+/* Phones and small tablets: wide tables scroll sideways inside their card instead of
+   stretching the page. Desktop layout is unchanged. */
+@media (max-width: 767px) {
+  .table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table th, .table td { white-space: nowrap; }
+}
+
+/* Long codes, URLs and emails never push the page wider than the screen. */
+main, .page, .card { overflow-wrap: anywhere; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }

@@ -6,7 +6,9 @@ import { Alert, Avatar, Badge, Button, CopyButton, Tabs, Textarea, useToast } fr
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL, type SessionState } from "@/components/live/types";
 import { createClient } from "@/lib/supabase/client";
-import { useNetwork, useRealtime, useRpc } from "@/lib/hooks";
+import { useNetwork, useNow, useRpc } from "@/lib/hooks";
+import { useSignal } from "@/lib/realtime";
+import { useScreenFeed } from "@/lib/screen-feed";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, timeAgo } from "@/lib/utils";
 import { LessonPanel } from "./LessonPanel";
@@ -28,21 +30,34 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sound, setSound] = useState(true);
   const { quality } = useNetwork();
-  const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: quality === "slow" ? 10000 : 5000 });
-  useRealtime(`live:${sessionId}`, [
-    { table: "environment_events", filter: `class_session_id=eq.${sessionId}` },
-    { table: "raise_hands", filter: `session_id=eq.${sessionId}` },
-    { table: "session_participants", filter: `session_id=eq.${sessionId}` },
-    { table: "quiz_answers" }
-  ], () => void state.reload());
-
-  // Thumbnails are fetched once here and shared by the left rail and the Screens tab.
-  const thumbEvery = Math.min(state.data?.settings.thumbnail_interval_seconds ?? 20, 10) * 1000;
-  const screensQ = useRpc<Screen[]>("session_screens", { p_session: sessionId }, [sessionId], { intervalMs: thumbEvery, enabled: !!state.data?.settings.allow_screen_capture });
-  const screens = useMemo(() => Object.fromEntries((screensQ.data ?? []).map((x) => [x.student_id, x])), [screensQ.data]);
-  const [focus, setFocus] = useState<string | null>(null);
+  // Roster, alerts and hands are pushed (staff:<session>); the poll is a safety net
+  // and also tells students a teacher is watching (so they send screen frames).
+  const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: quality === "slow" ? 30000 : 15000 });
+  useSignal(`staff:${sessionId}`, ["state", "roster", "alert", "hand"], () => void state.reload(), { debounceMs: 300, minGapMs: 1500 });
 
   const s = state.data;
+  const captureOn = !!s?.settings.allow_screen_capture;
+  // Live frames stream from each joined student's private channel (never stored).
+  const joinedIds = useMemo(() => (s?.roster ?? []).filter((r) => r.presence === "online" || r.presence === "idle").map((r) => r.student_id), [s]);
+  const feed = useScreenFeed(sessionId, joinedIds, captureOn);
+  // Managed browsers (extension) still upload to the database: poll only if any exist.
+  const hasDevices = (s?.roster ?? []).some((r) => r.device);
+  const thumbEvery = Math.max(s?.settings.thumbnail_interval_seconds ?? 10, 5) * 1000;
+  const screensQ = useRpc<Screen[]>("session_screens", { p_session: sessionId }, [sessionId], { intervalMs: thumbEvery, enabled: captureOn && hasDevices });
+  const now = useNow(5000);
+  const screens = useMemo(() => {
+    const out: Record<string, Screen> = Object.fromEntries((screensQ.data ?? []).map((x) => [x.student_id, x]));
+    const staleAfter = Math.max(thumbEvery * 3, 30_000);
+    for (const [id, f] of Object.entries(feed)) {
+      const at = new Date(f.receivedAt).toISOString();
+      if (!out[id] || out[id].captured_at < at) {
+        out[id] = { student_id: id, device_id: null, image: f.image, captured_at: at, url: null, stale: now - f.receivedAt > staleAfter, source: "web" };
+      }
+    }
+    return out;
+  }, [screensQ.data, feed, now, thumbEvery]);
+  const [focus, setFocus] = useState<string | null>(null);
+
   const openAlerts = useMemo(() => (s?.alerts ?? []).filter((a) => a.status === "open" && !a.resolved_at), [s]);
   const lastAlert = useRef<string | null>(null);
 
@@ -121,11 +136,11 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
       )}
 
       <div className="grid flex-1 lg:grid-cols-[220px_1fr] xl:grid-cols-[230px_1fr_300px]">
-        <aside className="max-h-[calc(100vh-7rem)] overflow-y-auto border-r border-ink-200 bg-white p-3 lg:sticky lg:top-14" aria-label="Student screens">
+        <aside className="border-b border-ink-200 bg-white p-3 lg:sticky lg:top-14 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r" aria-label="Student screens">
           <ScreenRail state={s} screens={screens} focus={focus} onFocus={setFocus} />
         </aside>
         <section className="min-w-0 p-4">
-          {focus ? <FocusView state={s} studentId={focus} sessionId={sessionId} onMinimize={() => setFocus(null)} /> : <>
+          {focus ? <FocusView state={s} studentId={focus} sessionId={sessionId} onMinimize={() => setFocus(null)} live={screens[focus]?.source === "web" ? screens[focus] : undefined} /> : <>
           <Tabs className="mb-4" value={tab} onChange={setTab} tabs={[
             { id: "lesson", label: "Lesson" },
             { id: "responses", label: "Responses" },

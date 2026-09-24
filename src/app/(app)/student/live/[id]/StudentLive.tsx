@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityPlayer } from "@/components/activities/ActivityPlayer";
 import { ThreadView } from "@/components/chat/ThreadView";
 import { Icon } from "@/components/Icon";
@@ -12,7 +12,8 @@ import { Alert, Badge, Button, Input, Modal, useToast } from "@/components/ui";
 import { useAnnotations } from "@/lib/annotations";
 import { useClassroomGuard } from "@/lib/classroom-guard";
 import { createClient } from "@/lib/supabase/client";
-import { useLoader, useNetwork, useRealtime, useRpc } from "@/lib/hooks";
+import { useLoader, useNetwork, useRpc } from "@/lib/hooks";
+import { useSignal } from "@/lib/realtime";
 import { useOfflineQueue } from "@/lib/offline-queue";
 import { errorText, rpc } from "@/lib/rpc";
 
@@ -31,14 +32,11 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
   const toast = useToast();
   const { quality } = useNetwork();
   const { pending } = useOfflineQueue((m) => toast(`An offline answer was rejected: ${m}`, "error"));
-  const st = useRpc<StudentState>("session_student_state", { p_session: sessionId }, [sessionId], { intervalMs: quality === "slow" ? 15000 : 8000 });
+  // Lesson state is refetched when the teacher changes something (pushed signal,
+  // or the version reported by the 10 s tick); the slow poll is only a safety net.
+  const st = useRpc<StudentState>("session_student_state", { p_session: sessionId }, [sessionId], { intervalMs: quality === "slow" ? 120000 : 60000 });
   const lesson = useLoader(() => rpc<{ slides: LearnerSlide[] }>("session_lesson", { p_session: sessionId }), [sessionId]);
-  useRealtime(`stu:${sessionId}`, [
-    { table: "class_sessions", filter: `id=eq.${sessionId}` },
-    { table: "announcements", filter: `session_id=eq.${sessionId}` },
-    { table: "spotlights", filter: `session_id=eq.${sessionId}` },
-    { table: "environment_events", filter: `class_session_id=eq.${sessionId}` }
-  ], () => void st.reload());
+  useSignal(`session:${sessionId}`, ["state"], () => void st.reload(), { debounceMs: 150 });
 
   const [ownSlide, setOwnSlide] = useState<number | null>(null);
   const [handMsg, setHandMsg] = useState("");
@@ -51,19 +49,18 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
   const paced = s?.session.mode === "student_paced";
   const slideIndex = paced ? (ownSlide ?? s?.my_slide ?? 0) : s?.session.current_slide ?? 0;
   const ann = useAnnotations(sessionId, slideIndex);
-  const guard = useClassroomGuard(sessionId, { live: s?.session.status === "live", managedDevice: !!s?.device_monitored });
-
-  // Presence heartbeat + idle detection (§3.4).
+  // One tick (presence, slide, focus, lockdown) every 10 s and on every change.
+  const guard = useClassroomGuard(sessionId, {
+    live: s?.session.status === "live", managedDevice: !!s?.device_monitored, userId: me.id,
+    slide: paced ? slideIndex : null, spotlightToClass: !!(s?.spotlight?.me && s.spotlight.show_to_class)
+  });
+  const version = guard.directives?.state_version;
+  const seenVersion = useRef<number | undefined>(undefined);
   useEffect(() => {
-    let idle = false;
-    let last = Date.now();
-    const mark = () => { last = Date.now(); if (idle) { idle = false; void beat(); } };
-    const beat = () => rpc("session_heartbeat", { p_session: sessionId, p_slide: paced ? slideIndex : null, p_status: idle ? "idle" : "online" }).catch(() => {});
-    const id = window.setInterval(() => { idle = Date.now() - last > 120_000 || document.hidden; void beat(); }, 15_000);
-    ["pointermove", "keydown", "visibilitychange"].forEach((e) => window.addEventListener(e, mark));
-    void beat();
-    return () => { window.clearInterval(id); ["pointermove", "keydown", "visibilitychange"].forEach((e) => window.removeEventListener(e, mark)); };
-  }, [sessionId, paced, slideIndex]);
+    if (version === undefined) return;
+    if (seenVersion.current !== undefined && version !== seenVersion.current) void st.reload();
+    seenVersion.current = version;
+  }, [version, st]);
 
   useEffect(() => {
     const a = s?.announcements[0];
