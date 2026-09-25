@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Badge, Button, Card, useToast } from "@/components/ui";
+import { Badge, Button, Card, useToast, useDialog } from "@/components/ui";
 import { errorText, rpc } from "@/lib/rpc";
 import { formatDate } from "@/lib/utils";
 
@@ -11,13 +11,14 @@ export type ConsentRow = { method: string; reference: string | null; recorded_at
 export function ParentConsent({ studentId, name, consent }: { studentId: string; name: string; consent: ConsentRow }) {
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const [busy, setBusy] = useState(false);
   const active = !!consent && !consent.revoked_at;
 
   async function set(give: boolean) {
     let reason: string | null = null;
     if (!give) {
-      reason = prompt(`Withdraw consent for ${name}? Your school will be told. Optional: tell them why.`);
+      reason = await dialog.ask({ title: `Withdraw consent for ${name}?`, body: "Your school will be told, and screen monitoring for your child stops.", label: "Reason (optional)", optional: true, multiline: true, tone: "danger", confirmLabel: "Withdraw consent" });
       if (reason === null) return;
     }
     setBusy(true);

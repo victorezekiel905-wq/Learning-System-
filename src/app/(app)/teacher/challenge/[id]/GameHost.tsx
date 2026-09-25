@@ -6,7 +6,7 @@ import { OptionShape } from "@/components/game/Shape";
 import { Lock, LockOpen, Pencil, X } from "lucide-react";
 import { BADGE, OPTION_COLORS, type GameState, type Leaderboard } from "@/components/game/types";
 import { RichText } from "@/components/RichText";
-import { Alert, Badge, Button, Card, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, useToast, useDialog } from "@/components/ui";
 import { useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
 import { errorText, rpc } from "@/lib/rpc";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 
 export function GameHost({ gameId, school }: { gameId: string; school: string }) {
   const toast = useToast();
+  const dialog = useDialog();
   const [fetchedAt, setFetchedAt] = useState(Date.now());
   const state = useRpc<GameState>("game_state", { p_game: gameId }, [gameId], { intervalMs: 10000 });
   const board = useRpc<Leaderboard>("game_leaderboard", { p_game: gameId, p_limit: 50 }, [gameId, state.data?.status, state.data?.current_index]);
@@ -26,8 +27,9 @@ export function GameHost({ gameId, school }: { gameId: string; school: string })
     catch (e) { toast(errorText(e), "error"); }
   }
   async function moderate(player: string, action: "rename" | "remove") {
-    const name = action === "rename" ? prompt("New display name") : null;
+    const name = action === "rename" ? await dialog.ask({ title: "Rename player", label: "New display name", maxLength: 20, confirmLabel: "Rename" }) : null;
     if (action === "rename" && !name) return;
+    if (action === "remove" && !(await dialog.confirm({ title: "Remove this player?", body: "They're taken out of this game.", tone: "danger", confirmLabel: "Remove" }))) return;
     try { await rpc("game_moderate_player", { p_player: player, p_action: action, p_name: name }); void state.reload(); }
     catch (e) { toast(errorText(e), "error"); }
   }
@@ -99,7 +101,7 @@ export function GameHost({ gameId, school }: { gameId: string; school: string })
 
       {(g.status === "review" || g.status === "ended") && board.data && !(g.settings.class_goal && g.status === "review") && <Standings board={board.data} ended={g.status === "ended"} school={school} title={g.title} certificates={g.settings.certificates} />}
 
-      {g.status !== "ended" && g.status !== "lobby" && <div className="text-right"><Button variant="ghost" onClick={() => { if (confirm("End the game now?")) void control("end"); }}>End game</Button></div>}
+      {g.status !== "ended" && g.status !== "lobby" && <div className="text-right"><Button variant="ghost" onClick={async () => { if (await dialog.confirm({ title: "End the game now?", body: "Final scores and badges go to everyone who played.", tone: "danger", confirmLabel: "End game" })) await control("end"); }}>End game</Button></div>}
     </div>
   );
 }

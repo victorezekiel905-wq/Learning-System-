@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
 import { errorText, rpc } from "@/lib/rpc";
 import type { ActivityKind, ActivitySettings, PublicQuestion, QuestionKind } from "@/lib/types";
-import { Alert, Badge, Button, Card, Field, Input, Modal, Select, Textarea, Toggle, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, Field, Input, Modal, Select, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
 import { blankQuestion, KIND_LABEL, QuestionEditor, saveQuestion, type EditableOption, type EditableQuestion } from "./QuestionEditor";
 import { Prompt, QuestionInput } from "./QuestionInput";
 import { StudentQuestions } from "./StudentQuestions";
@@ -47,6 +47,7 @@ function toEditable(row: Record<string, unknown>): EditableQuestion {
 
 export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Activity; onChanged?: () => void; rubrics?: { id: string; title: string }[] }) {
   const toast = useToast();
+  const dialog = useDialog();
   const [meta, setMeta] = useState(activity);
   const [openQ, setOpenQ] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, EditableQuestion>>({});
@@ -81,7 +82,7 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
     setSaving(null);
   }
   async function remove(id: string) {
-    if (!confirm("Delete this question? Students' answers to it are deleted too.")) return;
+    if (!(await dialog.confirm({ title: "Delete this question?", body: "Students' answers to it are deleted too.", tone: "danger", confirmLabel: "Delete question" }))) return;
     const { error } = await createClient().from("questions").delete().eq("id", id);
     if (error) toast(error.message, "error"); else void questions.reload();
   }

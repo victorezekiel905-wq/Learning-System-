@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Select, useToast } from "@/components/ui";
+import { Badge, Button, Select, useToast, useDialog } from "@/components/ui";
 import { api, errorText, rpc } from "@/lib/rpc";
 import { formatDate } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ const ROLES = ["student", "teacher", "it_admin", "school_admin", "parent"];
 export function UsersTable({ users, hideTenant }: { users: SaUser[]; hideTenant?: boolean }) {
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   async function act(fn: string, args: Record<string, unknown>, msg: string) {
     try { await rpc(fn, args); toast(msg, "success"); router.refresh(); } catch (e) { toast(errorText(e), "error"); }
   }
@@ -33,7 +34,7 @@ export function UsersTable({ users, hideTenant }: { users: SaUser[]; hideTenant?
                 ? <Button size="sm" variant="ghost" onClick={() => act("sa_set_user_status", { p_user: u.id, p_status: "suspended" }, "User suspended")}>Suspend</Button>
                 : <Button size="sm" variant="ghost" onClick={() => act("sa_set_user_status", { p_user: u.id, p_status: "active" }, "Suspension lifted")}>Lift suspension</Button>}
               <Button size="sm" variant="ghost" className="text-rose-600" onClick={async () => {
-                if (prompt(`Permanently delete ${u.full_name} (${u.email}) and their login? Type DELETE:`) !== "DELETE") return;
+                if ((await dialog.ask({ title: `Delete ${u.full_name}?`, body: `This permanently deletes ${u.email} and their login. It can't be undone.`, label: "", requireText: "DELETE", tone: "danger", confirmLabel: "Delete permanently" })) !== "DELETE") return;
                 try { await api(`/api/super/users/${u.id}`, { method: "DELETE" }); toast("User deleted", "success"); router.refresh(); } catch (e) { toast(errorText(e), "error"); }
               }}>Delete</Button>
             </div></td>

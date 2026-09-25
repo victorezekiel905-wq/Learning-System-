@@ -4,13 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
-import { api, errorText, rpc } from "@/lib/rpc";
+import { api, errorText, rpc, must } from "@/lib/rpc";
 import { formatDate } from "@/lib/utils";
 import { LevelsPanel } from "./LevelsPanel";
 import { SupportsPanel } from "./SupportsPanel";
+import { Icon } from "@/components/Icon";
 import {
-  Alert, Avatar, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, PageHeader, Select, Tabs, Textarea, useToast
-} from "@/components/ui";
+  Alert, Avatar, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, PageHeader, Select, Tabs, Textarea, useToast, useDialog } from "@/components/ui";
 
 type Cls = { id: string; name: string; subject: string | null; grade_level: string | null; join_code: string; archived_at: string | null; teacher_id: string; tenant_id: string };
 type Member = { user_id: string; role: string; joined_at: string; users: { full_name: string; email: string } | null };
@@ -59,12 +59,13 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
 
 function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canManage: boolean; members: Member[]; loading: boolean; reload: () => Promise<void> }) {
   const toast = useToast();
+  const dialog = useDialog();
   const [importOpen, setImportOpen] = useState(false);
   const [codeModal, setCodeModal] = useState<{ title: string; code: string; note: string } | null>(null);
   const joinUrl = typeof window !== "undefined" ? `${window.location.origin}/join?code=${cls.join_code}` : "";
 
   async function remove(userId: string) {
-    if (!confirm("Remove this person from the class? Their past work is kept.")) return;
+    if (!(await dialog.confirm({ title: "Remove from this class?", body: "Their past work is kept.", tone: "danger", confirmLabel: "Remove" }))) return;
     const { error } = await createClient().from("class_members").delete().eq("class_id", cls.id).eq("user_id", userId);
     if (error) toast(error.message, "error"); else { toast("Removed", "success"); void reload(); }
   }
@@ -178,6 +179,7 @@ type Group = { id: string; name: string; auto_start_policy_id: string | null; st
 
 function Groups({ cls, canManage, students, policies }: { cls: Cls; canManage: boolean; students: Member[]; policies: { id: string; name: string }[] }) {
   const toast = useToast();
+  const dialog = useDialog();
   const [name, setName] = useState("");
   const groups = useLoader(async () => {
     const { data, error } = await createClient().from("student_groups")
@@ -202,8 +204,8 @@ function Groups({ cls, canManage, students, policies }: { cls: Cls; canManage: b
     if (error) toast(error.message, "error"); else { toast("Saved", "success"); void groups.reload(); }
   }
   async function del(g: Group) {
-    if (!confirm(`Delete group ${g.name}?`)) return;
-    await createClient().from("student_groups").delete().eq("id", g.id);
+    if (!(await dialog.confirm({ title: `Delete group ${g.name}?`, tone: "danger", confirmLabel: "Delete group" }))) return;
+    try { must(await createClient().from("student_groups").delete().eq("id", g.id)); } catch (e) { toast(errorText(e), "error"); return; }
     void groups.reload();
   }
 
@@ -228,9 +230,9 @@ function Groups({ cls, canManage, students, policies }: { cls: Cls; canManage: b
               </Field>
               <div className="mt-3 flex flex-wrap gap-2">
                 {students.map((s) => (
-                  <button key={s.user_id} disabled={!canManage} onClick={() => toggleMember(g, s.user_id, !ids.has(s.user_id))}
+                  <button key={s.user_id} type="button" aria-pressed={ids.has(s.user_id)} disabled={!canManage} onClick={() => toggleMember(g, s.user_id, !ids.has(s.user_id))}
                     className={`badge border ${ids.has(s.user_id) ? "border-brand-300 bg-brand-50 text-brand-800" : "border-ink-200 bg-white text-ink-500"}`}>
-                    {ids.has(s.user_id) ? "✓ " : "+ "}{s.users?.full_name}
+                    <Icon name={ids.has(s.user_id) ? "check" : "plus"} className="h-3 w-3" />{s.users?.full_name}
                   </button>
                 ))}
               </div>
@@ -293,6 +295,7 @@ function Attendance({ cls, canManage, students }: { cls: Cls; canManage: boolean
 function Settings({ cls, isAdmin, teachers }: { cls: Cls; isAdmin: boolean; teachers: { id: string; full_name: string }[] }) {
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const [name, setName] = useState(cls.name);
   const [subject, setSubject] = useState(cls.subject ?? "");
   const [grade, setGrade] = useState(cls.grade_level ?? "");
@@ -307,7 +310,7 @@ function Settings({ cls, isAdmin, teachers }: { cls: Cls; isAdmin: boolean; teac
     if (error) toast(error.message, "error"); else router.refresh();
   }
   async function regen() {
-    if (!confirm("Generate a new join code? The old code stops working immediately.")) return;
+    if (!(await dialog.confirm({ title: "Generate a new join code?", body: "The old code stops working immediately.", confirmLabel: "New code" }))) return;
     try { await rpc("regenerate_class_code", { p_class: cls.id }); router.refresh(); } catch (e) { toast(errorText(e), "error"); }
   }
   async function transfer() {

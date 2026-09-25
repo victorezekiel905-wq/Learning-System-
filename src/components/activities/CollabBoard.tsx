@@ -59,12 +59,12 @@ export function CollabBoard({ activityId, sessionId, title, tenantId, userId, ma
     if (error) toast(error.message, "error"); else { setText(""); void posts.reload(); }
   }
   async function hide(p: Post) {
-    await createClient().from("collab_posts").update({ hidden: !p.hidden }).eq("id", p.id);
-    void posts.reload();
+    const { error } = await createClient().from("collab_posts").update({ hidden: !p.hidden }).eq("id", p.id);
+    if (error) toast(error.message, "error"); else void posts.reload();
   }
   async function toggleLock() {
-    const { data } = await createClient().from("collab_boards").update({ locked: !board!.locked }).eq("id", board!.id).select("id,title,locked,anonymous,owner_id").single();
-    if (data) setBoard(data as Board);
+    const { data, error } = await createClient().from("collab_boards").update({ locked: !board!.locked }).eq("id", board!.id).select("id,title,locked,anonymous,owner_id").single();
+    if (error) toast(error.message, "error"); else setBoard(data as Board);
   }
 
   return (

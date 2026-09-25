@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Alert, Badge, Button, CopyButton, Field, Input, Modal, Select, useToast } from "@/components/ui";
+import { Alert, Badge, Button, CopyButton, Field, Input, Modal, Select, useToast, useDialog } from "@/components/ui";
 import { api, errorText, rpc } from "@/lib/rpc";
 import { formatDate } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ export type TenantRow = {
 export function SchoolsClient({ tenants, plans, q, openNew }: { tenants: TenantRow[]; plans: { code: string; name: string }[]; q: string; openNew: boolean }) {
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const [creating, setCreating] = useState(openNew);
   const [deleting, setDeleting] = useState<TenantRow | null>(null);
 
@@ -40,9 +41,9 @@ export function SchoolsClient({ tenants, plans, q, openNew }: { tenants: TenantR
               <td>{t.classes}</td><td>{t.devices}</td>
               <td className="text-xs text-ink-500">{formatDate(t.created_at)}</td>
               <td className="text-right"><div className="flex justify-end gap-1">
-                <Button size="sm" variant="ghost" onClick={async () => { const name = prompt("New name", t.name); if (name && name !== t.name) await act("sa_update_tenant", { p_tenant: t.id, p_name: name }, "Renamed"); }}>Rename</Button>
+                <Button size="sm" variant="ghost" onClick={async () => { const name = await dialog.ask({ title: "Rename school", label: "School name", defaultValue: t.name, confirmLabel: "Rename" }); if (name && name !== t.name) await act("sa_update_tenant", { p_tenant: t.id, p_name: name }, "Renamed"); }}>Rename</Button>
                 {t.status === "active"
-                  ? <Button size="sm" variant="ghost" onClick={async () => { const reason = prompt(`Suspend ${t.name}? Everyone in this school will be locked out.\nReason (optional):`); if (reason !== null) await act("sa_set_tenant_status", { p_tenant: t.id, p_status: "suspended", p_reason: reason }, "School suspended"); }}>Suspend</Button>
+                  ? <Button size="sm" variant="ghost" onClick={async () => { const reason = await dialog.ask({ title: `Suspend ${t.name}?`, body: "Everyone in this school is locked out until you lift the suspension.", label: "Reason (optional)", optional: true, tone: "danger", confirmLabel: "Suspend school" }); if (reason !== null) await act("sa_set_tenant_status", { p_tenant: t.id, p_status: "suspended", p_reason: reason }, "School suspended"); }}>Suspend</Button>
                   : <Button size="sm" variant="ghost" onClick={() => act("sa_set_tenant_status", { p_tenant: t.id, p_status: "active" }, "School restored")}>Restore</Button>}
                 <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => setDeleting(t)}>Delete</Button>
               </div></td>

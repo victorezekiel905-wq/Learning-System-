@@ -3,7 +3,12 @@ import { useRef, useState } from "react";
 import type { Stroke } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const COLORS = ["#0f172a", "#4f46e5", "#0891b2", "#16a34a", "#ea580c", "#dc2626"];
+// Pen colours (named, so the colour buttons can be told apart without seeing them).
+export const PEN_COLORS: { hex: string; name: string }[] = [
+  { hex: "#151411", name: "Black" }, { hex: "#2340D3", name: "Blue" }, { hex: "#0F766E", name: "Teal" },
+  { hex: "#15803D", name: "Green" }, { hex: "#C2410C", name: "Orange" }, { hex: "#B91C1C", name: "Red" }
+];
+const COLORS = PEN_COLORS.map((c) => c.hex);
 
 /** Coordinates are stored in a 1000×562.5 (16:9) space so boards scale to any screen. */
 export const BOARD_W = 1000;
@@ -54,8 +59,8 @@ export function Whiteboard({ strokes, onChange, editable = true, background, cla
       {editable && (
         <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Drawing tools">
           {COLORS.map((c) => (
-            <button key={c} type="button" aria-label={`Colour ${c}`} onClick={() => { setColor(c); setErasing(false); }}
-              className={cn("h-6 w-6 rounded-full border-2", color === c && !erasing ? "border-ink-900" : "border-white shadow")} style={{ backgroundColor: c }} />
+            <button key={c} type="button" aria-label={PEN_COLORS.find((p) => p.hex === c)?.name ?? c} aria-pressed={color === c && !erasing} onClick={() => { setColor(c); setErasing(false); }}
+              className={cn("h-7 w-7 rounded-full border-2 ring-offset-2", color === c && !erasing ? "border-white ring-2 ring-ink-900" : "border-white ring-1 ring-ink-200")} style={{ backgroundColor: c }} />
           ))}
           <select className="input w-auto py-1 text-xs" value={width} onChange={(e) => setWidth(Number(e.target.value))} aria-label="Pen size">
             <option value={2}>Fine</option><option value={4}>Medium</option><option value={8}>Thick</option><option value={16}>Marker</option>

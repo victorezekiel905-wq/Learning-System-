@@ -10,6 +10,7 @@ import { errorText, rpc } from "@/lib/rpc";
 import { pct } from "@/lib/utils";
 import type { Me } from "./LiveRoom";
 import { ThinkingInsights, type Insight } from "./ThinkingInsights";
+import { Icon } from "@/components/Icon";
 
 export function ResponsesPanel({ state, me, reload }: { state: SessionState; me: Me; reload: () => Promise<void> }) {
   const toast = useToast();
@@ -53,7 +54,7 @@ export function ResponsesPanel({ state, me, reload }: { state: SessionState; me:
         {activityId && (activityId === s.active_activity_id
           ? <Button variant="secondary" onClick={() => launch(null)}>Close for students</Button>
           : <Button onClick={() => launch(activityId)}>Open for students</Button>)}
-        <Link href="/teacher/review" className="btn btn-ghost no-underline">Review queue →</Link>
+        <Link href="/teacher/review" className="btn btn-ghost no-underline">Review queue<Icon name="chevronRight" className="h-4 w-4" /></Link>
       </div>
 
       {!activityId ? <Empty title="No activity selected">Launch an activity from a slide, or pick one here, to see live responses.</Empty>
@@ -72,7 +73,7 @@ export function ResponsesPanel({ state, me, reload }: { state: SessionState; me:
                     <ul className="space-y-2">
                       {q.options.map((o) => (
                         <li key={o.id}>
-                          <div className="mb-0.5 flex justify-between text-sm"><span>{o.is_correct && q.kind !== "poll" ? "✓ " : ""}{o.label}</span><span className="tabular-nums text-ink-500">{o.count}</span></div>
+                          <div className="mb-0.5 flex justify-between text-sm"><span className="flex items-center gap-1.5">{o.is_correct && q.kind !== "poll" && <><Icon name="check" className="h-3.5 w-3.5 text-emerald-700" /><span className="sr-only">Correct answer: </span></>}{o.label}</span><span className="tabular-nums text-ink-500">{o.count}</span></div>
                           <div className="h-2.5 overflow-hidden rounded-full bg-ink-100" role="img" aria-label={`${o.count} of ${q.responses}`}>
                             <div className={`h-full rounded-full ${o.is_correct && q.kind !== "poll" ? "bg-emerald-500" : "bg-brand-500"}`} style={{ width: `${(100 * o.count) / total}%` }} />
                           </div>

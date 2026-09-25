@@ -6,6 +6,7 @@ import { errorText, rpc } from "@/lib/rpc";
 import { sendOrQueue } from "@/lib/offline-queue";
 import type { PublicQuestion } from "@/lib/types";
 import { SlideView, type SlideData } from "./SlideView";
+import { Icon } from "@/components/Icon";
 
 type Checkpoint = { id: string; t_seconds: number; required: boolean; question_id: string; activity_id: string };
 type Attempt = { attempt: { id: string }; questions: PublicQuestion[]; answers: Record<string, Answer> };
@@ -84,7 +85,7 @@ export function InteractiveVideo({ slide, checkpoints, sessionId, shareCode }: {
           {sorted.map((c) => (
             <button key={c.id} className="badge border border-ink-200 bg-white" disabled={directVideo && !done.has(c.question_id)}
               onClick={() => { if (!directVideo || done.has(c.question_id)) { setActive(c); setAnswer(undefined); setResult(null); } }}>
-              {done.has(c.question_id) ? "✓" : "○"} {Math.floor(c.t_seconds / 60)}:{String(Math.round(c.t_seconds % 60)).padStart(2, "0")}
+              <Icon name={done.has(c.question_id) ? "check" : "circle"} className="h-3 w-3" />{done.has(c.question_id) && <span className="sr-only">Answered: </span>}{Math.floor(c.t_seconds / 60)}:{String(Math.round(c.t_seconds % 60)).padStart(2, "0")}
             </button>
           ))}
           {!directVideo && <Badge tone="amber">Answer these as you reach each time in the video.</Badge>}

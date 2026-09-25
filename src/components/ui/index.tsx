@@ -1,6 +1,6 @@
 "use client";
 import {
-  createContext, forwardRef, useCallback, useContext, useEffect, useId, useRef, useState,
+  createContext, forwardRef, useCallback, useContext, useEffect, useId, useMemo, useRef, useState,
   type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
   type TextareaHTMLAttributes
 } from "react";
@@ -16,19 +16,38 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   loading?: boolean;
 };
 
+/**
+ * When `onClick` returns a promise, the button shows a spinner and is disabled
+ * until it settles (no double submits), and a rejection is shown as a toast
+ * instead of failing silently.
+ */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "primary", size = "md", loading, className, children, disabled, type = "button", ...rest }, ref
+  { variant = "primary", size = "md", loading, className, children, disabled, type = "button", onClick, ...rest }, ref
 ) {
+  const toast = useContext(ToastCtx);
+  const [running, setRunning] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const busy = !!loading || running;
   return (
     <button
       ref={ref}
       type={type}
-      disabled={disabled || loading}
-      aria-busy={loading || undefined}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
       className={cn("btn", `btn-${variant}`, size === "sm" && "btn-sm", size === "lg" && "btn-lg", className)}
+      onClick={onClick && ((e) => {
+        const result: unknown = (onClick as (ev: typeof e) => unknown)(e);
+        if (result && typeof (result as Promise<unknown>).then === "function") {
+          setRunning(true);
+          (result as Promise<unknown>)
+            .catch((err: unknown) => toast(err instanceof Error ? err.message : "Something went wrong.", "error"))
+            .finally(() => { if (alive.current) setRunning(false); });
+        }
+      })}
       {...rest}
     >
-      {loading && <Spinner className="h-3.5 w-3.5" />}
+      {busy && <Spinner className="h-3.5 w-3.5" />}
       {children}
     </button>
   );
@@ -240,6 +259,7 @@ export function Modal({ open, onClose, title, children, footer, wide }: {
   open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode; wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
@@ -247,13 +267,13 @@ export function Modal({ open, onClose, title, children, footer, wide }: {
     if (!open && d.open) d.close();
   }, [open]);
   return (
-    <dialog ref={ref} onClose={onClose} onCancel={onClose}
+    <dialog ref={ref} onClose={onClose} onCancel={onClose} aria-labelledby={titleId}
       className={cn("mb-0 mt-auto w-full max-w-none rounded-t-2xl p-0 text-ink-900 shadow-overlay backdrop:bg-ink-950/50",
         "sm:m-auto sm:w-[calc(100%-2rem)] sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-lg")}>
       {open && (
         <div className="animate-sheet-up sm:animate-fade-in">
           <header className="flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-4 sm:px-6">
-            <h2 className="font-display text-lg font-bold tracking-tight">{title}</h2>
+            <h2 id={titleId} className="font-display text-lg font-bold tracking-tight">{title}</h2>
             <button type="button" onClick={onClose} className="btn btn-ghost -mr-2 h-9 w-9 px-0" aria-label="Close"><X className="h-4 w-4" aria-hidden /></button>
           </header>
           <div className="max-h-[70vh] overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
@@ -272,16 +292,38 @@ const ToastCtx = createContext<(text: string, tone?: Toast["tone"]) => void>(() 
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [dialog, setDialog] = useState<PendingDialog | null>(null);
+  const box = useRef<HTMLDivElement>(null);
   const push = useCallback((text: string, tone: Toast["tone"] = "info") => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t.slice(-3), { id, tone, text }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === "error" ? 7000 : 4000);
   }, []);
+  // Open modals live in the browser's top layer, above any z-index. Toasts are a
+  // popover so they join the top layer too (re-shown so the newest is on top);
+  // otherwise an error raised inside a modal would be hidden behind it.
+  useEffect(() => {
+    const el = box.current as (HTMLDivElement & { showPopover?: () => void; hidePopover?: () => void }) | null;
+    if (!el?.showPopover) return;
+    try {
+      if (el.matches(":popover-open")) el.hidePopover!();
+      if (toasts.length) el.showPopover();
+    } catch { /* not supported: falls back to z-index */ }
+  }, [toasts]);
+  const dialogs = useMemo<DialogApi>(() => ({
+    confirm: (opts) => new Promise<boolean>((resolve) => setDialog((prev) => { prev?.cancel(); return { id: ++dialogSeq, kind: "confirm", opts, resolve, cancel: () => resolve(false) }; })),
+    ask: (opts) => new Promise<string | null>((resolve) => setDialog((prev) => { prev?.cancel(); return { id: ++dialogSeq, kind: "ask", opts, resolve, cancel: () => resolve(null) }; }))
+  }), []);
   return (
     <ToastCtx.Provider value={push}>
+      <DialogCtx.Provider value={dialogs}>
       {children}
+      {dialog && <DialogHost key={dialog.id} pending={dialog} done={() => setDialog(null)} />}
+      </DialogCtx.Provider>
       {/* Phones and tablets: centred above the bottom tab bar. Desktop: bottom-right. */}
-      <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] z-[60] flex flex-col items-center gap-2 lg:inset-x-auto lg:bottom-6 lg:right-6 lg:w-96 lg:items-stretch" aria-live="polite">
+      <div ref={box} {...{ popover: "manual" }}
+        className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] top-auto z-[60] m-0 flex h-auto w-auto flex-col items-center gap-2 overflow-visible border-0 bg-transparent p-0 lg:inset-x-auto lg:bottom-6 lg:right-6 lg:w-96 lg:items-stretch"
+        aria-live="polite">
         {toasts.map((t) => {
           const Icon = t.tone === "error" ? XCircle : t.tone === "success" ? CheckCircle2 : Info;
           return (
@@ -299,6 +341,62 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 export function useToast() {
   return useContext(ToastCtx);
+}
+
+// ---------------------------------------------------------------------------
+// Dialogs: branded replacements for window.confirm / window.prompt, which look
+// out of place, can't be styled and are blocked in some embedded/installed apps.
+//   const { confirm, ask } = useDialog();
+//   if (!(await confirm({ title: "Delete this slide?", tone: "danger", confirmLabel: "Delete" }))) return;
+//   const name = await ask({ title: "New folder", label: "Folder name" });
+// ---------------------------------------------------------------------------
+type ConfirmOpts = { title: string; body?: ReactNode; confirmLabel?: string; tone?: "danger" | "primary" };
+type AskOpts = ConfirmOpts & {
+  label: string; placeholder?: string; defaultValue?: string; multiline?: boolean; maxLength?: number;
+  /** Empty answers are allowed (returns ""). */
+  optional?: boolean;
+  /** Type-to-confirm for irreversible actions, e.g. "DELETE". */
+  requireText?: string;
+};
+type PendingDialog =
+  | { id: number; kind: "confirm"; opts: ConfirmOpts; resolve: (v: boolean) => void; cancel: () => void }
+  | { id: number; kind: "ask"; opts: AskOpts; resolve: (v: string | null) => void; cancel: () => void };
+type DialogApi = { confirm: (o: ConfirmOpts) => Promise<boolean>; ask: (o: AskOpts) => Promise<string | null> };
+let dialogSeq = 0;
+const DialogCtx = createContext<DialogApi>({ confirm: async () => false, ask: async () => null });
+
+export function useDialog() {
+  return useContext(DialogCtx);
+}
+
+function DialogHost({ pending, done }: { pending: PendingDialog; done: () => void }) {
+  const ask = pending.kind === "ask" ? pending.opts : null;
+  const [value, setValue] = useState(ask?.defaultValue ?? "");
+  const o = pending.opts;
+  const valid = !ask ? true : ask.requireText ? value.trim() === ask.requireText : ask.optional || value.trim().length > 0;
+  const close = (ok: boolean) => {
+    if (pending.kind === "confirm") pending.resolve(ok);
+    else pending.resolve(ok ? value.trim() : null);
+    done();
+  };
+  return (
+    <Modal open onClose={() => close(false)} title={o.title}
+      footer={<>
+        <Button variant="secondary" onClick={() => close(false)}>Cancel</Button>
+        <Button variant={o.tone === "danger" ? "danger" : "primary"} disabled={!valid} onClick={() => close(true)}>{o.confirmLabel ?? (ask ? "Save" : "Confirm")}</Button>
+      </>}>
+      {o.body && <div className="text-[15px] leading-relaxed text-ink-700">{o.body}</div>}
+      {ask && (
+        <form className={cn(o.body && "mt-4")} onSubmit={(e) => { e.preventDefault(); if (valid) close(true); }}>
+          <Field label={ask.requireText ? <>Type <strong className="font-mono">{ask.requireText}</strong> to confirm</> : ask.label}>
+            {ask.multiline
+              ? <Textarea autoFocus rows={3} maxLength={ask.maxLength ?? 2000} placeholder={ask.placeholder} value={value} onChange={(e) => setValue(e.target.value)} />
+              : <Input autoFocus maxLength={ask.maxLength ?? 200} placeholder={ask.placeholder} value={value} onChange={(e) => setValue(e.target.value)} />}
+          </Field>
+        </form>
+      )}
+    </Modal>
+  );
 }
 
 export function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {

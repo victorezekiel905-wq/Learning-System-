@@ -55,12 +55,13 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
     slide: paced ? slideIndex : null, spotlightToClass: !!(s?.spotlight?.me && s.spotlight.show_to_class)
   });
   const version = guard.directives?.state_version;
+  const reloadState = st.reload;
   const seenVersion = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (version === undefined) return;
-    if (seenVersion.current !== undefined && version !== seenVersion.current) void st.reload();
+    if (seenVersion.current !== undefined && version !== seenVersion.current) void reloadState();
     seenVersion.current = version;
-  }, [version, st]);
+  }, [version, reloadState]);
 
   useEffect(() => {
     const a = s?.announcements[0];
@@ -72,6 +73,9 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
 
   if (st.error && !s) return <div className="page"><Alert tone="error">{st.error}</Alert></div>;
   if (!s) return <div className="page text-sm text-ink-500">Joining…</div>;
+  if (s.session.status === "scheduled") {
+    return <div className="page max-w-xl"><Alert title="This lesson hasn't started yet">Keep this page open. It starts as soon as {s.session.teacher} begins the lesson.</Alert></div>;
+  }
   if (s.session.status !== "live") {
     return <div className="page max-w-xl"><Alert title="This session has ended">Thanks for taking part. <Link href="/student">Back to home</Link></Alert></div>;
   }
@@ -97,13 +101,13 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
           {guard.locked && <Badge tone="gray"><Icon name="lock" className="mr-1 inline h-3 w-3" />Lockdown</Badge>}
           {pending > 0 && <Badge tone="amber">{pending} answer(s) waiting to sync</Badge>}
           {quality === "offline" && <Badge tone="red">Offline</Badge>}
-          {s.hand ? <Button variant="secondary" onClick={async () => { await rpc("lower_hand", { p_session: sessionId }); void st.reload(); }}><Icon name="hand" className="h-4 w-4 text-amber-600" /> Lower hand</Button>
+          {s.hand ? <Button variant="secondary" onClick={async () => { try { await rpc("lower_hand", { p_session: sessionId }); void st.reload(); } catch (e) { toast(errorText(e), "error"); } }}><Icon name="hand" className="h-4 w-4 text-amber-600" /> Lower hand</Button>
             : <Button variant="secondary" onClick={async () => {
                 const { error } = await createClient().from("raise_hands").insert({ tenant_id: me.tenantId, session_id: sessionId, student_id: me.id, message: handMsg.trim().slice(0, 500) });
                 if (error) toast(error.message, "error"); else { setHandMsg(""); toast("Your teacher can see your hand is raised", "success"); void st.reload(); }
               }}><Icon name="hand" className="h-4 w-4" /> Raise hand</Button>}
           <Button variant="secondary" onClick={() => openChat("teacher")}><Icon name="chat" className="h-4 w-4" /> Ask teacher</Button>
-          {s.session.group_chat_enabled && <Button variant="secondary" onClick={() => openChat("group")}># Class chat</Button>}
+          {s.session.group_chat_enabled && <Button variant="secondary" onClick={() => openChat("group")}><Icon name="users" className="h-4 w-4" /> Class chat</Button>}
         </div>
       </div>
 
@@ -135,9 +139,9 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
 
       {paced && slides.length > 0 && (
         <div className="flex items-center justify-between">
-          <Button variant="secondary" disabled={slideIndex <= 0} onClick={() => setOwnSlide(slideIndex - 1)}>← Previous</Button>
+          <Button variant="secondary" disabled={slideIndex <= 0} onClick={() => setOwnSlide(slideIndex - 1)}><Icon name="chevronLeft" className="h-4 w-4" />Previous</Button>
           <span className="text-sm text-ink-500">Slide {slideIndex + 1} of {slides.length}</span>
-          <Button disabled={slideIndex >= slides.length - 1} onClick={() => setOwnSlide(slideIndex + 1)}>Next →</Button>
+          <Button disabled={slideIndex >= slides.length - 1} onClick={() => setOwnSlide(slideIndex + 1)}>Next<Icon name="chevronRight" className="h-4 w-4" /></Button>
         </div>
       )}
 

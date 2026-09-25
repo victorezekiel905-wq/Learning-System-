@@ -179,10 +179,11 @@ begin
     if v_prev.revealed then
       raise exception 'You have already answered this question. Move on to the next one.' using errcode = 'P0001';
     end if;
-    -- Second chance: only after a wrong first try with instant feedback. Worth half.
+    -- Second chance: only after a wrong first try with instant feedback. Worth half,
+    -- but never less than any partial credit the first try already earned.
     if v_instant and v_second and v_prev.is_correct is false and v_prev.tries = 1 then
       v_tries := 2;
-      v_score := round(coalesce(v_score, 0) * 0.5, 2);
+      v_score := greatest(round(coalesce(v_score, 0) * 0.5, 2), coalesce(v_prev.auto_score, 0));
     end if;
   end if;
 
@@ -226,9 +227,13 @@ declare
   v_shuffle_q boolean;
   v_shuffle_o boolean;
   v_level    smallint;
+  v_retry    boolean;
 begin
   select * into v_act from public.activities where id = p_activity and tenant_id = v_me.tenant_id;
   if v_act.id is null then raise exception 'Activity not found.' using errcode = 'P0002'; end if;
+  -- Second chances exist only with instant feedback (otherwise right/wrong stays hidden until submit).
+  v_retry := coalesce(v_act.settings ->> 'show_feedback', 'after_submit') = 'immediately'
+             and coalesce((v_act.settings ->> 'redemption')::boolean, false);
   if not app.attempt_context_ok(v_act, p_session, p_assignment, p_share) then
     raise exception 'This activity is not open for you right now.' using errcode = '42501';
   end if;
@@ -290,7 +295,8 @@ begin
                 from public.quiz_answers a where a.attempt_id = v_attempt.id),
     -- Which answers are final (already revealed) and which are on their second try.
     'locked', (select coalesce(jsonb_object_agg(a.question_id, jsonb_build_object('revealed', a.revealed, 'tries', a.tries, 'is_correct', a.is_correct)), '{}'::jsonb)
-               from public.quiz_answers a where a.attempt_id = v_attempt.id and (a.revealed or a.tries > 1 or a.is_correct is false)));
+               from public.quiz_answers a where a.attempt_id = v_attempt.id
+                and (a.revealed or (v_retry and a.tries = 1 and a.is_correct is false))));
 end$$;
 
 -- ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
 import { uploadMedia, useSignedUrl } from "@/lib/media";
 import { errorText } from "@/lib/rpc";
-import { Button, Empty, Input, Modal, useToast } from "@/components/ui";
+import { Button, Empty, Input, Modal, useToast, useDialog } from "@/components/ui";
 
 export type MediaRow = { id: string; storage_path: string; kind: string; title: string; mime_type: string; alt_text: string | null; tags: string[]; bytes: number; created_at: string };
 
@@ -21,6 +21,7 @@ export function MediaPicker({ open, onClose, onPick, kinds, tenantId, userId, le
   open: boolean; onClose: () => void; onPick: (m: MediaRow) => void; kinds?: string[]; tenantId: string; userId: string; lessonId?: string;
 }) {
   const toast = useToast();
+  const dialog = useDialog();
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const media = useLoader(async () => {
@@ -34,9 +35,14 @@ export function MediaPicker({ open, onClose, onPick, kinds, tenantId, userId, le
   }, [search, open, (kinds ?? []).join()], { enabled: open });
 
   async function upload(file: File) {
+    let alt: string | undefined;
+    if (file.type.startsWith("image/")) {
+      const a = await dialog.ask({ title: "Describe this image", body: "Screen readers read this aloud to students who can't see the image.", label: "Alt text", optional: true, maxLength: 300, confirmLabel: "Upload" });
+      if (a === null) return;
+      alt = a;
+    }
     setBusy(true);
     try {
-      const alt = file.type.startsWith("image/") ? prompt("Describe this image for screen-reader users (alt text):") ?? "" : undefined;
       await uploadMedia(file, { tenantId, userId, lessonId, alt });
       await media.reload();
       toast("Uploaded", "success");

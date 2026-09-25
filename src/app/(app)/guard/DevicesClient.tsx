@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, Select, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, Select, useToast, useDialog } from "@/components/ui";
 import { errorText, rpc } from "@/lib/rpc";
 import { formatDateTime, timeAgo } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ type Diag = {
 export function DevicesClient({ devices, students, isIt, appUrl }: { devices: Device[]; students: { id: string; full_name: string; email: string }[]; isIt: boolean; appUrl: string }) {
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [diag, setDiag] = useState<Diag | null>(null);
@@ -85,7 +86,7 @@ export function DevicesClient({ devices, students, isIt, appUrl }: { devices: De
                   {isIt && (d.status === "active"
                     ? <Button size="sm" variant="ghost" onClick={() => act("device_set_status", { p_device: d.id, p_status: "disabled" }, "Device disabled remotely")}>Disable</Button>
                     : <Button size="sm" variant="ghost" onClick={() => act("device_set_status", { p_device: d.id, p_status: "active" }, "Re-enabled")}>Enable</Button>)}
-                  {isIt && d.status !== "unenrolled" && <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => confirm("Unenrol this device? The extension will stop working until paired again.") && act("device_set_status", { p_device: d.id, p_status: "unenrolled" }, "Unenrolled")}>Unenrol</Button>}
+                  {isIt && d.status !== "unenrolled" && <Button size="sm" variant="ghost" className="text-rose-600" onClick={async () => { if (await dialog.confirm({ title: "Unenrol this device?", body: "The extension stops working until the device is paired again.", tone: "danger", confirmLabel: "Unenrol" })) await act("device_set_status", { p_device: d.id, p_status: "unenrolled" }, "Unenrolled"); }}>Unenrol</Button>}
                 </div></td>
               </tr>
             ))}</tbody>

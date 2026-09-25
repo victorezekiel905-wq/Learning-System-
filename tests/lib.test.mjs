@@ -71,3 +71,15 @@ test("accent keeps the picked colour and chooses readable text on it", async () 
   assert.equal(lime["--accent-ink"], "21 20 17", "ink text on lime");
   assert.equal(theme.paletteVars("accent", "#1e3a8a")["--accent-ink"], "255 255 255", "white text on navy");
 });
+
+test("a dropped connection is reported as a network problem (and never as a server rejection)", async () => {
+  const errors = await load("src/lib/errors.ts");
+  for (const m of ["TypeError: Failed to fetch", "NetworkError when attempting to fetch resource.", "Load failed", "fetch failed"]) {
+    assert.equal(errors.isNetworkMessage(m), true, m);
+    assert.equal(errors.messageForError({ message: m }), errors.NETWORK_MESSAGE);
+  }
+  // Real server answers keep their meaning.
+  assert.equal(errors.isNetworkMessage("Invalid login credentials"), false);
+  assert.equal(errors.messageForError({ message: "You already answered this question.", code: "P0001" }), "You already answered this question.");
+  assert.equal(errors.messageForError({ message: "boom" }), "Something went wrong. Please try again.");
+});

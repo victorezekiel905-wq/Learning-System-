@@ -43,7 +43,7 @@ export default async function LessonsPage(
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {lessons.map((l) => (
-            <Link key={l.id} href={`/teacher/lessons/${l.id}`} className="card card-pad block no-underline transition hover:border-brand-300 hover:shadow-md">
+            <Link key={l.id} href={`/teacher/lessons/${l.id}`} className="card card-pad block no-underline transition hover:border-ink-400">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="font-semibold text-ink-900">{l.title}</h2>
                 <Badge tone={l.is_template ? "cyan" : l.status === "published" ? "green" : "gray"}>{l.is_template ? "template" : l.status}</Badge>

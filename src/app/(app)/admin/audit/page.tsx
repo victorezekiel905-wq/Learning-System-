@@ -1,3 +1,4 @@
+import { Icon } from "@/components/Icon";
 import Link from "next/link";
 import { requireRole, ADMINS } from "@/lib/session";
 import { Badge, Empty, PageHeader } from "@/components/ui";
@@ -40,8 +41,8 @@ export default async function AuditPage(props: { searchParams: Promise<{ action?
         </table></div>
       )}
       <div className="mt-4 flex justify-between text-sm">
-        {page > 0 ? <Link href={`/admin/audit?page=${page - 1}&action=${searchParams.action ?? ""}`}>← Newer</Link> : <span />}
-        {(count ?? 0) > (page + 1) * PAGE && <Link href={`/admin/audit?page=${page + 1}&action=${searchParams.action ?? ""}`}>Older →</Link>}
+        {page > 0 ? <Link href={`/admin/audit?page=${page - 1}&action=${searchParams.action ?? ""}`} className="btn btn-secondary btn-sm no-underline"><Icon name="chevronLeft" className="h-4 w-4" />Newer</Link> : <span />}
+        {(count ?? 0) > (page + 1) * PAGE && <Link href={`/admin/audit?page=${page + 1}&action=${searchParams.action ?? ""}`} className="btn btn-secondary btn-sm no-underline">Older<Icon name="chevronRight" className="h-4 w-4" /></Link>}
       </div>
     </div>
   );

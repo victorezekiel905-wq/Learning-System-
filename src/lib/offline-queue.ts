@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { ActionError, rpc } from "./rpc";
+import { ActionError, NETWORK, rpc } from "./rpc";
 
 /**
  * Low-bandwidth design (§33) / failure scenario (§30): answers are written to
@@ -18,8 +18,10 @@ function write(jobs: Job[]) {
   window.dispatchEvent(new Event("sc-queue"));
 }
 
+// A request that never reached the server (queue and retry), as opposed to the
+// server refusing it (report). Messages are made human-readable, so use the code.
 function isNetworkError(e: unknown) {
-  return !(e instanceof ActionError) || /fetch|network|Failed to/i.test(e.message);
+  return !(e instanceof ActionError) || e.code === NETWORK;
 }
 
 let flushing = false;

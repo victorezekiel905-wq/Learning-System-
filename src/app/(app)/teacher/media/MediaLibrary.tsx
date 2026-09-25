@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { deleteMedia, MediaThumb, type MediaRow } from "@/components/studio/MediaPicker";
-import { Badge, Button, Card, Empty, Field, Input, Modal, Select, useToast } from "@/components/ui";
+import { Badge, Button, Card, Empty, Field, Input, Modal, Select, useToast, useDialog } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
 import { signedUrl, uploadMedia } from "@/lib/media";
@@ -11,6 +11,7 @@ type Folder = { id: string; name: string; parent_id: string | null };
 
 export function MediaLibrary({ me }: { me: { id: string; tenantId: string } }) {
   const toast = useToast();
+  const dialog = useDialog();
   const [folder, setFolder] = useState<string>("");
   const [kind, setKind] = useState("");
   const [search, setSearch] = useState("");
@@ -44,7 +45,7 @@ export function MediaLibrary({ me }: { me: { id: string; tenantId: string } }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
       <Card title="Folders" actions={<Button size="sm" variant="ghost" onClick={async () => {
-        const name = prompt("Folder name");
+        const name = await dialog.ask({ title: "New folder", label: "Folder name", confirmLabel: "Create folder" });
         if (!name) return;
         const { error } = await createClient().from("media_folders").insert({ tenant_id: me.tenantId, owner_id: me.id, name, parent_id: folder || null });
         if (error) toast(error.message, "error"); else void folders.reload();

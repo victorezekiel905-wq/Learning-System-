@@ -1121,6 +1121,54 @@ test("learning supports, student-written questions, gradebook export", async () 
   await rejects(db.rpc(S.stu1, "class_gradebook", { p_class: S.classA }), /Not your class/);
 });
 
+test("audit fixes: no right/wrong leak before submit, second try never lowers a score, atomic slide order", async () => {
+  const t = S.teacherA;
+  const s = await db.rpc(t, "start_session", { p_class: S.classA });
+  await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
+
+  // "After submit" feedback: a wrong answer must not come back flagged on reload (that would reveal it's wrong).
+  const [quiet] = await db.as(t, `insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+    values ($1,$2,$3,'quiz','Quiet quiz','{"show_feedback":"after_submit","redemption":true}') returning id`, [S.tenantA, S.lesson, t]);
+  const [qq] = await db.as(t, `insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points) values ($1,$2,$3,'mcq','2+2?',1) returning id`, [S.tenantA, quiet.id, t]);
+  const qo = await db.as(t, `insert into public.question_options (tenant_id, question_id, label, is_correct, position)
+    values ($1,$2,'4',true,0), ($1,$2,'5',false,1) returning id, is_correct`, [S.tenantA, qq.id]);
+  await db.rpc(t, "set_session_state", { p_session: s.id, p_activity: quiet.id });
+  const a1 = await db.rpc(S.stu1, "start_attempt", { p_activity: quiet.id, p_session: s.id });
+  const saved = await db.rpc(S.stu1, "submit_answer", { p_attempt: a1.attempt.id, p_question: qq.id, p_response: J({ option_id: qo.find((o) => !o.is_correct).id }) });
+  assert.equal(saved.is_correct, undefined, "no right/wrong before submit");
+  assert.deepEqual((await db.rpc(S.stu1, "start_attempt", { p_activity: quiet.id, p_session: s.id })).locked, {});
+
+  // Partial credit + second chance: a worse second try keeps the first try's partial score.
+  const [pc] = await db.as(t, `insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+    values ($1,$2,$3,'quiz','Primes','{"show_feedback":"immediately","redemption":true}') returning id`, [S.tenantA, S.lesson, t]);
+  const [mq] = await db.as(t, `insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, config)
+    values ($1,$2,$3,'multi_select','Pick the primes',4,'{"partial_credit":true}') returning id`, [S.tenantA, pc.id, t]);
+  const mo = await db.as(t, `insert into public.question_options (tenant_id, question_id, label, is_correct, position)
+    values ($1,$2,'2',true,0), ($1,$2,'3',true,1), ($1,$2,'4',false,2), ($1,$2,'6',false,3) returning id, label`, [S.tenantA, mq.id]);
+  const id = (l) => mo.find((o) => o.label === l).id;
+  await db.rpc(t, "set_session_state", { p_session: s.id, p_activity: pc.id });
+  const a2 = await db.rpc(S.stu1, "start_attempt", { p_activity: pc.id, p_session: s.id });
+  const try1 = await db.rpc(S.stu1, "submit_answer", { p_attempt: a2.attempt.id, p_question: mq.id, p_response: J({ option_ids: [id("2")] }) });
+  assert.equal(try1.second_chance, true);
+  const try2 = await db.rpc(S.stu1, "submit_answer", { p_attempt: a2.attempt.id, p_question: mq.id, p_response: J({ option_ids: [id("2"), id("4")] }) });
+  assert.equal(Number(try2.score), 2, "keeps the 2 points from the first try (half of 4)");
+  await db.rpc(t, "end_session", { p_session: s.id });
+
+  // Slide order: one atomic call; only the lesson's editor; the whole list must match.
+  const slides = await db.as(t, `insert into public.lesson_slides (tenant_id, lesson_id, position, kind, content) values
+    ($1,$2,10,'text','{}'), ($1,$2,11,'text','{}') returning id`, [S.tenantA, S.lesson]);
+  const all = (await db.admin("select id from public.lesson_slides where lesson_id = $1 order by position", [S.lesson])).map((r) => r.id);
+  const reversed = [...all].reverse();
+  await db.rpc(t, "reorder_slides", { p_lesson: S.lesson, p_order: `{${reversed.join(",")}}` });
+  const after = await db.admin("select id, position from public.lesson_slides where lesson_id = $1 order by position", [S.lesson]);
+  assert.deepEqual(after.map((r) => r.id), reversed);
+  assert.deepEqual(after.map((r) => r.position), reversed.map((_, i) => i));
+  await rejects(db.rpc(t, "reorder_slides", { p_lesson: S.lesson, p_order: `{${reversed.slice(1).join(",")}}` }), /slide list changed/);
+  await rejects(db.rpc(S.stu1, "reorder_slides", { p_lesson: S.lesson, p_order: `{${all.join(",")}}` }), /can't edit/);
+  await rejects(db.rpc(S.adminB, "reorder_slides", { p_lesson: S.lesson, p_order: `{${all.join(",")}}` }), /can't edit|profile/);
+  await db.admin("delete from public.lesson_slides where id = any($1::uuid[])", [slides.map((x) => x.id)]);
+});
+
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {
   const before = (await db.admin("select count(*)::int n from public.users where tenant_id = $1", [S.tenantA]))[0].n;
   assert.ok(before > 3);

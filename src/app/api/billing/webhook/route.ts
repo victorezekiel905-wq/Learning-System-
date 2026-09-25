@@ -7,12 +7,13 @@ export const runtime = "nodejs";
 /** Verify Stripe's `Stripe-Signature` header (t=…,v1=…) with a 5-minute tolerance. */
 function verify(payload: string, header: string | null, secret: string): boolean {
   if (!header) return false;
-  const parts = Object.fromEntries(header.split(",").map((p) => p.split("=") as [string, string]));
-  const t = Number(parts.t);
-  if (!t || Math.abs(Date.now() / 1000 - t) > 300 || !parts.v1) return false;
-  const expected = createHmac("sha256", secret).update(`${t}.${payload}`).digest("hex");
-  const a = Buffer.from(expected), b = Buffer.from(parts.v1);
-  return a.length === b.length && timingSafeEqual(a, b);
+  const pairs = header.split(",").map((p) => { const i = p.indexOf("="); return [p.slice(0, i).trim(), p.slice(i + 1).trim()] as const; });
+  const t = Number(pairs.find(([k]) => k === "t")?.[1]);
+  // While a signing secret is being rotated Stripe sends several v1 signatures; any one may match.
+  const sigs = pairs.filter(([k]) => k === "v1").map(([, v]) => v);
+  if (!t || Math.abs(Date.now() / 1000 - t) > 300 || !sigs.length) return false;
+  const expected = Buffer.from(createHmac("sha256", secret).update(`${t}.${payload}`).digest("hex"));
+  return sigs.some((s) => { const b = Buffer.from(s); return b.length === expected.length && timingSafeEqual(expected, b); });
 }
 
 const STATUS: Record<string, string> = { active: "active", trialing: "trialing", past_due: "past_due", unpaid: "past_due", canceled: "canceled", incomplete_expired: "canceled" };

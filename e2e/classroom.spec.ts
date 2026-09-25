@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, call, canSeed, cleanup, dbReady, makeUser, type TestUser } from "./env";
+import { admin, call, canSeed, cleanup, dbReady, makeUser, sessionCookies, type TestUser } from "./env";
 
 // The core promise of SwiftCipher, in a real browser:
 //  1. a student joins a live class, shares their entire screen and goes full screen;
@@ -36,11 +36,11 @@ test.describe("live classroom", () => {
 
   test.afterAll(async () => { await cleanup(created); });
 
+  // Session cookies instead of the sign-in form: the form itself is covered by the public
+  // tests, and this avoids Supabase's sign-in rate limit and one-off network blips.
   async function signIn(page: Page, u: TestUser, next: string) {
-    await page.goto(`/login?next=${encodeURIComponent(next)}`);
-    await page.locator("#email").fill(u.email);
-    await page.locator("#password").fill(u.password);
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.context().addCookies(await sessionCookies(u, test.info().project.use.baseURL!));
+    await page.goto(next);
     await page.waitForURL((url) => url.pathname === next, { timeout: 30_000 });
   }
 
@@ -111,9 +111,11 @@ test.describe("live classroom", () => {
     await sPage.close({ runBeforeUnload: true });
     await expect(tPage.getByText(/E2E Student left the lesson: Closed the lesson/).first()).toBeVisible({ timeout: 15_000 });
     console.log(`teacher told of closed tab after ${((Date.now() - closedAt) / 1000).toFixed(1)} s`);
-    const { count } = await admin().from("environment_events").select("id", { count: "exact", head: true })
+    // The earlier full-screen alert was resolved when they came back. (A new "closed the
+    // lesson" alert may already exist once the 5 s grace period passes, which is correct.)
+    const { data: open } = await admin().from("environment_events").select("rule")
       .eq("class_session_id", sessionId).is("resolved_at", null);
-    expect(count).toBe(0);
+    expect((open ?? []).filter((e) => /full-screen/.test(e.rule))).toEqual([]);
 
     // Ending the class deletes the live screen pictures.
     await call(teacher.client, "end_session", { p_session: sessionId });

@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { PickMediaButton } from "@/components/studio/MediaPicker";
 import { ShapesSvg } from "@/components/slides/SlideView";
-import { BOARD_H, BOARD_W, Whiteboard } from "@/components/slides/Whiteboard";
+import { BOARD_H, BOARD_W, PEN_COLORS, Whiteboard } from "@/components/slides/Whiteboard";
 import { Alert, Button, Card, Field, Input, Textarea } from "@/components/ui";
 import type { Shape, SlideContent, SlideKind } from "@/lib/types";
 import { uid } from "@/lib/utils";
@@ -75,7 +75,7 @@ export function SlideForm({ slide, lesson, userId, onChange, onNotes }: Props) {
   );
 }
 
-const SHAPE_COLORS = ["#4f46e5", "#0891b2", "#16a34a", "#ea580c", "#dc2626", "#0f172a"];
+const SHAPE_COLORS = PEN_COLORS.map((c) => c.hex);
 
 function ShapesEditor({ shapes, onChange }: { shapes: Shape[]; onChange: (s: Shape[]) => void }) {
   const [sel, setSel] = useState<string | null>(null);
@@ -108,7 +108,7 @@ function ShapesEditor({ shapes, onChange }: { shapes: Shape[]; onChange: (s: Sha
           <Field label="Height"><Input type="number" value={selected.h} onChange={(e) => onChange(shapes.map((s) => s.id === sel ? { ...s, h: Number(e.target.value) } : s))} /></Field>
           {selected.type === "text" && <Field label="Text" className="col-span-2"><Input value={selected.text ?? ""} onChange={(e) => onChange(shapes.map((s) => s.id === sel ? { ...s, text: e.target.value } : s))} /></Field>}
           <div className="col-span-2 flex items-center gap-2">
-            {SHAPE_COLORS.map((col) => <button key={col} type="button" aria-label={col} className="h-6 w-6 rounded-full border-2 border-white shadow" style={{ background: col }} onClick={() => onChange(shapes.map((s) => s.id === sel ? { ...s, color: col } : s))} />)}
+            {SHAPE_COLORS.map((col) => <button key={col} type="button" aria-label={PEN_COLORS.find((p) => p.hex === col)?.name ?? col} className="h-7 w-7 rounded-full border-2 border-white ring-1 ring-ink-200" style={{ background: col }} onClick={() => onChange(shapes.map((s) => s.id === sel ? { ...s, color: col } : s))} />)}
             <Button size="sm" variant="ghost" className="ml-auto text-rose-600" onClick={() => { onChange(shapes.filter((s) => s.id !== sel)); setSel(null); }}>Remove</Button>
           </div>
         </div>

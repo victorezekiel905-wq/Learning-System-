@@ -10,8 +10,7 @@
 //    alert; when leaving, one evidence frame is stored for that alert.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
-import { openChannel } from "@/lib/realtime";
+import { closeChannel, openChannel } from "@/lib/realtime";
 import { rpc } from "@/lib/rpc";
 
 export type GuardDirectives = {
@@ -85,8 +84,13 @@ export function useClassroomGuard(sessionId: string, opts: {
   // Phones/tablets can't share a screen or go full screen from a web page:
   // they're only held to "keep the lesson open and in front".
   const unsupported = !supported.share || !supported.fullscreen;
+  // Full screen is only required where the device can both share and go full screen
+  // (Android Chrome can go full screen but can't share, so it isn't held to it).
+  const fullscreenRequired = supported.fullscreen && !unsupported;
+  const fullscreenRequiredRef = useRef(fullscreenRequired);
+  fullscreenRequiredRef.current = fullscreenRequired;
 
-  const report = useCallback(async (override?: Partial<{ visible: boolean; fullscreen: boolean; sharing: boolean }>) => {
+  const report = useCallback(async (override?: Partial<{ visible: boolean; fullscreen: boolean; sharing: boolean; surface: string | null }>) => {
     if (!opts.live) return;
     try {
       const d = await rpc<GuardDirectives>("student_report", {
@@ -94,7 +98,7 @@ export function useClassroomGuard(sessionId: string, opts: {
         p_visible: override?.visible ?? lessonInFront(),
         p_fullscreen: override?.fullscreen ?? isFullscreen(),
         p_sharing: (override?.sharing ?? !!stream.current?.active) || opts.managedDevice,
-        p_surface: surface,
+        p_surface: override?.surface !== undefined ? override.surface : surface,
         p_unsupported: unsupported,
         p_slide: slideRef.current,
         p_idle: Date.now() - lastInput.current > IDLE_AFTER_MS
@@ -181,7 +185,7 @@ export function useClassroomGuard(sessionId: string, opts: {
       track.addEventListener("ended", () => { stopShare(); void report({ sharing: false }); });
       setSurface(kind); setSharing(true);
       lastThumb.current = 0;
-      void report({ sharing: true });
+      void report({ sharing: true, surface: kind });
       return true;
     } catch (e) {
       setShareError((e as Error).name === "NotAllowedError"
@@ -201,11 +205,13 @@ export function useClassroomGuard(sessionId: string, opts: {
     if (!sharing || !opts.userId) return;
     let cancelled = false;
     let opened: RealtimeChannel | null = null;
-    void openChannel(`screen:${sessionId}:${opts.userId}`).then((c) => {
-      if (cancelled) { void createClient().removeChannel(c); return; }
+    const topic = `screen:${sessionId}:${opts.userId}`;
+    void openChannel(topic).then((c) => {
+      if (cancelled) { void closeChannel(topic, c); return; }
       opened = c;
       restChannel.current = c;
-      // Frames are only sent once the channel is actually joined (never via the REST fallback).
+      // Frames go over the joined socket once SUBSCRIBED; until then (or on networks
+      // that block WebSockets) sendLive() uses the same channel's HTTP send.
       c.subscribe((status) => {
         if (cancelled) return;
         channel.current = status === "SUBSCRIBED" ? c : null;
@@ -213,7 +219,7 @@ export function useClassroomGuard(sessionId: string, opts: {
     });
     return () => {
       cancelled = true;
-      if (opened) void createClient().removeChannel(opened);
+      if (opened) void closeChannel(topic, opened);
       channel.current = null;
       restChannel.current = null;
     };
@@ -237,7 +243,7 @@ export function useClassroomGuard(sessionId: string, opts: {
       if (document.hidden) hiddenReport = window.setTimeout(() => { if (!leaving) void report({ visible: v, fullscreen: f }); }, 400);
       else void report({ visible: v, fullscreen: f });
       window.clearTimeout(hiddenShot);
-      const leftLesson = !v || (!f && !!directivesRef.current?.lockdown && canFullscreen());
+      const leftLesson = !v || (!f && !!directivesRef.current?.lockdown && fullscreenRequiredRef.current);
       // Store what they switched to, as evidence for the teacher's alert.
       if (leftLesson) hiddenShot = window.setTimeout(() => void storeFrame("thumbnail"), 1500);
       // Under lockdown, pop a system notification over whatever they switched to (e.g. a game).
@@ -306,7 +312,7 @@ export function useClassroomGuard(sessionId: string, opts: {
   useEffect(() => () => stopShare(), [stopShare]);
 
   const needShare = !!directives?.capture.enabled && !opts.managedDevice && supported.share;
-  const needFullscreen = supported.fullscreen && !unsupported;
+  const needFullscreen = fullscreenRequired;
   const locked = !!directives?.lockdown;
   const blocked = locked && ((needShare && !sharing) || (needFullscreen && !fullscreen) || !visible);
 

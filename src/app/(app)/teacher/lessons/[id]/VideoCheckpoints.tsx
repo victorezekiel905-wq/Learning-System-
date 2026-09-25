@@ -4,7 +4,8 @@ import { blankQuestion, QuestionEditor, saveQuestion, type EditableQuestion } fr
 import { Alert, Button, Field, Input, Modal, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
-import { errorText } from "@/lib/rpc";
+import { errorText, must } from "@/lib/rpc";
+import { Icon } from "@/components/Icon";
 
 type Checkpoint = { id: string; t_seconds: number; required: boolean; question_id: string; questions: { prompt: string } | null };
 
@@ -70,7 +71,7 @@ export function VideoCheckpoints({ slideId, lesson, userId, directVideo }: { sli
           {(list.data ?? []).map((c) => (
             <li key={c.id} className="flex items-center justify-between gap-2">
               <span><span className="font-mono text-xs text-brand-700">{Math.floor(c.t_seconds / 60)}:{String(Math.round(c.t_seconds % 60)).padStart(2, "0")}</span> {c.questions?.prompt}</span>
-              <Button size="sm" variant="ghost" className="text-rose-600" onClick={async () => { await createClient().from("questions").delete().eq("id", c.question_id); void list.reload(); }}>✕</Button>
+              <Button size="sm" variant="ghost" className="h-8 w-8 px-0 text-rose-700" aria-label="Delete this checkpoint" onClick={async () => { must(await createClient().from("questions").delete().eq("id", c.question_id)); void list.reload(); }}><Icon name="x" className="h-4 w-4" /></Button>
             </li>
           ))}
         </ul>

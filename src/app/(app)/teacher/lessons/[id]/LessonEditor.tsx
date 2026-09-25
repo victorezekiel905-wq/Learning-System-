@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityEditor, ACTIVITY_LABEL, type Activity } from "@/components/activities/ActivityEditor";
 import { SlideView, type SlideData } from "@/components/slides/SlideView";
-import { Alert, Badge, Button, CopyButton, Field, Modal, Select, Tabs, useToast } from "@/components/ui";
+import { Alert, Badge, Button, CopyButton, Field, Modal, Select, Tabs, useToast, useDialog } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
-import { errorText, rpc } from "@/lib/rpc";
+import { ActionError, errorText, must, rpc } from "@/lib/rpc";
+import { messageForError } from "@/lib/errors";
 import type { ActivityKind, SlideContent, SlideKind } from "@/lib/types";
 import { cn, formatDateTime } from "@/lib/utils";
 import { SlideForm } from "./SlideForm";
@@ -26,6 +27,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
 }) {
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const [lesson, setLesson] = useState(initial);
   const [selected, setSelected] = useState<string | null>(null);
   const [panel, setPanel] = useState<"slide" | "activity">("slide");
@@ -70,14 +72,24 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
     }, 700);
   }
 
+  /** Slide ids in their current order. */
+  const ordered = () => [...local].sort((a, b) => a.position - b.position).map((x) => x.id);
+
+  /** Saves a new slide order in one atomic call (migration 0810). */
+  async function saveOrder(ids: string[]) {
+    const sb = createClient();
+    const { error } = await sb.rpc("reorder_slides", { p_lesson: lesson.id, p_order: ids });
+    if (!error) return;
+    // Database not updated to 0810 yet: renumber one slide at a time, stopping at the first failure.
+    if (error.code !== "PGRST202") throw new ActionError(messageForError(error), error.code);
+    for (const [i, id] of ids.entries()) must(await sb.from("lesson_slides").update({ position: i }).eq("id", id));
+  }
+
   async function addSlide(kind: SlideKind, activityKind?: ActivityKind) {
     const sb = createClient();
-    const position = (current ? current.position : local.length - 1) + 1;
+    // New slides go straight after the selected one (or at the end).
+    const at = current ? ordered().indexOf(current.id) + 1 : local.length;
     try {
-      // Shift later slides down to make room.
-      for (const s of [...local].filter((x) => x.position >= position).sort((a, b) => b.position - a.position)) {
-        await sb.from("lesson_slides").update({ position: s.position + 1 }).eq("id", s.id);
-      }
       let activityId: string | null = null;
       if (kind === "activity") {
         const { data, error } = await sb.from("activities").insert({
@@ -88,9 +100,12 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
         activityId = data.id;
       }
       const { data, error } = await sb.from("lesson_slides").insert({
-        tenant_id: lesson.tenant_id, lesson_id: lesson.id, position, kind, content: kind === "text" ? { heading: "New slide", body: "" } : {}, activity_id: activityId
+        tenant_id: lesson.tenant_id, lesson_id: lesson.id, position: local.length, kind, content: kind === "text" ? { heading: "New slide", body: "" } : {}, activity_id: activityId
       }).select("id").single();
       if (error) throw new Error(error.message);
+      const ids = ordered();
+      ids.splice(at, 0, data.id);
+      await saveOrder(ids);
       await Promise.all([slides.reload(), activities.reload()]);
       setSelected(data.id);
       setPanel(kind === "activity" ? "activity" : "slide");
@@ -99,35 +114,37 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
   }
 
   async function move(s: SlideRow, dir: -1 | 1) {
-    const other = local.find((x) => x.position === s.position + dir);
-    if (!other) return;
-    const sb = createClient();
-    await sb.from("lesson_slides").update({ position: s.position }).eq("id", other.id);
-    await sb.from("lesson_slides").update({ position: other.position }).eq("id", s.id);
+    const ids = ordered();
+    const i = ids.indexOf(s.id), j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    try { await saveOrder(ids); } catch (e) { toast(errorText(e), "error"); }
     void slides.reload();
   }
 
   async function remove(s: SlideRow) {
-    if (!confirm("Delete this slide?")) return;
+    if (!(await dialog.confirm({ title: "Delete this slide?", tone: "danger", confirmLabel: "Delete slide" }))) return;
     const sb = createClient();
-    await sb.from("lesson_slides").delete().eq("id", s.id);
-    if (s.activity_id) await sb.from("activities").delete().eq("id", s.activity_id);
-    for (const x of local.filter((y) => y.position > s.position).sort((a, b) => a.position - b.position)) {
-      await sb.from("lesson_slides").update({ position: x.position - 1 }).eq("id", x.id);
-    }
-    setSelected(null);
+    try {
+      must(await sb.from("lesson_slides").delete().eq("id", s.id));
+      if (s.activity_id) must(await sb.from("activities").delete().eq("id", s.activity_id));
+      await saveOrder(ordered().filter((id) => id !== s.id));
+      setSelected(null);
+    } catch (e) { toast(errorText(e), "error"); }
     void slides.reload();
   }
 
   async function duplicateSlide(s: SlideRow) {
     if (s.kind === "activity") { toast("Duplicate the whole lesson to copy activities.", "info"); return; }
     const sb = createClient();
-    for (const x of local.filter((y) => y.position > s.position).sort((a, b) => b.position - a.position)) {
-      await sb.from("lesson_slides").update({ position: x.position + 1 }).eq("id", x.id);
-    }
-    const { data } = await sb.from("lesson_slides").insert({ tenant_id: lesson.tenant_id, lesson_id: lesson.id, position: s.position + 1, kind: s.kind, content: s.content, notes: s.notes }).select("id").single();
-    await slides.reload();
-    if (data) setSelected(data.id);
+    try {
+      const data = must(await sb.from("lesson_slides").insert({ tenant_id: lesson.tenant_id, lesson_id: lesson.id, position: local.length, kind: s.kind, content: s.content, notes: s.notes }).select("id").single())!;
+      const ids = ordered();
+      ids.splice(ids.indexOf(s.id) + 1, 0, data.id);
+      await saveOrder(ids);
+      await slides.reload();
+      setSelected(data.id);
+    } catch (e) { toast(errorText(e), "error"); }
   }
 
   async function saveLesson(patch: Partial<Lesson>) {
@@ -288,7 +305,7 @@ function ShareModal({ lessonId, classes, onClose }: { lessonId: string; classes:
           <tbody>{(shares.data ?? []).map((s) => (
             <tr key={s.id}><td className="font-mono">{s.code}</td><td>{s.mode.replace("_", " ")}</td>
               <td>{s.revoked_at ? <Badge tone="red">revoked</Badge> : new Date(s.expires_at) < new Date() ? <Badge>expired</Badge> : formatDateTime(s.expires_at)}</td>
-              <td className="text-right">{!s.revoked_at && <Button size="sm" variant="ghost" onClick={async () => { await createClient().from("lesson_shares").update({ revoked_at: new Date().toISOString() }).eq("id", s.id); void shares.reload(); }}>Revoke</Button>}</td></tr>
+              <td className="text-right">{!s.revoked_at && <Button size="sm" variant="ghost" onClick={async () => { must(await createClient().from("lesson_shares").update({ revoked_at: new Date().toISOString() }).eq("id", s.id)); void shares.reload(); }}>Revoke</Button>}</td></tr>
           ))}</tbody>
         </table>
       </div>

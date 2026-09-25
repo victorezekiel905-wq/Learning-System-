@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { Icon } from "@/components/Icon";
 import { TeacherBroadcast } from "@/components/live/RtcBroadcast";
 import { SlideView, type SlideData } from "@/components/slides/SlideView";
 import { BOARD_H, BOARD_W, StrokeLayer, Whiteboard } from "@/components/slides/Whiteboard";
@@ -42,7 +43,12 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
       </div>
     );
   }
-  if (!slide) return <p className="text-sm text-ink-500">Loading lesson…</p>;
+  if (lesson.error && !lesson.data) return <Alert tone="error">{lesson.error}</Alert>;
+  if (!slide) {
+    return lesson.loading
+      ? <p className="text-sm text-ink-500">Loading lesson…</p>
+      : <Alert>This lesson has no slides yet. <Link href={`/teacher/lessons/${s.lesson_id}`}>Add slides in the lesson editor</Link>.</Alert>;
+  }
   const isActivity = slide.kind === "activity" && slide.activity;
   const launched = isActivity && s.active_activity_id === slide.activity!.id;
 
@@ -50,9 +56,9 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled={s.current_slide <= 0} onClick={() => update({ p_slide: s.current_slide - 1 })}>← Prev</Button>
+          <Button variant="secondary" disabled={s.current_slide <= 0} onClick={() => update({ p_slide: s.current_slide - 1 })}><Icon name="chevronLeft" className="h-4 w-4" />Prev</Button>
           <span className="text-sm font-medium">Slide {s.current_slide + 1} / {slides.length}</span>
-          <Button variant="secondary" disabled={s.current_slide >= slides.length - 1} onClick={() => update({ p_slide: s.current_slide + 1 })}>Next →</Button>
+          <Button variant="secondary" disabled={s.current_slide >= slides.length - 1} onClick={() => update({ p_slide: s.current_slide + 1 })}>Next<Icon name="chevronRight" className="h-4 w-4" /></Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select className="w-auto py-1 text-xs" value={s.mode} onChange={(e) => update({ p_mode: e.target.value })} aria-label="Delivery mode">

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Alert, Badge, Button, Modal, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Modal, useToast, useDialog } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL, type RosterEntry, type SessionState } from "./types";
 import { useRpc } from "@/lib/hooks";
@@ -57,8 +57,14 @@ export function EvidenceButton({ eventId, student }: { eventId: string; student:
 export function ScreenRail({ state, screens, focus, onFocus }: {
   state: SessionState; screens: Record<string, Screen>; focus: string | null; onFocus: (id: string) => void;
 }) {
-  const joined = state.roster.filter((r) => r.presence === "online" || r.presence === "idle");
-  const away = state.roster.filter((r) => !(r.presence === "online" || r.presence === "idle"));
+  const here = (r: RosterEntry) => r.presence === "online" || r.presence === "idle";
+  // Someone who left (closed the lesson, switched away, or has an open "left" alert)
+  // stays in the main strip, at the top and in red, until the teacher deals with it;
+  // otherwise closing the tab would quietly move them into "Not in class".
+  const leftNow = (r: RosterEntry) => !!r.web?.away_since || !!alertFor(state, r.student_id) && LEFT_KINDS.has(alertFor(state, r.student_id)!.kind);
+  const joined = state.roster.filter((r) => here(r) || (r.presence === "offline" && leftNow(r)))
+    .sort((a, b) => Number(leftNow(b)) - Number(leftNow(a)));
+  const away = state.roster.filter((r) => !joined.includes(r));
   const [showAway, setShowAway] = useState(false);
 
   const tile = (r: RosterEntry) => {
@@ -70,7 +76,7 @@ export function ScreenRail({ state, screens, focus, onFocus }: {
     return (
       <li key={r.student_id}>
         <button type="button" onClick={() => onFocus(r.student_id)} aria-pressed={focus === r.student_id}
-          className={cn("block w-full overflow-hidden rounded-lg border-2 bg-white text-left transition hover:shadow-md",
+          className={cn("block w-full overflow-hidden rounded-lg border-2 bg-white text-left transition-colors hover:bg-ink-50",
             focus === r.student_id ? "border-brand-500 ring-2 ring-brand-200" : left || stepping ? "border-rose-500 ring-2 ring-rose-200" : alert ? "border-amber-400" : "border-ink-200")}>
           <div className="relative aspect-video bg-ink-100">
             {live ? <img src={sc.image} alt={`${r.name}'s screen`} className="h-full w-full object-cover" />
@@ -83,7 +89,8 @@ export function ScreenRail({ state, screens, focus, onFocus }: {
             <span className="truncate">{r.name}</span>
             {r.hand_raised && <Icon name="hand" className="h-3 w-3 shrink-0 text-amber-600" />}
           </p>
-          {alert && <p className={cn("truncate px-2 pb-1 text-[10px]", left ? "text-rose-600" : "text-amber-700")}>{ALERT_LABEL[alert.kind] ?? alert.kind}{alert.domain && `: ${alert.domain}`}</p>}
+          {alert ? <p className={cn("truncate px-2 pb-1 text-[11px] font-medium", left ? "text-rose-700" : "text-amber-800")}>{ALERT_LABEL[alert.kind] ?? alert.kind}{alert.domain && `: ${alert.domain}`}</p>
+            : stepping && r.web?.away_reason ? <p className="truncate px-2 pb-1 text-[11px] font-medium text-rose-700">{r.web.away_reason}</p> : null}
         </button>
       </li>
     );
@@ -92,14 +99,14 @@ export function ScreenRail({ state, screens, focus, onFocus }: {
   return (
     <div className="space-y-3">
       <p className="flex items-center justify-between text-[13px] font-semibold text-ink-600">
-        <span>Screens</span><span>{joined.length} in class</span>
+        <span>Screens</span><span>{joined.filter(here).length} in class</span>
       </p>
       {joined.length === 0 && <p className="text-xs text-ink-500">Students appear here as soon as they join with the code.</p>}
       {/* Phones/tablets: a swipeable row above the lesson; laptops: a column on the left. */}
       <ul className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 lg:mx-0 lg:block lg:space-y-2 lg:overflow-visible lg:px-0 lg:pb-0 [&>li]:w-40 [&>li]:shrink-0 [&>li]:snap-start lg:[&>li]:w-auto">{joined.map(tile)}</ul>
       {away.length > 0 && (
         <div>
-          <button className="text-xs font-medium text-ink-500" onClick={() => setShowAway((v) => !v)}>{showAway ? "▾" : "▸"} Not in class ({away.length})</button>
+          <button className="flex items-center gap-1 text-[13px] font-medium text-ink-600 hover:text-ink-900" aria-expanded={showAway} onClick={() => setShowAway((v) => !v)}><Icon name={showAway ? "chevronDown" : "chevronRight"} className="h-3.5 w-3.5" />Not in class ({away.length})</button>
           {showAway && <ul className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 opacity-70 lg:mx-0 lg:block lg:space-y-2 lg:px-0 [&>li]:w-40 [&>li]:shrink-0 lg:[&>li]:w-auto">{away.map(tile)}</ul>}
         </div>
       )}
@@ -114,6 +121,7 @@ export function FocusView({ state, studentId, sessionId, onMinimize, live }: {
   live?: Screen;
 }) {
   const toast = useToast();
+  const dialog = useDialog();
   const r = state.roster.find((x) => x.student_id === studentId);
   // Managed browsers upload frames to the database; web sharing streams them live.
   const stored = useRpc<{ image: string; captured_at: string; url: string | null; quality: string; stale: boolean } | null>(
@@ -143,7 +151,7 @@ export function FocusView({ state, studentId, sessionId, onMinimize, live }: {
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={() => rpc("request_screenshot", { p_session: sessionId, p_student: studentId }).then(() => toast("Fresh frame requested", "info")).catch((e) => toast(errorText(e), "error"))}>Refresh</Button>
           <Button size="sm" variant="secondary" onClick={async () => {
-            const text = prompt(`Message to ${r.name}:`);
+            const text = await dialog.ask({ title: `Message ${r.name}`, body: "It pops up on their screen.", label: "Message", multiline: true, maxLength: 500, confirmLabel: "Send" });
             if (text) { try { await rpc("issue_command", { p_session: sessionId, p_students: [studentId], p_kind: "message", p_payload: { text } }); toast("Sent", "success"); } catch (e) { toast(errorText(e), "error"); } }
           }}>Message</Button>
           {alert && LEFT_KINDS.has(alert.kind) && (

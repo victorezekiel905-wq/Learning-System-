@@ -17,9 +17,17 @@ export function statusForError(err: RpcError | null | undefined): number {
   return STATUS_BY_CODE[err.code ?? ""] ?? 500;
 }
 
+export const NETWORK_MESSAGE = "Can't reach SwiftCipher right now. Check your internet connection and try again.";
+
+/** Browser/fetch messages for a request that never reached the server (not a server answer). */
+export function isNetworkMessage(message: string | null | undefined): boolean {
+  return /failed to fetch|networkerror|load failed|fetch failed|network request failed|err_network|err_internet_disconnected/i.test(message ?? "");
+}
+
 /** Human message; hides raw SQL errors that were not written for users. */
 export function messageForError(err: RpcError | null | undefined): string {
   if (!err) return "Something went wrong.";
+  if (!err.code && isNetworkMessage(err.message)) return NETWORK_MESSAGE;
   if (err.code && STATUS_BY_CODE[err.code]) {
     if (err.code === "23505") return "That already exists.";
     if (err.code === "22P02") return "Some of the data sent was malformed.";

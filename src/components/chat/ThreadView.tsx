@@ -42,7 +42,7 @@ export function ThreadView({ threadId, meId, canModerate, className }: { threadI
                 <p className="whitespace-pre-wrap">{m.hidden && !canModerate && !mine ? "Message hidden by teacher" : m.body}</p>
                 <p className={cn("mt-0.5 text-[10px]", mine ? "text-white/70" : "text-ink-500")}>
                   {timeAgo(m.created_at)}
-                  {canModerate && !mine && !m.hidden && <button className="ml-2 underline" onClick={async () => { await rpc("hide_message", { p_message: m.id }); void msgs.reload(); }}>hide</button>}
+                  {canModerate && !mine && !m.hidden && <button className="ml-2 underline" onClick={async () => { try { await rpc("hide_message", { p_message: m.id }); void msgs.reload(); } catch (e) { toast(errorText(e), "error"); } }}>hide</button>}
                 </p>
               </div>
             </div>

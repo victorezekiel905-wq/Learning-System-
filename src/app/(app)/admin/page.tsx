@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole, ADMINS } from "@/lib/session";
 import { Card, PageHeader, Stat } from "@/components/ui";
 import { Line } from "@/components/charts";
+import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "School admin" };
 
@@ -36,7 +37,7 @@ export default async function AdminHome() {
         <Card title="Setup checklist">
           <ol className="space-y-2">{steps.map((st, i) => (
             <li key={i} className="flex items-center gap-3 text-sm">
-              <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${st.done ? "bg-emerald-500 text-white" : "bg-ink-200 text-ink-600"}`}>{st.done ? "✓" : i + 1}</span>
+              <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${st.done ? "bg-emerald-700 text-white" : "bg-ink-200 text-ink-600"}`}>{st.done ? <Icon name="check" className="h-3.5 w-3.5" /> : i + 1}{st.done && <span className="sr-only">Done</span>}</span>
               <Link href={st.href} className={st.done ? "text-ink-500 line-through" : ""}>{st.label}</Link>
             </li>
           ))}</ol>

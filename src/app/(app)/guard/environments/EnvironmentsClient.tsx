@@ -1,10 +1,12 @@
 "use client";
+import { must } from "@/lib/rpc";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Alert, Badge, Button, Card, Empty, Field, Input, Modal, Select, Tabs, Textarea, Toggle, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, Empty, Field, Input, Modal, Select, Tabs, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORIES, type EnvironmentPolicy } from "@/lib/types";
 import { splitList } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
 
 type Scene = { id: string; name: string; description: string | null; policy_id: string; owner_id: string; scene_rules: { id: string; rule_type: string; value: string | null; position: number }[] };
 type Me = { id: string; tenantId: string; isIt: boolean };
@@ -66,6 +68,7 @@ export function EnvironmentsClient({ policies, scenes, me, initialTab }: { polic
 
 function PolicyEditor({ value, me, onClose, onSaved }: { value: Partial<EnvironmentPolicy>; me: Me; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
+  const dialog = useDialog();
   const [p, setP] = useState(value);
   const [allowed, setAllowed] = useState((value.allowed_domains ?? []).join("\n"));
   const [blocked, setBlocked] = useState((value.blocked_domains ?? []).join("\n"));
@@ -88,7 +91,7 @@ function PolicyEditor({ value, me, onClose, onSaved }: { value: Partial<Environm
     if (error) toast(error.message, "error"); else { toast("Environment saved (change recorded in the audit log)", "success"); onSaved(); }
   }
   async function del() {
-    if (!p.id || !confirm("Delete this environment? Sessions using it stop enforcing it.")) return;
+    if (!p.id || !(await dialog.confirm({ title: "Delete this environment?", body: "Sessions using it stop enforcing it.", tone: "danger", confirmLabel: "Delete" }))) return;
     const { error } = await createClient().from("environment_policies").delete().eq("id", p.id);
     if (error) toast(error.message, "error"); else onSaved();
   }
@@ -108,8 +111,8 @@ function PolicyEditor({ value, me, onClose, onSaved }: { value: Partial<Environm
           <p className="label">Blocked categories</p>
           <div className="flex flex-wrap gap-2">{CATEGORIES.map((c) => {
             const on = (p.blocked_categories ?? []).includes(c);
-            return <button key={c} type="button" onClick={() => set({ blocked_categories: on ? p.blocked_categories!.filter((x) => x !== c) : [...(p.blocked_categories ?? []), c] })}
-              className={`badge border capitalize ${on ? "border-rose-300 bg-rose-50 text-rose-800" : "border-ink-200 bg-white text-ink-600"}`}>{on ? "✕ " : "+ "}{c}</button>;
+            return <button key={c} type="button" aria-pressed={on} onClick={() => set({ blocked_categories: on ? p.blocked_categories!.filter((x) => x !== c) : [...(p.blocked_categories ?? []), c] })}
+              className={`badge border capitalize ${on ? "border-rose-300 bg-rose-50 text-rose-800" : "border-ink-200 bg-white text-ink-600"}`}><Icon name={on ? "x" : "plus"} className="h-3 w-3" />{c}</button>;
           })}</div>
         </div>
         <div className="space-y-3">
@@ -154,7 +157,8 @@ function SceneEditor({ value, policies, me, onClose, onSaved }: { value: Partial
       : await sb.from("scenes").insert({ ...row, tenant_id: me.tenantId, owner_id: me.id }).select("id").single();
     if (res.error) { toast(res.error.message, "error"); setBusy(false); return; }
     const id = res.data.id;
-    await sb.from("scene_rules").delete().eq("scene_id", id);
+    const cleared = await sb.from("scene_rules").delete().eq("scene_id", id);
+    if (cleared.error) { toast(cleared.error.message, "error"); setBusy(false); return; }
     if (rules.length) {
       const { error } = await sb.from("scene_rules").insert(rules.map((r, i) => ({ tenant_id: me.tenantId, scene_id: id, rule_type: r.rule_type, value: r.value || null, position: i })));
       if (error) { toast(error.message, "error"); setBusy(false); return; }
@@ -165,7 +169,7 @@ function SceneEditor({ value, policies, me, onClose, onSaved }: { value: Partial
 
   return (
     <Modal open onClose={onClose} title={s.id ? "Edit scene" : "New scene"}
-      footer={<>{s.id && <Button variant="ghost" className="mr-auto text-rose-600" onClick={async () => { await createClient().from("scenes").delete().eq("id", s.id!); onSaved(); }}>Delete</Button>}
+      footer={<>{s.id && <Button variant="ghost" className="mr-auto text-rose-600" onClick={async () => { must(await createClient().from("scenes").delete().eq("id", s.id!)); onSaved(); }}>Delete</Button>}
         <Button variant="ghost" onClick={onClose}>Cancel</Button><Button loading={busy} disabled={!s.name?.trim() || !s.policy_id} onClick={save}>Save</Button></>}>
       <div className="space-y-4">
         <Field label="Name"><Input value={s.name ?? ""} onChange={(e) => setS({ ...s, name: e.target.value })} placeholder="Coding sprint" /></Field>
@@ -178,7 +182,7 @@ function SceneEditor({ value, policies, me, onClose, onSaved }: { value: Partial
               <div key={i} className="flex gap-2">
                 <Select aria-label={`Rule ${i + 1} type`} className="w-44" value={r.rule_type} onChange={(e) => setRules(rules.map((x, j) => j === i ? { ...x, rule_type: e.target.value } : x))}>{RULE_TYPES.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}</Select>
                 {meta?.needs && <Input placeholder={meta.needs} value={r.value} onChange={(e) => setRules(rules.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />}
-                <Button size="sm" variant="ghost" onClick={() => setRules(rules.filter((_, j) => j !== i))}>✕</Button>
+                <Button size="sm" variant="ghost" onClick={() => setRules(rules.filter((_, j) => j !== i))} aria-label="Remove rule"><Icon name="x" className="h-4 w-4" /></Button>
               </div>
             );
           })}

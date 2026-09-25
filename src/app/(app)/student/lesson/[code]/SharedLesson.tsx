@@ -4,6 +4,7 @@ import { LessonStage, type LearnerSlide } from "@/components/student/LessonStage
 import { Alert, Button, PageHeader } from "@/components/ui";
 import { useLoader } from "@/lib/hooks";
 import { rpc } from "@/lib/rpc";
+import { Icon } from "@/components/Icon";
 
 type Shared = { lesson: { title: string; description: string | null }; slides: LearnerSlide[]; share: { mode: string; expires_at: string } };
 
@@ -22,9 +23,9 @@ export function SharedLesson({ code, tenantId, userId }: { code: string; tenantI
       {slide && (viewOnly && slide.kind === "activity" ? <Alert>This lesson is shared view-only; activities are answered in class.</Alert>
         : <LessonStage slide={slide} shareCode={code} tenantId={tenantId} userId={userId} />)}
       <div className="flex items-center justify-between">
-        <Button variant="secondary" disabled={i === 0} onClick={() => setI(i - 1)}>← Previous</Button>
+        <Button variant="secondary" disabled={i === 0} onClick={() => setI(i - 1)}><Icon name="chevronLeft" className="h-4 w-4" />Previous</Button>
         <span className="text-sm text-ink-500">{i + 1} / {slides.length}</span>
-        <Button disabled={i >= slides.length - 1} onClick={() => setI(i + 1)}>Next →</Button>
+        <Button disabled={i >= slides.length - 1} onClick={() => setI(i + 1)}>Next<Icon name="chevronRight" className="h-4 w-4" /></Button>
       </div>
     </div>
   );

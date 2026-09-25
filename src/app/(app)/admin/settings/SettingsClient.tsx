@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Alert, Button, Card, Field, Input, Select, Textarea, Toggle, useToast } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, Select, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { errorText, rpc } from "@/lib/rpc";
 import { useRpc } from "@/lib/hooks";
@@ -139,6 +139,7 @@ export function SettingsClient({ tenant, settings, schools, flags, plan }: {
 }) {
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const [t, setT] = useState(tenant);
   const [s, setS] = useState(settings);
   const [busy, setBusy] = useState(false);
@@ -176,7 +177,7 @@ export function SettingsClient({ tenant, settings, schools, flags, plan }: {
         </div>
         <div className="mt-4"><p className="label">Campuses</p>
           <div className="flex flex-wrap gap-2">{schools.map((x) => <span key={x.id} className="badge bg-ink-100">{x.name}</span>)}
-            <Button size="sm" variant="secondary" onClick={async () => { const name = prompt("Campus name"); if (!name) return; const { error } = await createClient().from("schools").insert({ tenant_id: t.id, name }); if (error) toast(error.message, "error"); else router.refresh(); }}>Add campus</Button></div></div>
+            <Button size="sm" variant="secondary" onClick={async () => { const name = await dialog.ask({ title: "Add a campus", label: "Campus name", placeholder: "e.g. Lekki campus", confirmLabel: "Add campus" }); if (!name) return; const { error } = await createClient().from("schools").insert({ tenant_id: t.id, name }); if (error) toast(error.message, "error"); else router.refresh(); }}>Add campus</Button></div></div>
       </Card>
 
       <Card title="Classroom monitoring (Guard)">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button, Card, Empty, Field, Input, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { uid } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
 
 type Level = { label: string; points: number; description?: string };
 type Criterion = { id: string; title: string; levels: Level[] };
@@ -31,7 +32,7 @@ export function RubricsClient({ rubrics, me }: { rubrics: Rubric[]; me: { id: st
           {edit.criteria.map((c, i) => (
             <div key={c.id} className="rounded-lg border border-ink-200 p-3">
               <div className="flex gap-2"><Input value={c.title} placeholder="Criterion, e.g. Accuracy" onChange={(e) => setEdit({ ...edit, criteria: edit.criteria.map((x, j) => j === i ? { ...x, title: e.target.value } : x) })} />
-                <Button variant="ghost" onClick={() => setEdit({ ...edit, criteria: edit.criteria.filter((_, j) => j !== i) })}>✕</Button></div>
+                <Button variant="ghost" onClick={() => setEdit({ ...edit, criteria: edit.criteria.filter((_, j) => j !== i) })} aria-label="Remove criterion"><Icon name="x" className="h-4 w-4" /></Button></div>
               <div className="mt-2 grid gap-2 sm:grid-cols-4">{c.levels.map((l, k) => (
                 <div key={k} className="space-y-1">
                   <Input value={l.label} onChange={(e) => setEdit({ ...edit, criteria: edit.criteria.map((x, j) => j === i ? { ...x, levels: x.levels.map((y, m) => m === k ? { ...y, label: e.target.value } : y) } : x) })} />

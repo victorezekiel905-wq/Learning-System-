@@ -2,11 +2,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Alert, Badge, Button, CopyButton, Field, Input, Modal, Select, Tabs, useToast } from "@/components/ui";
+import { Alert, Badge, Button, CopyButton, Field, Input, Modal, Select, Tabs, useToast, useDialog } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
-import { api, errorText, rpc } from "@/lib/rpc";
+import { api, errorText, rpc, must } from "@/lib/rpc";
 import { ROLE_LABEL, type Role } from "@/lib/types";
 import { formatDate, timeAgo } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
 
 type U = { id: string; full_name: string; email: string; role: Role; status: string; created_at: string; last_seen_at: string | null };
 type Inv = { id: string; code: string; role: Role; email: string | null; uses: number; max_uses: number; expires_at: string; revoked_at: string | null; created_at: string };
@@ -16,6 +17,7 @@ export function UsersClient({ users, total, page, pageSize, q, role, invites, me
 }) {
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const [tab, setTab] = useState<"people" | "invites">("people");
   const [invite, setInvite] = useState(false);
   const rows = users;
@@ -33,7 +35,7 @@ export function UsersClient({ users, total, page, pageSize, q, role, invites, me
     } catch (e) { toast(errorText(e), "error"); }
   }
   async function remove(u: U) {
-    if (prompt(`This permanently deletes ${u.full_name}'s account and data. Type DELETE to confirm.`) !== "DELETE") return;
+    if ((await dialog.ask({ title: `Delete ${u.full_name}?`, body: "This permanently deletes their account and all their data. It can't be undone.", label: "", requireText: "DELETE", tone: "danger", confirmLabel: "Delete permanently" })) !== "DELETE") return;
     try { await api(`/api/admin/users/${u.id}`, { method: "DELETE" }); toast("Deleted", "success"); router.refresh(); } catch (e) { toast(errorText(e), "error"); }
   }
 
@@ -77,8 +79,8 @@ export function UsersClient({ users, total, page, pageSize, q, role, invites, me
           <nav className="flex items-center justify-between text-sm" aria-label="Pages">
             <span className="text-ink-500">Page {page} of {pages.toLocaleString()}</span>
             <span className="flex gap-2">
-              {page > 1 && <Link href={href(page - 1)} className="btn btn-secondary btn-sm no-underline">← Previous</Link>}
-              {page < pages && <Link href={href(page + 1)} className="btn btn-secondary btn-sm no-underline">Next →</Link>}
+              {page > 1 && <Link href={href(page - 1)} className="btn btn-secondary btn-sm no-underline"><Icon name="chevronLeft" className="h-4 w-4" />Previous</Link>}
+              {page < pages && <Link href={href(page + 1)} className="btn btn-secondary btn-sm no-underline">Next<Icon name="chevronRight" className="h-4 w-4" /></Link>}
             </span>
           </nav>
         </>
@@ -92,7 +94,7 @@ export function UsersClient({ users, total, page, pageSize, q, role, invites, me
             return (
               <tr key={i.id} className={dead ? "opacity-50" : ""}><td className="font-mono">{i.code}</td><td>{ROLE_LABEL[i.role]}</td><td className="text-xs">{i.email ?? "anyone with the code"}</td>
                 <td>{i.uses}/{i.max_uses}</td><td className="text-xs">{formatDate(i.expires_at)}</td>
-                <td className="text-right">{!dead && <><CopyButton value={i.code} /><Button size="sm" variant="ghost" onClick={async () => { await createClient().from("invites").update({ revoked_at: new Date().toISOString() }).eq("id", i.id); router.refresh(); }}>Revoke</Button></>}</td></tr>
+                <td className="text-right">{!dead && <><CopyButton value={i.code} /><Button size="sm" variant="ghost" onClick={async () => { must(await createClient().from("invites").update({ revoked_at: new Date().toISOString() }).eq("id", i.id)); toast("Invite revoked", "success"); router.refresh(); }}>Revoke</Button></>}</td></tr>
             );
           })}</tbody>
         </table></div>

@@ -24,7 +24,7 @@ export default async function ClassesPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {classes.map((c) => (
-            <Link key={c.id} href={`/teacher/classes/${c.id}`} className="card card-pad block no-underline transition hover:border-brand-300 hover:shadow-md">
+            <Link key={c.id} href={`/teacher/classes/${c.id}`} className="card card-pad block no-underline transition hover:border-ink-400">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="font-semibold text-ink-900">{c.name}</h2>
                 {c.archived_at ? <Badge>Archived</Badge> : <span className="font-mono text-sm font-bold text-brand-700">{c.join_code}</span>}

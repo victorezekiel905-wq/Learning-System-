@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { errorText, rpc } from "@/lib/rpc";
+import { errorText, rpc, must } from "@/lib/rpc";
 import { Alert, Button, Field, Input, Modal, Select, Tabs } from "@/components/ui";
 
 export function NewLessonButton({ openInitially, templates }: { openInitially?: boolean; templates: { id: string; title: string }[] }) {
@@ -38,7 +38,7 @@ export function NewLessonButton({ openInitially, templates }: { openInitially?: 
         const { data, error } = await sb.from("lessons").insert({ tenant_id: me!.tenant_id, owner_id: user!.id, title: title.trim(), subject: subject || null }).select("id").single();
         if (error) throw new Error(error.message);
         id = data.id;
-        await sb.from("lesson_slides").insert({ tenant_id: me!.tenant_id, lesson_id: id, position: 0, kind: "title", content: { heading: title.trim() } });
+        must(await sb.from("lesson_slides").insert({ tenant_id: me!.tenant_id, lesson_id: id, position: 0, kind: "title", content: { heading: title.trim() } }));
       }
       router.push(`/teacher/lessons/${id}`);
     } catch (e) {

@@ -60,7 +60,7 @@ function SessionView({ id, r }: { id: string; r: SessionReport }) {
       <Card title="Alerts">{Object.keys(r.alerts).length ? <p className="text-sm">{Object.entries(r.alerts).map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join(" · ")}</p> : <p className="text-sm text-ink-500">None.</p>}</Card>
       <Card title="Students" pad={false}>
         <table className="table"><thead><tr><th>Student</th><th>Joined</th><th>Answers</th><th>Correct</th><th>Alerts</th></tr></thead>
-          <tbody>{r.students.map((s) => <tr key={s.student_id}><td>{s.name}</td><td>{s.joined ? "✓" : "—"}</td><td>{s.answers}</td><td>{s.correct}</td><td>{s.alerts}</td></tr>)}</tbody></table>
+          <tbody>{r.students.map((s) => <tr key={s.student_id}><td>{s.name}</td><td>{s.joined ? "Yes" : "No"}</td><td>{s.answers}</td><td>{s.correct}</td><td>{s.alerts}</td></tr>)}</tbody></table>
       </Card>
     </div>
   );

@@ -1,9 +1,8 @@
 "use client";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
-import { openChannel } from "@/lib/realtime";
+import { listen } from "@/lib/realtime";
 import { useNetwork } from "@/lib/hooks";
 import { errorText, rpc } from "@/lib/rpc";
 
@@ -131,15 +130,11 @@ export function StudentReceiver({ sessionId }: { sessionId: string }) {
       setRoom(data as { id: string; purpose: string } | null);
     };
     void find();
-    // Room changes bump the session's state signal (migration 0760).
-    let ch: RealtimeChannel | null = null;
-    let cancelled = false;
-    void openChannel(`session:${sessionId}`).then((c) => {
-      if (cancelled) return;
-      ch = c.on("broadcast", { event: "state" }, () => void find()).subscribe();
-    });
+    // Room changes bump the session's state signal (migration 0760). Shared with the
+    // live page's own listener on the same topic (see listen()).
+    const stop = listen(`session:${sessionId}`, (event) => { if (event === "state") void find(); });
     const id = setInterval(find, 30000);
-    return () => { cancelled = true; clearInterval(id); if (ch) void sb.removeChannel(ch); };
+    return () => { clearInterval(id); stop(); };
   }, [sessionId]);
 
   // §33: video is off by default on poor connections until the student opts in.

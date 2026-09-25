@@ -4,8 +4,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { rpc, errorText } from "@/lib/rpc";
+import { isNetworkMessage, NETWORK_MESSAGE } from "@/lib/errors";
 import { safeNext } from "@/lib/utils";
 import { Alert, Button, Field, Input } from "@/components/ui";
+
+/** Supabase Auth messages are user-facing, except when the request never got there. */
+const authMessage = (m: string) => (isNetworkMessage(m) ? NETWORK_MESSAGE : m);
 
 const SSO = (process.env.NEXT_PUBLIC_SSO_PROVIDERS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const SSO_LABEL: Record<string, string> = { google: "Google", azure: "Microsoft", keycloak: "School SSO" };
@@ -48,7 +52,7 @@ export function LoginForm() {
     setBusy(true); setErr(null);
     const { error } = await createClient().auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(authMessage(error.message)); return; }
     router.replace(next);
     router.refresh();
   }
@@ -58,7 +62,7 @@ export function LoginForm() {
     const { error } = await createClient().auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account?reset=1")}`
     });
-    if (error) setErr(error.message); else setInfo("Check your inbox for a password reset link.");
+    if (error) setErr(authMessage(error.message)); else setInfo("Check your inbox for a password reset link.");
   }
 
   return (
@@ -107,7 +111,7 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`
       }
     });
-    if (error) { setBusy(false); setErr(error.message); return; }
+    if (error) { setBusy(false); setErr(authMessage(error.message)); return; }
     // Supabase hides whether an email is registered: for an existing account it
     // returns a user with no identities and sends no email.
     if (data.user && (data.user.identities ?? []).length === 0) {

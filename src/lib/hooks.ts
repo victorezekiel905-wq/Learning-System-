@@ -12,25 +12,32 @@ type QueryState<T> = { data: T | null; error: string | null; loading: boolean; r
 export function useLoader<T>(loader: () => Promise<T>, deps: unknown[], opts: { intervalMs?: number; enabled?: boolean } = {}): QueryState<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const enabled = opts.enabled ?? true;
+  const [loading, setLoading] = useState(enabled);
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
-  const enabled = opts.enabled ?? true;
+  // Each load gets a number; only the newest one may update state, so a slow
+  // earlier response (e.g. for the previous class or activity) never
+  // overwrites the current one.
+  const latest = useRef(0);
 
   const reload = useCallback(async () => {
+    const seq = ++latest.current;
     try {
       const next = await loaderRef.current();
+      if (seq !== latest.current) return;
       setData(next);
       setError(null);
     } catch (e) {
+      if (seq !== latest.current) return;
       setError(e instanceof Error ? e.message : "Failed to load.");
     } finally {
-      setLoading(false);
+      if (seq === latest.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) { latest.current++; setLoading(false); return; }
     setLoading(true);
     void reload();
     if (!opts.intervalMs) return;
@@ -50,34 +57,6 @@ export function useRpc<T>(fn: string, args: Record<string, unknown>, deps: unkno
     if (error) throw new Error(messageForError(error));
     return data as T;
   }, deps, opts);
-}
-
-/**
- * Re-run `onChange` when rows change in any of the given tables (Supabase
- * Realtime respects RLS). Debounced so bursts cause one refetch.
- */
-export function useRealtime(key: string, subs: { table: string; filter?: string }[], onChange: () => void, enabled = true) {
-  const cb = useRef(onChange);
-  cb.current = onChange;
-  useEffect(() => {
-    if (!enabled) return;
-    const sb = createClient();
-    let timer: number | undefined;
-    const fire = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => cb.current(), 250);
-    };
-    let channel = sb.channel(`rt:${key}`);
-    for (const s of subs) {
-      channel = channel.on("postgres_changes" as never, { event: "*", schema: "public", table: s.table, filter: s.filter } as never, fire);
-    }
-    channel.subscribe();
-    return () => {
-      window.clearTimeout(timer);
-      void sb.removeChannel(channel);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, enabled]);
 }
 
 /** Tracks navigator.onLine plus a rough connection quality (§33 bandwidth indicator). */

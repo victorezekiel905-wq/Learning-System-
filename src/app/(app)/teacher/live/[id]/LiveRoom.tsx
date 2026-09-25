@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Avatar, Badge, Button, CopyButton, Tabs, Textarea, useToast } from "@/components/ui";
+import { Alert, Avatar, Badge, Button, CopyButton, Tabs, Textarea, useToast, useDialog } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL, type SessionState } from "@/components/live/types";
 import { createClient } from "@/lib/supabase/client";
@@ -26,6 +26,7 @@ const PRESENCE_DOT: Record<string, string> = { online: "bg-emerald-500", idle: "
 export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; me: Me; envs: { id: string; name: string }[]; scenes: { id: string; name: string }[] }) {
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const [tab, setTab] = useState<Tab>("lesson");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sound, setSound] = useState(true);
@@ -125,7 +126,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
   const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   async function end() {
-    if (!confirm("End the session for everyone? Attendance and a report are saved.")) return;
+    if (!(await dialog.confirm({ title: "End the session for everyone?", body: "Attendance and a report are saved.", tone: "danger", confirmLabel: "End session" }))) return;
     try { await rpc("end_session", { p_session: sessionId }); router.push(`/teacher/reports?session=${sessionId}`); }
     catch (e) { toast(errorText(e), "error"); }
   }

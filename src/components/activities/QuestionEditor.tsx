@@ -5,6 +5,7 @@ import type { Item, QuestionKind } from "@/lib/types";
 import { BLOOM } from "@/lib/progress";
 import { uid } from "@/lib/utils";
 import { Badge, Button, Field, Input, Select, Textarea, Toggle, useToast } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
 export type EditableOption = { id?: string; label: string; is_correct: boolean; feedback?: string | null };
 export type EditableQuestion = {
@@ -69,7 +70,7 @@ export async function saveQuestion(q: EditableQuestion, ctx: { tenantId: string;
     const { data: existing } = await sb.from("question_options").select("id").eq("question_id", qid);
     const keep = new Set(q.options.filter((o) => o.id).map((o) => o.id));
     const drop = (existing ?? []).map((o) => o.id as string).filter((id) => !keep.has(id));
-    if (drop.length) await sb.from("question_options").delete().in("id", drop);
+    if (drop.length) { const del = await sb.from("question_options").delete().in("id", drop); if (del.error) throw new Error(del.error.message); }
     for (const [i, o] of q.options.entries()) {
       const payload = { label: o.label.trim() || `Option ${i + 1}`, is_correct: q.kind === "poll" ? false : o.is_correct, feedback: o.feedback ?? null, position: i };
       const res = o.id
@@ -116,7 +117,7 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
                   onChange={(e) => set({ options: q.options.map((x, j) => q.kind === "mcq" ? { ...x, is_correct: j === i } : j === i ? { ...x, is_correct: e.target.checked } : x) })} />
               )}
               <Input value={o.label} placeholder={`Option ${i + 1}`} onChange={(e) => set({ options: q.options.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
-              <Button size="sm" variant="ghost" disabled={q.options.length <= 2} onClick={() => set({ options: q.options.filter((_, j) => j !== i) })} aria-label="Remove option">✕</Button>
+              <Button size="sm" variant="ghost" disabled={q.options.length <= 2} onClick={() => set({ options: q.options.filter((_, j) => j !== i) })} aria-label="Remove option"><Icon name="x" className="h-4 w-4" /></Button>
             </div>
           ))}
           {q.options.length < 8 && <Button size="sm" variant="secondary" onClick={() => set({ options: [...q.options, { label: "", is_correct: false }] })}>Add option</Button>}
@@ -158,12 +159,12 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
             {left.map((l, i) => (
               <div key={l.id} className="flex items-center gap-2">
                 <Input value={l.label} placeholder="Term" onChange={(e) => setConfig({ left: left.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
-                <span>↔</span>
+                <span aria-hidden className="text-ink-500">↔</span>
                 <Input value={right[i]?.label ?? ""} placeholder="Match" onChange={(e) => setConfig({ right: right.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
                 <Button size="sm" variant="ghost" disabled={left.length <= 2} onClick={() => {
                   const nl = left.filter((_, j) => j !== i), nr = right.filter((_, j) => j !== i);
                   onChange({ ...q, config: { ...q.config, left: nl, right: nr }, answer_key: { pairs: Object.fromEntries(nl.map((x, j) => [x.id, nr[j]!.id])) } });
-                }}>✕</Button>
+                }} aria-label="Remove pair"><Icon name="x" className="h-4 w-4" /></Button>
               </div>
             ))}
             <Button size="sm" variant="secondary" onClick={() => {
@@ -184,7 +185,7 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
               <div key={it.id} className="flex items-center gap-2">
                 <span className="w-6 text-center text-sm font-bold text-ink-500">{i + 1}</span>
                 <Input value={it.label} onChange={(e) => setConfig({ items: items.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} />
-                <Button size="sm" variant="ghost" disabled={items.length <= 2} onClick={() => setConfig({ items: items.filter((_, j) => j !== i) })}>✕</Button>
+                <Button size="sm" variant="ghost" disabled={items.length <= 2} onClick={() => setConfig({ items: items.filter((_, j) => j !== i) })} aria-label="Remove item"><Icon name="x" className="h-4 w-4" /></Button>
               </div>
             ))}
             <Button size="sm" variant="secondary" onClick={() => setConfig({ items: [...items, { id: uid(), label: "" }] })}>Add item</Button>
@@ -209,7 +210,7 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
                 <Select className="w-44" value={placements[it.id] ?? ""} onChange={(e) => set({ answer_key: { placements: { ...placements, [it.id]: e.target.value } } })}>
                   <option value="">Choose group</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.label || c.id}</option>)}
                 </Select>
-                <Button size="sm" variant="ghost" onClick={() => { const p = { ...placements }; delete p[it.id]; onChange({ ...q, config: { ...q.config, items: items.filter((_, j) => j !== i) }, answer_key: { placements: p } }); }}>✕</Button>
+                <Button size="sm" variant="ghost" onClick={() => { const p = { ...placements }; delete p[it.id]; onChange({ ...q, config: { ...q.config, items: items.filter((_, j) => j !== i) }, answer_key: { placements: p } }); }} aria-label="Remove item"><Icon name="x" className="h-4 w-4" /></Button>
               </div>
             ))}
             <Button size="sm" variant="secondary" onClick={() => setConfig({ items: [...items, { id: uid(), label: "" }] })}>Add item</Button>
@@ -237,7 +238,7 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
                     <Input placeholder="Name" value={t.name} onChange={(e) => setConfig({ tests: tests.map((x, j) => j === i ? { ...x, name: e.target.value } : x) })} />
                     <Input placeholder="Expression, e.g. add(2,3)" className="font-mono text-xs" value={t.input} onChange={(e) => setConfig({ tests: tests.map((x, j) => j === i ? { ...x, input: e.target.value } : x) })} />
                     <Input placeholder="Expected, e.g. 5" className="font-mono text-xs" value={t.expected} onChange={(e) => setConfig({ tests: tests.map((x, j) => j === i ? { ...x, expected: e.target.value } : x) })} />
-                    <Button size="sm" variant="ghost" onClick={() => setConfig({ tests: tests.filter((_, j) => j !== i) })}>✕</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfig({ tests: tests.filter((_, j) => j !== i) })} aria-label="Remove test"><Icon name="x" className="h-4 w-4" /></Button>
                   </div>
                 ))}
                 <Button size="sm" variant="secondary" onClick={() => setConfig({ tests: [...tests, { name: `Test ${tests.length + 1}`, input: "", expected: "" }] })}>Add test</Button>
