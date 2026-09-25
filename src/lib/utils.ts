@@ -63,3 +63,22 @@ export function toCsv(rows: Record<string, unknown>[]): string {
   };
   return [cols.join(","), ...rows.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\n");
 }
+
+const TITLES = /^(mr|mrs|ms|miss|mx|dr|prof|sir|rev)\.?$/i;
+
+/** "Mrs. Adaeze Nwosu" → "Adaeze": for greetings, skipping honorifics. */
+export function firstName(full: string | null | undefined): string {
+  return (full ?? "").split(/\s+/).find((p) => p && !TITLES.test(p)) ?? "";
+}
+
+/** Name parts without honorifics, for initials. */
+export function nameParts(full: string): string[] {
+  return full.split(/\s+/).filter((p) => p && !TITLES.test(p));
+}
+
+/** "morning" / "afternoon" / "evening" in the school's own time zone. */
+export function dayPart(timeZone?: string | null, now = new Date()): "morning" | "afternoon" | "evening" {
+  let h = now.getHours();
+  try { h = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: timeZone || undefined }).format(now)); } catch { /* unknown zone: server time */ }
+  return h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+}

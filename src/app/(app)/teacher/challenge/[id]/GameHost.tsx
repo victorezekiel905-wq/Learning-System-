@@ -36,10 +36,10 @@ export function GameHost({ gameId, school }: { gameId: string; school: string })
   return (
     <div className="page space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-semibold uppercase tracking-wider text-accent-700">SwiftCipher Challenge</p><h1 className="text-2xl font-bold">{g.title}</h1></div>
+        <div><p className="text-[13px] font-semibold text-ink-500">SwiftCipher Challenge</p><h1 className="text-2xl font-bold">{g.title}</h1></div>
         <div className="flex items-center gap-4">
-          {g.status !== "ended" && <div className="text-center"><p className="text-[10px] font-semibold uppercase text-ink-500">Join code</p><p className="font-mono text-3xl font-extrabold tracking-[0.2em] text-brand-700">{g.join_code}</p></div>}
-          <div className="text-center"><p className="text-[10px] font-semibold uppercase text-ink-500">Players</p><p className="font-display text-2xl font-bold">{g.players}</p></div>
+          {g.status !== "ended" && <div className="text-center"><p className="text-[11px] font-semibold text-ink-500">Join code</p><p className="font-mono text-3xl font-extrabold tracking-[0.2em] text-brand-700">{g.join_code}</p></div>}
+          <div className="text-center"><p className="text-[11px] font-semibold text-ink-500">Players</p><p className="font-display text-2xl font-bold">{g.players}</p></div>
           {!!g.flags && <Badge tone="amber" className="self-center">{g.flags} pattern flag(s)</Badge>}
         </div>
       </div>
@@ -96,12 +96,12 @@ function Standings({ board, ended, school, title, certificates }: { board: Leade
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       {ended && podium.length > 0 && (
-        <Card title="🏆 Podium">
+        <Card title="Podium">
           <div className="flex items-end justify-center gap-4 pt-4">
             {[1, 0, 2].map((i) => podium[i] && (
               <div key={podium[i]!.player_id} className="text-center">
                 <p className="font-bold">{podium[i]!.name}</p><p className="text-sm text-ink-500">{podium[i]!.score}</p>
-                <div className={cn("mt-2 w-24 rounded-t-xl bg-gradient-to-t from-brand-600 to-accent-500", i === 0 ? "h-32" : i === 1 ? "h-24" : "h-16")} />
+                <div className={cn("mt-2 w-24 rounded-t-xl ", i === 0 ? "bg-accent-500" : "bg-ink-900", i === 0 ? "h-32" : i === 1 ? "h-24" : "h-16")} />
               </div>
             ))}
           </div>

@@ -70,7 +70,7 @@ export function GamePlayer({ gameId }: { gameId: string }) {
   return (
     <div className="page max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <div><p className="text-xs font-semibold uppercase text-accent-700">Challenge</p><h1 className="text-lg font-bold">{g.title}</h1></div>
+        <div><p className="text-[13px] font-semibold text-ink-500">Challenge</p><h1 className="text-lg font-bold">{g.title}</h1></div>
         {g.me && <div className="text-right"><p className="text-xs text-ink-500">{g.me.name}</p><p className="font-display text-2xl font-extrabold tabular-nums">{g.me.score}</p>{g.me.streak > 1 && <p className="text-xs font-semibold text-orange-600">🔥 {g.me.streak} streak</p>}</div>}
       </div>
 

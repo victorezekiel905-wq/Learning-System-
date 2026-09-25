@@ -23,7 +23,7 @@ function SsoButtons({ next }: { next: string }) {
           Continue with {SSO_LABEL[p] ?? p}
         </Button>
       ))}
-      <div className="flex items-center gap-3 py-1 text-[11px] uppercase text-ink-500"><span className="h-px flex-1 bg-ink-200" />or<span className="h-px flex-1 bg-ink-200" /></div>
+      <div className="flex items-center gap-3 py-1 text-[12px] text-ink-500"><span className="h-px flex-1 bg-ink-200" />or<span className="h-px flex-1 bg-ink-200" /></div>
     </div>
   );
 }
@@ -62,17 +62,17 @@ export function LoginForm() {
   }
 
   return (
-    <div className="card card-pad space-y-4">
+    <div className="space-y-5">
       <SsoButtons next={next} />
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} className="space-y-5">
         <Field label="Email" htmlFor="email"><Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label="Password" htmlFor="password"><Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
         {err && <Alert tone="error">{err}</Alert>}
         {info && <Alert tone="success">{info}</Alert>}
-        <Button type="submit" className="w-full" loading={busy}>Sign in</Button>
+        <Button type="submit" size="lg" className="w-full" loading={busy}>Sign in</Button>
       </form>
-      <div className="flex justify-between text-xs">
-        <button type="button" className="font-medium text-brand-700" onClick={reset}>Forgot password?</button>
+      <div className="flex justify-between border-t border-ink-200 pt-5 text-[13px]">
+        <button type="button" className="font-semibold text-brand-700 hover:text-brand-800" onClick={reset}>Forgot password?</button>
         <Link href="/signup">Create a school</Link>
       </div>
     </div>
@@ -135,7 +135,7 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
   }
 
   return (
-    <form onSubmit={submit} className="card card-pad space-y-4">
+    <form onSubmit={submit} className="space-y-5">
       {mode === "code" ? (
         <Field label="Join code" hint="From your teacher (class code) or your school (invite code)." htmlFor="code">
           <Input id="code" required value={code} maxLength={12} className="font-mono uppercase tracking-widest"
@@ -151,8 +151,8 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
       <Field label="Password" hint="At least 8 characters." htmlFor="password">
         <Input id="password" type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
       </Field>
-      <label className="flex items-start gap-2 text-sm text-ink-700">
-        <input type="checkbox" className="mt-1" required checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+      <label className="flex items-start gap-3 rounded-xl border border-ink-200 bg-white p-3.5 text-[13px] leading-relaxed text-ink-700">
+        <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-brand-600" required checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
         <span>
           I agree to the <Link href="/terms" target="_blank">Terms of Service</Link> and have read the <Link href="/privacy" target="_blank">Privacy Notice</Link>
           {mode === "school"
@@ -161,7 +161,7 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
         </span>
       </label>
       {err && <Alert tone="error">{err}</Alert>}
-      <Button type="submit" className="w-full" loading={busy} disabled={!agreed}>{mode === "school" ? "Create school workspace" : "Create account and join"}</Button>
+      <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!agreed}>{mode === "school" ? "Create school workspace" : "Create account and join"}</Button>
     </form>
   );
 }

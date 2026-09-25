@@ -7,6 +7,7 @@ import { Alert, Badge, Button, Card, Field, PageHeader, Textarea, useToast } fro
 import { createClient } from "@/lib/supabase/client";
 import { errorText, rpc } from "@/lib/rpc";
 import { formatDateTime } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
 
 type Assignment = { id: string; title: string; instructions: string | null; due_at: string | null; allow_late: boolean; max_resubmissions: number; points_possible: number; activity_id: string | null; classes: { name: string } | null };
 type Sub = { id: string; attempt_no: number; body: string | null; files: { path: string; name: string }[]; status: string; is_late: boolean; submitted_at: string; grades: { score: number; feedback: string | null; released_at: string | null } | { score: number; feedback: string | null; released_at: string | null }[] | null };
@@ -49,7 +50,7 @@ export function AssignmentView({ assignment: a, submissions, me }: { assignment:
             <Field label="Answer / notes"><Textarea rows={6} value={body} onChange={(e) => setBody(e.target.value)} /></Field>
             <Field label="Attachments">
               <input type="file" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
-              {files.length > 0 && <ul className="mt-2 text-sm">{files.map((f) => <li key={f.path}>📎 {f.name}</li>)}</ul>}
+              {files.length > 0 && <ul className="mt-2 text-sm">{files.map((f) => <li key={f.path}><Icon name="paperclip" className="inline h-3.5 w-3.5 align-[-2px] text-ink-500" /> {f.name}</li>)}</ul>}
             </Field>
             <Button loading={busy} disabled={!body.trim() && !files.length} onClick={submit}>Submit</Button>
           </div>
@@ -80,6 +81,6 @@ function FileLink({ f }: { f: { path: string; name: string } }) {
     <button className="mt-1 block text-left text-sm font-medium text-brand-700 underline" onClick={async () => {
       const { data } = await createClient().storage.from("submissions").createSignedUrl(f.path, 300);
       if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
-    }}>📎 {f.name}</button>
+    }}><Icon name="paperclip" className="inline h-3.5 w-3.5 align-[-2px] text-ink-500" /> {f.name}</button>
   );
 }

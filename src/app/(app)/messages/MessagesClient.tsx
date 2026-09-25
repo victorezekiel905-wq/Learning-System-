@@ -42,7 +42,7 @@ export function MessagesClient({ threads, classes, me, initialThread, initialCla
 
   const current = threads.find((t) => t.id === active);
   return (
-    <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
+    <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
       <div className="space-y-4">
         <Card title="New conversation">
           <div className="space-y-2">

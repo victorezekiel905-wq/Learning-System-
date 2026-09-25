@@ -44,7 +44,7 @@ export function ScreensPanel({ state, sessionId, selected, setSelected, reload, 
     <div className="space-y-4">
       {!state.settings.allow_screen_capture && <Alert tone="warn">Screen thumbnails are turned off by your school's policy. Tab and focus commands still work.</Alert>}
 
-      <div className="sticky top-14 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-ink-200 bg-white p-2 shadow-sm">
+      <div className="sticky top-16 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-ink-200 bg-white p-2 shadow-sm">
         <span className="px-2 text-sm font-medium">{targets.length ? `${targets.length} selected` : "Select students"}</span>
         <Button size="sm" disabled={targets.length !== 1 || !state.settings.allow_spotlight} onClick={() => setSpot(true)} title={!state.settings.allow_spotlight ? "Disabled by school policy" : undefined}>
           <Icon name="star" className="h-4 w-4" /> Spotlight

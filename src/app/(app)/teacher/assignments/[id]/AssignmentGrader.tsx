@@ -7,6 +7,7 @@ import { Alert, Badge, Button, Card, Field, Input, PageHeader, Select, Textarea,
 import { createClient } from "@/lib/supabase/client";
 import { errorText, rpc } from "@/lib/rpc";
 import { formatDateTime } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
 
 type Criterion = { id: string; title: string; levels: { label: string; points: number; description?: string }[] };
 type Assignment = { id: string; title: string; instructions: string | null; due_at: string | null; points_possible: number; status: string; allow_late: boolean; max_resubmissions: number; activity_id: string | null; classes: { name: string } | null; rubrics: { id: string; title: string; criteria: Criterion[] } | null };
@@ -42,7 +43,7 @@ export function AssignmentGrader({ assignment: a, submissions, roster }: { assig
         </>} />
       {a.instructions && <Card><RichText text={a.instructions} /></Card>}
 
-      <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
+      <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
         <div className="space-y-3">
           <Card title={`Submissions (${latest.size}/${roster.length})`} pad={false}>
             <ul className="max-h-[60vh] divide-y divide-ink-100 overflow-y-auto">
@@ -93,7 +94,7 @@ function GradePanel({ a, s, onSaved }: { a: Assignment; s: Sub; onSaved: () => v
           <button key={f.path} className="block text-sm font-medium text-brand-700 underline" onClick={async () => {
             const { data } = await createClient().storage.from("submissions").createSignedUrl(f.path, 300);
             if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
-          }}>📎 {f.name}</button>
+          }}><Icon name="paperclip" className="inline h-3.5 w-3.5 align-[-2px]" /> {f.name}</button>
         ))}</div>}
 
         {criteria.length > 0 && (
@@ -111,7 +112,7 @@ function GradePanel({ a, s, onSaved }: { a: Assignment; s: Sub; onSaved: () => v
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+        <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
           <Field label={`Score / ${a.points_possible}`}><Input type="number" min={0} max={a.points_possible} step="0.5" value={score} onChange={(e) => setScore(Number(e.target.value))} /></Field>
           <Field label="Feedback"><Textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} /></Field>
         </div>

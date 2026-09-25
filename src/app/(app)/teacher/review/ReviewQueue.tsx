@@ -9,6 +9,7 @@ import { useRpc } from "@/lib/hooks";
 import { errorText, rpc } from "@/lib/rpc";
 import type { Stroke } from "@/lib/types";
 import { timeAgo } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
 
 type Item = {
   answer_id: string; answered_at: string; response: Record<string, unknown>; status: string;
@@ -22,7 +23,7 @@ export function ReviewQueue({ rubrics }: { rubrics: Rubric[] }) {
   const q = useRpc<Item[]>("review_queue", {}, []);
   const items = q.data ?? [];
   if (q.loading) return <p className="text-sm text-ink-500">Loading…</p>;
-  if (!items.length) return <Empty title="Nothing to review">Everything is marked. 🎉</Empty>;
+  if (!items.length) return <Empty title="Nothing to review">Everything is marked.</Empty>;
   return (
     <div className="space-y-4">
       <p className="text-sm text-ink-500">{items.length} answer(s) waiting</p>
@@ -50,7 +51,7 @@ function ReviewCard({ it, rubric, onDone }: { it: Item; rubric?: Rubric; onDone:
           {typeof r.path === "string" && <button className="font-medium text-brand-700 underline" onClick={async () => {
             const { data } = await createClient().storage.from("submissions").createSignedUrl(r.path as string, 300);
             if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
-          }}>📎 {String(r.name ?? "Download file")}</button>}
+          }}><Icon name="paperclip" className="inline h-3.5 w-3.5 align-[-2px]" /> {String(r.name ?? "Download file")}</button>}
           {Array.isArray(r.blanks) && <p>{(r.blanks as string[]).join(" · ")}</p>}
         </div>
         {rubric && (

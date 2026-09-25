@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/session";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
-import { formatDateTime } from "@/lib/utils";
+import { firstName, formatDateTime } from "@/lib/utils";
 import { ProgressPanel } from "./ProgressPanel";
+import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "Home" };
 
@@ -24,19 +25,32 @@ export default async function StudentHome() {
 
   return (
     <div className="page">
-      <PageHeader title={`Hi, ${me.profile.full_name.split(" ")[0]}`} subtitle="Your classes, live lessons and work."
-        actions={<Link href="/student/join" className="btn btn-primary no-underline">Join with code</Link>} />
+      <PageHeader title={`Hi${firstName(me.profile.full_name) ? `, ${firstName(me.profile.full_name)}` : ""}.`} subtitle="Your lessons, your level and your work, in one place."
+        actions={<Link href="/student/join" className="btn btn-primary no-underline"><Icon name="key" className="h-4 w-4" />Join with code</Link>} />
 
-      {me.settings?.welcome_message && <div className="mb-5 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-900">{me.settings.welcome_message}</div>}
+      {me.settings?.welcome_message && <div className="mb-6 rounded-2xl border border-ink-200 bg-white px-5 py-4 text-[15px] text-ink-800"><span className="mr-2 font-semibold">From your school:</span>{me.settings.welcome_message}</div>}
 
       {h.live.map((s) => (
-        <Link key={s.id} href={`/student/live/${s.id}`} className="mb-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 no-underline">
-          <span className="font-semibold text-emerald-900">● {s.class} is live: {s.title}</span><span className="btn btn-primary btn-sm">Join now</span>
+        <Link key={s.id} href={`/student/live/${s.id}`}
+          className="group mb-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-ink-950 p-5 text-white no-underline hover:text-white sm:p-6">
+          <span className="min-w-0">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-1.5 py-1 text-[11px] font-bold leading-none">
+              <span className="h-1.5 w-1.5 animate-pulse2 rounded-full bg-white" aria-hidden />LIVE</span>
+            <span className="mt-3 block font-display text-2xl font-extrabold tracking-tight">{s.class} is live</span>
+            <span className="mt-1 block text-sm text-ink-400">{s.title}</span>
+          </span>
+          <span className="btn btn-accent btn-lg">Join now</span>
         </Link>
       ))}
       {h.games.map((g) => (
-        <Link key={g.id} href={`/student/game/${g.id}`} className="mb-3 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 no-underline">
-          <span className="font-semibold text-amber-900">🏆 Challenge open: {g.title} ({g.class})</span><span className="btn btn-accent btn-sm">Play</span>
+        <Link key={g.id} href={`/student/game/${g.id}`}
+          className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-accent-500 p-5 text-accent-ink no-underline hover:text-accent-ink sm:p-6">
+          <span className="min-w-0">
+            <span className="flex items-center gap-2 text-[13px] font-bold"><Icon name="trophy" className="h-4 w-4" />Challenge open</span>
+            <span className="mt-1 block font-display text-2xl font-extrabold tracking-tight">{g.title}</span>
+            <span className="block text-sm opacity-80">{g.class}</span>
+          </span>
+          <span className="btn btn-ink btn-lg">Play</span>
         </Link>
       ))}
       {h.live.some((s) => s.environment_active) && h.devices > 0 && (
@@ -47,7 +61,7 @@ export default async function StudentHome() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2" title={`To do (${todo.length})`}>
-          {todo.length === 0 ? <p className="text-sm text-ink-500">You're all caught up. 🎉</p> : (
+          {todo.length === 0 ? <p className="text-sm text-ink-500">You're all caught up.</p> : (
             <ul className="divide-y divide-ink-100">
               {todo.map((a) => {
                 const overdue = a.due_at && new Date(a.due_at) < new Date();

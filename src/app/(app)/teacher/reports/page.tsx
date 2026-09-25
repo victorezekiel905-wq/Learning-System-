@@ -27,7 +27,7 @@ export default async function ReportsPage(props: { searchParams: Promise<{ sessi
     <div className="page">
       <PageHeader title="Reports" subtitle="Session summaries are generated automatically when a session ends. Export any report as CSV."
         actions={<GenerateReport classes={(classes as { id: string; name: string }[]) ?? []} />} />
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <Card title="All reports" pad={false}>
           {list.length === 0 ? <p className="p-5 text-sm text-ink-500">No reports yet.</p> : (
             <ul className="max-h-[70vh] divide-y divide-ink-100 overflow-y-auto">{list.map((r) => (

@@ -19,8 +19,8 @@ export type Leaderboard = {
 };
 
 export const BADGE: Record<string, string> = {
-  gold: "🥇 1st place", silver: "🥈 2nd place", bronze: "🥉 3rd place", podium: "🏅 Podium",
-  perfect: "💯 Perfect score", streak_5: "🔥 5-answer streak", speedster: "⚡ Fastest correct answers"
+  gold: "1st place", silver: "2nd place", bronze: "3rd place", podium: "Podium",
+  perfect: "Perfect score", streak_5: "5-answer streak", speedster: "Fastest correct answers"
 };
 
 export const OPTION_COLORS = ["bg-rose-500", "bg-sky-500", "bg-amber-500", "bg-emerald-500", "bg-violet-500", "bg-teal-500"];

@@ -65,7 +65,7 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
   useEffect(() => {
     const a = s?.announcements[0];
     if (a && a.id !== lastAnnouncement) {
-      if (lastAnnouncement !== null) toast(`📣 ${a.body}`, "info");
+      if (lastAnnouncement !== null) toast(`Announcement: ${a.body}`, "info");
       setLastAnnouncement(a.id);
     }
   }, [s?.announcements, lastAnnouncement, toast]);
@@ -117,7 +117,7 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
           <Button size="sm" className="mt-2" onClick={async () => { await rpc("accept_notice", { p_kind: "monitoring_notice" }).catch(() => {}); setAck(true); }}>I understand</Button>
         </Alert>
       )}
-      {s.device_monitored && ack && <p className="text-xs text-ink-500">🔒 Managed session active: your teacher can see your current site and screen during class. <Link href="/student/device">Details</Link></p>}
+      {s.device_monitored && ack && <p className="text-xs text-ink-500"><Icon name="lock" className="inline h-3.5 w-3.5 align-[-2px]" /> Managed session active: your teacher can see your current site and screen during class. <Link href="/student/device">Details</Link></p>}
 
       {s.spotlight?.show_to_class && !s.spotlight.me && <SpotlightView sessionId={sessionId} />}
       <StudentReceiver sessionId={sessionId} />
@@ -142,7 +142,7 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
       )}
 
       {s.announcements.length > 0 && (
-        <div className="card p-4"><p className="mb-2 text-sm font-semibold">📣 Announcements</p>
+        <div className="card p-4"><p className="mb-2 text-sm font-semibold"><Icon name="megaphone" className="inline h-4 w-4 align-[-3px]" /> Announcements</p>
           <ul className="space-y-1 text-sm">{s.announcements.map((a) => <li key={a.id}>{a.body}</li>)}</ul></div>
       )}
 
@@ -158,7 +158,7 @@ function SpotlightView({ sessionId }: { sessionId: string }) {
   if (!view.data) return null;
   return (
     <div className="card overflow-hidden">
-      <p className="border-b border-ink-100 px-4 py-2 text-sm font-semibold">⭐ Spotlight: {view.data.student}</p>
+      <p className="border-b border-ink-100 px-4 py-2 text-sm font-semibold"><Icon name="star" className="inline h-4 w-4 align-[-3px]" /> Spotlight: {view.data.student}</p>
       {view.data.image && !view.data.stale ? <img src={view.data.image} alt={`Screen shared by ${view.data.student}`} className="w-full" /> : <p className="p-6 text-center text-sm text-ink-500">Screen unavailable right now.</p>}
     </div>
   );

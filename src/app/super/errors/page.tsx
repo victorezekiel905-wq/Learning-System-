@@ -21,7 +21,7 @@ export default async function SuperErrors(props: { searchParams: Promise<{ all?:
       <PageHeader title="Errors" subtitle="Crashes and failed requests reported by browsers and the server, grouped by cause. Kept for 30 days."
         actions={<a href={all ? "/super/errors" : "/super/errors?all=1"} className="btn btn-secondary btn-sm no-underline">{all ? "Open only" : "Include resolved"}</a>} />
       <Card pad={false}>
-        {rows.length === 0 ? <p className="p-5 text-sm text-ink-500">No open errors. 🎉</p> : (
+        {rows.length === 0 ? <p className="p-5 text-sm text-ink-500">No open errors.</p> : (
           <ul className="divide-y divide-ink-100">
             {rows.map((r) => (
               <li key={r.id} className="space-y-1 px-4 py-3">

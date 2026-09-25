@@ -60,7 +60,7 @@ test.describe("engaging learning", () => {
     await expect(page.getByText("Extension challenge")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Challenge: which fraction is closest to 0.76?")).toBeVisible();
     await expect(page.getByText("Easy: which is 0.75?")).toHaveCount(0);
-    await page.getByRole("button", { name: /3\/4/ }).click();
+    await page.getByRole("radio", { name: /3\/4/ }).click();
     await expect(page.getByText("Explain your reasoning (required)")).toBeVisible();
     await page.getByPlaceholder(/Why is this your answer/).fill("3/4 is 0.75, only 0.01 away, while 4/5 is 0.80 which is 0.04 away.");
     await page.getByRole("radio", { name: "Certain" }).click();

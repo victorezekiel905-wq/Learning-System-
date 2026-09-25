@@ -20,13 +20,13 @@ export function LockdownGate({ guard, teacher }: { guard: Guard; teacher: string
   const fsDone = !guard.needFullscreen || guard.fullscreen;
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-ink-900/95 p-4 text-white" role="dialog" aria-modal="true" aria-labelledby="gate-title">
+    <div className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-ink-950 p-4 text-white" role="dialog" aria-modal="true" aria-labelledby="gate-title">
       <div className="w-full max-w-lg space-y-5 py-8">
         <div className="space-y-2 text-center">
-          <span className={cn("mx-auto grid h-14 w-14 place-items-center rounded-2xl", left ? "bg-rose-500" : "bg-brand-500")}>
+          <span className={cn("mx-auto grid h-14 w-14 place-items-center rounded-2xl", left ? "bg-rose-600" : "bg-accent-500 text-accent-ink")}>
             <Icon name={left ? "alert" : "lock"} className="h-7 w-7" />
           </span>
-          <h1 id="gate-title" className="text-2xl font-extrabold">
+          <h1 id="gate-title" className="text-[28px] font-extrabold leading-tight tracking-tightest">
             {left ? "Return to the lesson" : `Join ${teacher}'s class`}
           </h1>
           <p className="text-sm text-ink-300">

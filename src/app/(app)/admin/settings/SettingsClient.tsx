@@ -71,8 +71,8 @@ function BrandingCard({ s, set, tenantId }: { s: TenantSettings; set: (p: Partia
   const toast = useToast();
   const logo = useSignedUrl(s.brand_logo_path);
   const [busy, setBusy] = useState(false);
-  const primary = s.brand_primary ?? "#4f46e5";
-  const accent = s.brand_accent ?? "#0891b2";
+  const primary = s.brand_primary ?? "#2340d3";
+  const accent = s.brand_accent ?? "#c8f03c";
   const lowContrast = contrastWithWhite(primary) < 4.5;
   const preview = { ...paletteVars("brand", primary), ...paletteVars("accent", accent) } as React.CSSProperties;
 

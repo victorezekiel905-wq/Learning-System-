@@ -35,15 +35,30 @@ export function accessibleBase(c: RGB): RGB {
   return out;
 }
 
+// Accent: the chosen colour is the fill (shade 500) exactly as picked; it is a highlight, never body text.
+const ACCENT_STEPS: [number, "w" | "b", number][] = [
+  [50, "w", 0.9], [100, "w", 0.78], [200, "w", 0.6], [300, "w", 0.4], [400, "w", 0.2],
+  [500, "w", 0], [600, "b", 0.1], [700, "b", 0.3], [800, "b", 0.5], [900, "b", 0.66]
+];
+const INK: RGB = [21, 20, 17];
+const WHITE: RGB = [255, 255, 255];
+const contrast = (a: RGB, b: RGB) => {
+  const [x, y] = [relLum(a), relLum(b)].sort((m, n) => n - m) as [number, number];
+  return (x + 0.05) / (y + 0.05);
+};
+
 export function paletteVars(name: "brand" | "accent", hex: string | null | undefined): Record<string, string> {
   const picked = hex ? hexToRgb(hex) : null;
   if (!picked) return {};
-  const base = accessibleBase(picked);
   const out: Record<string, string> = {};
-  for (const [step, dir, t] of STEPS) {
-    if (name === "accent" && step === 950) continue;
-    out[`--${name}-${step}`] = triple(mix(base, dir === "w" ? [255, 255, 255] : [0, 0, 0], t));
+  if (name === "accent") {
+    for (const [step, dir, t] of ACCENT_STEPS) out[`--accent-${step}`] = triple(mix(picked, dir === "w" ? WHITE : [0, 0, 0], t));
+    // Text on the accent: whichever of ink or white reads better on it.
+    out["--accent-ink"] = triple(contrast(picked, INK) >= contrast(picked, WHITE) ? INK : WHITE);
+    return out;
   }
+  const base = accessibleBase(picked);
+  for (const [step, dir, t] of STEPS) out[`--brand-${step}`] = triple(mix(base, dir === "w" ? WHITE : [0, 0, 0], t));
   return out;
 }
 

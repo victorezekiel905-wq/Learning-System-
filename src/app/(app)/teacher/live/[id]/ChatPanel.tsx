@@ -21,14 +21,14 @@ export function ChatPanel({ state, me }: { state: SessionState; me: Me }) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-[240px_1fr]">
+    <div className="grid gap-4 md:grid-cols-[240px_minmax(0,1fr)]">
       <div className="card p-2">
         {state.session.group_chat_enabled && (
           <button className={cn("mb-1 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-ink-50", thread?.label === "Class chat" && "bg-brand-50")} onClick={() => open(null, "Class chat")}>
             # Class chat
           </button>
         )}
-        <p className="px-3 py-1 text-[11px] font-semibold uppercase text-ink-500">Private 1:1</p>
+        <p className="px-3 py-1 text-[12px] font-semibold text-ink-500">Private 1:1</p>
         <ul>
           {state.roster.map((r) => (
             <li key={r.student_id}>

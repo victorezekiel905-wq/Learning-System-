@@ -269,7 +269,7 @@ function CategorizeInput({ items, categories, placements, onChange, disabled }: 
         {categories.map((c) => (
           <div key={c.id} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragging) place(dragging, c.id); setDragging(null); }}
             className="min-h-[6rem] rounded-xl border-2 border-dashed border-brand-200 bg-brand-50/50 p-2">
-            <p className="mb-2 text-xs font-semibold uppercase text-brand-700">{c.label}</p>
+            <p className="mb-2 text-[13px] font-semibold text-ink-700">{c.label}</p>
             <div className="flex flex-wrap gap-2">{items.filter((i) => placements[i.id] === c.id).map(chip)}</div>
           </div>
         ))}

@@ -42,7 +42,7 @@ export function MediaLibrary({ me }: { me: { id: string; tenantId: string } }) {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[220px_1fr]">
+    <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
       <Card title="Folders" actions={<Button size="sm" variant="ghost" onClick={async () => {
         const name = prompt("Folder name");
         if (!name) return;

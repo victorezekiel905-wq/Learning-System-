@@ -4,53 +4,73 @@
 
 :root {
   color-scheme: light;
-  /* SwiftCipher defaults: indigo primary, cyan accent. Schools override via inline CSS variables. */
-  --brand-50: 238 242 255; --brand-100: 224 231 255; --brand-200: 199 210 254; --brand-300: 165 180 252;
-  --brand-400: 129 140 248; --brand-500: 99 102 241; --brand-600: 79 70 229; --brand-700: 67 56 202;
-  --brand-800: 55 48 163; --brand-900: 49 46 129; --brand-950: 30 27 75;
-  --accent-50: 236 254 255; --accent-100: 207 250 254; --accent-200: 165 243 252; --accent-300: 103 232 249;
-  /* accent-600 is cyan-700 so white text on accent buttons meets WCAG AA (5.4:1) */
-  --accent-400: 34 211 238; --accent-500: 8 145 178; --accent-600: 14 116 144; --accent-700: 21 94 117;
-  --accent-800: 21 94 117; --accent-900: 22 78 99;
+  /* SwiftCipher defaults: cobalt for action, electric lime as the signature highlight.
+     Schools override both via inline CSS variables (src/lib/theme.ts). */
+  --brand-50: 238 241 253; --brand-100: 221 227 251; --brand-200: 186 198 246; --brand-300: 142 161 239;
+  --brand-400: 95 121 230; --brand-500: 60 90 220; --brand-600: 35 64 211; --brand-700: 28 51 171;
+  --brand-800: 24 42 135; --brand-900: 21 35 107; --brand-950: 14 22 70;
+  --accent-50: 248 253 230; --accent-100: 240 251 200; --accent-200: 228 247 155; --accent-300: 214 243 102;
+  --accent-400: 212 245 90; --accent-500: 200 240 60; --accent-600: 179 220 36; --accent-700: 137 170 23;
+  --accent-800: 95 118 16; --accent-900: 63 79 11;
+  /* Text on accent backgrounds: ink for light accents like lime, white for dark ones. */
+  --accent-ink: 21 20 17;
 }
 
 @layer base {
-  body { @apply bg-ink-50 text-ink-900 antialiased; }
-  h1, h2, h3, h4, h5, h6 { @apply font-display tracking-tight; }
-  :focus-visible { @apply outline-none ring-2 ring-brand-500 ring-offset-2; }
-  a { @apply text-brand-700 underline-offset-2; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-ink-50 text-[15px] leading-relaxed text-ink-900 antialiased;
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+  /* Headings inherit their colour, so they also read on dark panels. */
+  h1, h2, h3, h4, h5, h6 { @apply font-display font-bold tracking-tight; }
+  ::selection { @apply bg-accent-300 text-ink-900; }
+  :focus-visible { @apply outline-none ring-2 ring-brand-600 ring-offset-2 ring-offset-white; }
+  a { @apply text-brand-700 underline-offset-[3px] decoration-1 hover:text-brand-800; }
   /* Links inside running text are underlined, not told apart by colour alone (WCAG 1.4.1). */
-  :where(p, li, label, td, dd, blockquote) a:not(.btn) { @apply underline; }
+  :where(p, li, label, td, dd, blockquote) a:where(:not(.btn)) { @apply underline; }
+  .tabular, table { font-variant-numeric: tabular-nums; }
 }
 
 @layer components {
-  .btn { @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50; }
-  .btn-primary { @apply bg-brand-600 text-white shadow-sm hover:bg-brand-700; }
-  .btn-secondary { @apply border border-ink-200 bg-white text-ink-800 shadow-sm hover:bg-ink-50; }
-  .btn-ghost { @apply text-ink-700 hover:bg-ink-100; }
-  .btn-danger { @apply bg-rose-600 text-white shadow-sm hover:bg-rose-700; }
-  .btn-accent { @apply bg-accent-600 text-white shadow-sm hover:bg-accent-700; }
-  .btn-sm { @apply px-2.5 py-1.5 text-xs; }
-  .btn-lg { @apply px-5 py-2.5 text-base; }
+  /* Buttons: solid, confident, 40 px tall (44 px on touch-first lg). */
+  .btn { @apply inline-flex h-10 select-none items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-4 text-sm font-semibold no-underline transition-[background-color,border-color,color,transform] duration-150 active:translate-y-px disabled:pointer-events-none disabled:opacity-45; }
+  .btn-primary { @apply bg-brand-600 text-white hover:bg-brand-700 hover:text-white; }
+  .btn-secondary { @apply border border-ink-200 bg-white text-ink-900 hover:border-ink-300 hover:bg-ink-50 hover:text-ink-900; }
+  .btn-ghost { @apply text-ink-700 hover:bg-ink-100 hover:text-ink-900; }
+  .btn-danger { @apply bg-rose-700 text-white hover:bg-rose-800 hover:text-white; }
+  .btn-accent { @apply bg-accent-500 text-accent-ink hover:bg-accent-400 hover:text-accent-ink; }
+  .btn-ink { @apply bg-ink-900 text-white hover:bg-ink-800 hover:text-white; }
+  .btn-sm { @apply h-8 rounded-lg px-3 text-[13px]; }
+  .btn-lg { @apply h-12 rounded-xl px-6 text-base; }
 
+  /* Surfaces: flat white on paper, hairline edge. Only overlays get shadows. */
   /* min-w-0: inside grids/flex rows a card shrinks and lets wide content scroll, instead of widening the page. */
-  .card { @apply min-w-0 rounded-xl border border-ink-200 bg-white shadow-sm; }
-  .card-pad { @apply p-5; }
+  .card { @apply min-w-0 rounded-2xl border border-ink-200 bg-white; }
+  .card-pad { @apply p-5 sm:p-6; }
 
-  .input { @apply block w-full rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 disabled:bg-ink-100; }
-  .label { @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500; }
-  .hint { @apply mt-1 text-xs text-ink-500; }
+  .input { @apply block h-10 w-full rounded-[10px] border border-ink-300 bg-white px-3 text-[15px] text-ink-900 transition-colors placeholder:text-ink-500 hover:border-ink-400 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-600/15 disabled:bg-ink-100 sm:text-sm; }
+  textarea.input { @apply h-auto py-2.5 leading-relaxed; }
+  select.input { @apply appearance-none bg-no-repeat pr-9; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236B675E' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E"); background-position: right .6rem center; background-size: 1.1rem; }
+  .label { @apply mb-1.5 block text-[13px] font-semibold text-ink-800; }
+  .hint { @apply mt-1.5 text-[13px] leading-snug text-ink-500; }
 
-  .badge { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium; }
+  .badge { @apply inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset; }
   .table { @apply w-full text-left text-sm; }
-  .table th { @apply border-b border-ink-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink-500; }
-  .table td { @apply border-b border-ink-100 px-3 py-2 align-middle; }
+  .table th { @apply border-b border-ink-200 bg-ink-50/70 px-4 py-2.5 text-[12px] font-semibold text-ink-500; }
+  .table td { @apply border-b border-ink-100 px-4 py-3 align-middle; }
+  .table tbody tr:last-child td { @apply border-b-0; }
+  .table tbody tr { @apply transition-colors hover:bg-ink-50/60; }
 
-  .page { @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-6; }
-  .page-title { @apply font-display text-2xl font-bold text-ink-900; }
-  .page-sub { @apply mt-1 text-sm text-ink-500; }
+  .page { @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8; }
+  .page-title { @apply font-display text-[28px] font-extrabold leading-[1.1] tracking-tightest text-ink-900 sm:text-[34px]; }
+  .page-sub { @apply mt-2 max-w-2xl text-[15px] text-ink-600; }
+  .section-title { @apply font-display text-lg font-bold tracking-tight text-ink-900; }
 
-  .slide-surface { @apply relative aspect-video w-full overflow-hidden rounded-xl border border-ink-200 bg-white shadow-sm; }
+  /* The lime "marker" used for emphasis in headlines. */
+  .mark { @apply relative whitespace-nowrap; background: linear-gradient(transparent 58%, rgb(var(--accent-400)) 58%, rgb(var(--accent-400)) 92%, transparent 92%); }
+
+  .slide-surface { @apply relative aspect-video w-full overflow-hidden rounded-2xl border border-ink-200 bg-white; }
 }
 
 /* Phones and small tablets: wide tables scroll sideways inside their card instead of
@@ -62,6 +82,9 @@
 
 /* Long codes, URLs and emails never push the page wider than the screen. */
 main, .page, .card { overflow-wrap: anywhere; }
+
+/* Room for the phone/tablet tab bar and the iPhone home indicator. */
+.pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }

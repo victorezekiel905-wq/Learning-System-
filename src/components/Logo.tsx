@@ -1,19 +1,23 @@
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-export function Logo({ href = "/", compact = false }: { href?: string; compact?: boolean }) {
+/** The SwiftCipher mark: an ink tile with a cut "S" and a lime notch in the corner. */
+export function LogoMark({ className, onDark = false }: { className?: string; onDark?: boolean }) {
   return (
-    <Link href={href} className="flex items-center gap-2 text-ink-900 no-underline" aria-label="SwiftCipher home">
-      <svg viewBox="0 0 64 64" className="h-8 w-8" aria-hidden>
-        <defs>
-          <linearGradient id="sc-g" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#4f46e5" />
-            <stop offset="1" stopColor="#0891b2" />
-          </linearGradient>
-        </defs>
-        <rect width="64" height="64" rx="14" fill="url(#sc-g)" />
-        <path d="M42 20c-3-3-7-4-11-4-7 0-12 4-12 9 0 11 26 6 26 17 0 5-5 9-13 9-5 0-9-2-12-5" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" />
-      </svg>
-      {!compact && <span className="font-display text-base font-extrabold tracking-tight">Swift<span className="text-brand-600">Cipher</span></span>}
+    <svg viewBox="0 0 40 40" className={cn("h-8 w-8 shrink-0", className)} aria-hidden>
+      <rect width="40" height="40" rx="10" fill={onDark ? "#FFFFFF" : "#151411"} />
+      <path d="M26.5 13.2c-1.7-1.6-4-2.4-6.6-2.4-4.2 0-7 2.2-7 5.3 0 7.3 14.6 3.6 14.6 10.6 0 3.2-3 5.5-7.4 5.5-2.9 0-5.4-1-7.2-2.8"
+            fill="none" stroke={onDark ? "#151411" : "#FFFFFF"} strokeWidth="3.6" strokeLinecap="round" />
+      <rect x="29" y="4" width="7" height="7" rx="2" fill="rgb(var(--accent-500))" />
+    </svg>
+  );
+}
+
+export function Logo({ href = "/", compact = false, onDark = false, className }: { href?: string; compact?: boolean; onDark?: boolean; className?: string }) {
+  return (
+    <Link href={href} className={cn("flex items-center gap-2.5 no-underline", onDark ? "text-white hover:text-white" : "text-ink-900 hover:text-ink-900", className)} aria-label="SwiftCipher home">
+      <LogoMark onDark={onDark} />
+      {!compact && <span className="font-display text-[17px] font-extrabold tracking-tight">SwiftCipher</span>}
     </Link>
   );
 }

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { CollabBoard } from "./CollabBoard";
 import { isAnswered, Prompt, QuestionInput, type Answer } from "./QuestionInput";
 import { BADGE_LABEL, CHALLENGE, type Progress } from "@/lib/progress";
+import { Icon } from "@/components/Icon";
 
 type Started = {
   attempt: { id: string; attempt_no: number; deadline_at: string | null; status: string; server_now: string; level?: 1 | 2 | 3 | null };
@@ -138,7 +139,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900" role="status">
             <span className="font-display text-2xl font-extrabold">+{reward.xp} XP</span>
             <span className="text-sm">{reward.levelUp ? `Level up! You're now level ${reward.level}.` : `Level ${reward.level}`}</span>
-            {reward.badges.map((b) => <Badge key={b} tone="amber">🏅 {BADGE_LABEL[b] ?? b}</Badge>)}
+            {reward.badges.map((b) => <Badge key={b} tone="amber"><Icon name="award" className="inline h-3.5 w-3.5 align-[-2px]" /> {BADGE_LABEL[b] ?? b}</Badge>)}
           </div>
         )}
         {pendingReview && <Alert>Some answers will be marked by your teacher. You'll get a notification when they're reviewed.</Alert>}
@@ -177,7 +178,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
     <div className={cn("card space-y-5", compact ? "p-4" : "card-pad")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{data.activity.title}</p>
+          <p className="text-[13px] font-semibold text-ink-600">{data.activity.title}</p>
           {questions.length > 1 && <p className="text-xs text-ink-500">Question {index + 1} of {questions.length} · {answeredCount} answered</p>}
         </div>
         <div className="flex items-center gap-2">

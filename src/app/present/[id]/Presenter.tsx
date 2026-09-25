@@ -6,6 +6,7 @@ import { useAnnotations } from "@/lib/annotations";
 import { useLoader, useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
 import { rpc } from "@/lib/rpc";
+import { Icon } from "@/components/Icon";
 
 export function Presenter({ sessionId }: { sessionId: string }) {
   const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: 15000 });
@@ -28,7 +29,7 @@ export function Presenter({ sessionId }: { sessionId: string }) {
           <figure className="w-full max-w-6xl">
             {spot.data.image && !spot.data.stale ? <img src={spot.data.image} alt={`Spotlight: ${spot.data.student}`} className="w-full rounded-xl" />
               : <div className="grid aspect-video place-items-center rounded-xl bg-ink-800 text-ink-400">Screen unavailable</div>}
-            <figcaption className="mt-3 text-center text-xl font-semibold">⭐ {spot.data.student}</figcaption>
+            <figcaption className="mt-3 text-center text-xl font-semibold"><Icon name="star" className="inline h-5 w-5 align-[-3px] text-accent-400" /> {spot.data.student}</figcaption>
           </figure>
         ) : results && s?.responses_visible ? (
           <div className="w-full max-w-4xl space-y-6">

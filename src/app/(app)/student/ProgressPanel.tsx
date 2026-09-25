@@ -5,6 +5,7 @@ import { useRpc } from "@/lib/hooks";
 import { BADGE_HINT, BADGE_LABEL, CHALLENGE, type Progress } from "@/lib/progress";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
 
 type Board = { enabled: boolean; rows: { rank: number; name: string; xp: number; me: boolean }[] };
 
@@ -41,7 +42,7 @@ export function ProgressPanel() {
           </div>
           <div className="h-3 overflow-hidden rounded-full bg-ink-100" role="progressbar" aria-label="Progress to next level"
                aria-valuemin={0} aria-valuemax={span} aria-valuenow={into}>
-            <div className="h-full rounded-full bg-gradient-to-r from-brand-600 to-accent-600" style={{ width: `${(into / span) * 100}%` }} />
+            <div className="h-full rounded-full bg-brand-600" style={{ width: `${(into / span) * 100}%` }} />
           </div>
           <p className="text-xs text-ink-500">{(d.next_level_xp - d.xp).toLocaleString()} XP to level {d.level + 1}. Harder questions and explaining your reasoning earn more.</p>
           <ul className="flex flex-wrap gap-2" aria-label="Badges">
@@ -49,7 +50,7 @@ export function ProgressPanel() {
               <li key={b} title={BADGE_HINT[b]}>
                 <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium",
                   earned.has(b) ? "border-amber-300 bg-amber-50 text-amber-900" : "border-ink-200 bg-white text-ink-500")}>
-                  {earned.has(b) ? "🏅" : "🔒"} {BADGE_LABEL[b]}
+                  <Icon name={earned.has(b) ? "award" : "lock"} className="h-3.5 w-3.5" /> {BADGE_LABEL[b]}
                 </span>
               </li>
             ))}

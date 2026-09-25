@@ -91,7 +91,7 @@ export function ScreenRail({ state, screens, focus, onFocus }: {
 
   return (
     <div className="space-y-3">
-      <p className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-ink-500">
+      <p className="flex items-center justify-between text-[13px] font-semibold text-ink-600">
         <span>Screens</span><span>{joined.length} in class</span>
       </p>
       {joined.length === 0 && <p className="text-xs text-ink-500">Students appear here as soon as they join with the code.</p>}
@@ -154,7 +154,7 @@ export function FocusView({ state, studentId, sessionId, onMinimize, live }: {
           <Button size="sm" onClick={onMinimize}><Icon name="x" className="h-4 w-4" /> Minimize</Button>
         </div>
       </div>
-      <p className="rounded-lg bg-ink-100 px-3 py-1.5 text-xs text-ink-600">🔒 Only you can see this. Students' screens are unchanged and they still see your lesson.</p>
+      <p className="rounded-lg bg-ink-100 px-3 py-1.5 text-xs text-ink-600"><Icon name="lock" className="inline h-3.5 w-3.5 align-[-2px]" /> Only you can see this. Students' screens are unchanged and they still see your lesson.</p>
       {alert && (
         <Alert tone={LEFT_KINDS.has(alert.kind) ? "error" : "warn"} title={ALERT_LABEL[alert.kind] ?? alert.kind}>
           {alert.rule}{alert.domain && ` (${alert.domain})`}, {timeAgo(alert.created_at)}

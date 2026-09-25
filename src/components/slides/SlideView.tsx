@@ -51,9 +51,9 @@ export function SlideView({ slide, activitySlot, overlay, onVideoTime, videoRef 
   switch (slide.kind) {
     case "title":
       inner = (
-        <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-brand-600 to-accent-600 p-10 text-center text-white">
-          <h2 className="text-3xl font-extrabold sm:text-5xl">{c.heading || "Untitled"}</h2>
-          {c.body && <p className="mt-4 max-w-2xl text-lg text-white/85">{c.body}</p>}
+        <div className="flex h-full flex-col items-start justify-end bg-ink-950 p-8 text-left text-white sm:p-14"><span aria-hidden className="mb-5 h-2 w-16 rounded-full bg-accent-500 sm:mb-7" />
+          <h2 className="max-w-4xl text-3xl font-extrabold leading-[1.02] tracking-tightest text-white sm:text-6xl">{c.heading || "Untitled"}</h2>
+          {c.body && <p className="mt-4 max-w-2xl text-lg text-ink-300 sm:text-xl">{c.body}</p>}
         </div>
       );
       break;
@@ -133,7 +133,7 @@ export function SlideView({ slide, activitySlot, overlay, onVideoTime, videoRef 
     case "activity":
       inner = activitySlot ?? (
         <div className="flex h-full flex-col items-center justify-center gap-2 bg-brand-50 p-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">Activity</p>
+          <p className="text-[13px] font-semibold text-ink-600">Activity</p>
           <h2 className="text-2xl font-bold text-ink-900">{slide.activity?.title ?? "Activity"}</h2>
           {slide.activity?.instructions && <p className="max-w-lg text-ink-600">{slide.activity.instructions}</p>}
         </div>

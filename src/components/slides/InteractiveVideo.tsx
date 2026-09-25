@@ -66,7 +66,7 @@ export function InteractiveVideo({ slide, checkpoints, sessionId, shareCode }: {
         <SlideView slide={slide} videoRef={video} onVideoTime={onTime} />
         {active && q && (
           <div className="absolute inset-0 z-10 overflow-y-auto rounded-xl bg-white/95 p-6 backdrop-blur">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-brand-600">Checkpoint · {Math.floor(active.t_seconds / 60)}:{String(Math.round(active.t_seconds % 60)).padStart(2, "0")}</p>
+            <p className="mb-2 text-[13px] font-semibold text-ink-600">Checkpoint · {Math.floor(active.t_seconds / 60)}:{String(Math.round(active.t_seconds % 60)).padStart(2, "0")}</p>
             <Prompt q={q} />
             <div className="mt-3"><QuestionInput q={q} value={answer} onChange={setAnswer} disabled={!!result} /></div>
             {result && <div className="mt-3"><Alert tone={result.is_correct === false ? "warn" : "success"}>{result.is_correct === true ? "Correct!" : result.is_correct === false ? "Not quite." : "Saved."} {result.explanation}</Alert></div>}

@@ -63,3 +63,11 @@ test("school brand colours are made readable (white text >= 4.5:1), strong colou
   assert.equal(theme.paletteVars("brand", "#4f46e5")["--brand-600"], "79 70 229");
   assert.equal(theme.paletteVars("brand", "#1e3a8a")["--brand-600"], "30 58 138");
 });
+
+test("accent keeps the picked colour and chooses readable text on it", async () => {
+  const theme = await load("src/lib/theme.ts");
+  const lime = theme.paletteVars("accent", "#c8f03c");
+  assert.equal(lime["--accent-500"], "200 240 60");
+  assert.equal(lime["--accent-ink"], "21 20 17", "ink text on lime");
+  assert.equal(theme.paletteVars("accent", "#1e3a8a")["--accent-ink"], "255 255 255", "white text on navy");
+});

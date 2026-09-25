@@ -26,7 +26,7 @@ export default async function BillingPage(props: { searchParams: Promise<{ statu
       <PageHeader title="Plan & billing" subtitle={`Current plan: ${u.plan.name}`} />
       {searchParams.status === "success" && <div className="mb-4"><Alert tone="success">Payment received. Your plan updates as soon as the payment provider confirms it.</Alert></div>}
       {searchParams.status === "cancelled" && <div className="mb-4"><Alert tone="warn">Checkout was cancelled.</Alert></div>}
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-500">Usage (billing metrics)</h2>
+      <h2 className="mb-3 font-display text-[15px] font-bold text-ink-900">Usage (billing metrics)</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Active teachers (30d)" value={u.active_teachers_30d} sub={`limit ${limit("teachers")}`} />
         <Stat label="Active students (30d)" value={u.active_students_30d} />
@@ -38,7 +38,7 @@ export default async function BillingPage(props: { searchParams: Promise<{ statu
         <Stat label="Retention" value={`${u.retention.learning_days}d / ${u.retention.telemetry_days}d`} sub="learning / telemetry" />
       </div>
 
-      <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wider text-ink-500">Plans</h2>
+      <h2 className="mb-3 mt-8 font-display text-[15px] font-bold text-ink-900">Plans</h2>
       {!stripe && <div className="mb-3"><Alert>Online payments aren't set up on this server (no STRIPE_SECRET_KEY). Contact SwiftCipher to change plan manually, or use local payment options.</Alert></div>}
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
         {(plans ?? []).map((p) => (

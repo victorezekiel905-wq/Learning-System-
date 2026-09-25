@@ -157,7 +157,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
   } : null, [current, currentActivity]);
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+    <div className="flex min-h-[calc(100dvh-3.5rem)] lg:min-h-[calc(100dvh-4rem)] flex-col">
       <div className="flex flex-wrap items-center gap-3 border-b border-ink-200 bg-white px-4 py-2.5">
         <Link href="/teacher/lessons" className="text-sm">← Lessons</Link>
         <input className="min-w-[12rem] flex-1 rounded-md border border-transparent px-2 py-1 text-lg font-bold hover:border-ink-200 focus:border-brand-500 focus:outline-none"
@@ -179,14 +179,14 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
 
       {!canEdit && <div className="px-4 pt-3"><Alert>You're viewing a colleague's published lesson. Make a copy to edit it.</Alert></div>}
 
-      <div className="grid flex-1 lg:grid-cols-[220px_1fr]">
+      <div className="grid flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="border-r border-ink-200 bg-ink-50 p-3">
           <ol className="space-y-1.5">
             {local.map((s, i) => (
               <li key={s.id}>
                 <button onClick={() => { setSelected(s.id); setPanel(s.kind === "activity" ? "activity" : "slide"); }}
                   className={cn("w-full rounded-lg border px-2.5 py-2 text-left text-xs transition", s.id === selected ? "border-brand-400 bg-white shadow-sm" : "border-transparent hover:bg-white")}>
-                  <span className="flex items-center justify-between"><span className="font-bold text-ink-500">{i + 1}</span><span className="text-[10px] uppercase text-ink-500">{s.kind}</span></span>
+                  <span className="flex items-center justify-between"><span className="font-bold text-ink-500">{i + 1}</span><span className="text-[11px] capitalize text-ink-500">{s.kind}</span></span>
                   <span className="mt-0.5 block truncate font-medium text-ink-800">
                     {s.kind === "activity" ? activities.data?.[s.activity_id ?? ""]?.title ?? "Activity" : s.content.heading || s.content.caption || s.content.url || "Untitled"}
                   </span>

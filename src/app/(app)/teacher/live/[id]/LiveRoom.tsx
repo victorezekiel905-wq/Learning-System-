@@ -131,19 +131,28 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
-      <div className="flex flex-wrap items-center gap-4 border-b border-ink-200 bg-white px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-ink-500">{s.session.class_name}{s.session.lesson_title && ` · ${s.session.lesson_title}`}</p>
-          <h1 className="flex items-center gap-2 truncate text-lg font-bold"><span className="h-2.5 w-2.5 animate-pulse2 rounded-full bg-emerald-500" />{s.session.title}</h1>
+    <div className="flex min-h-[calc(100dvh-3.5rem)] lg:min-h-[calc(100dvh-4rem)] flex-col">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 bg-ink-950 px-4 py-3 text-white sm:px-6">
+        <div className="min-w-0 flex-1 basis-60">
+          <p className="truncate text-[13px] text-ink-400">{s.session.class_name}{s.session.lesson_title && ` · ${s.session.lesson_title}`}</p>
+          <h1 className="flex items-center gap-2.5 text-lg font-bold text-white sm:text-xl">
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-rose-600 px-1.5 py-1 text-[11px] font-bold leading-none text-white">
+              <span className="h-1.5 w-1.5 animate-pulse2 rounded-full bg-white" aria-hidden />LIVE</span>
+            <span className="truncate">{s.session.title}</span>
+          </h1>
         </div>
-        <div className="text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Join code</p>
-          <p className="font-mono text-2xl font-extrabold tracking-[0.2em] text-brand-700">{s.session.join_code}</p>
+        <div className="flex items-stretch gap-2.5">
+          <div className="rounded-xl bg-accent-500 px-3.5 py-1.5 text-accent-ink">
+            <p className="text-[11px] font-semibold leading-tight">Join code</p>
+            <p className="font-mono text-xl font-extrabold leading-tight tracking-[0.18em] sm:text-2xl">{s.session.join_code}</p>
+          </div>
+          <div className="rounded-xl border border-white/15 px-3.5 py-1.5">
+            <p className="text-[11px] font-semibold leading-tight text-ink-400">Students</p>
+            <p className="font-display text-xl font-extrabold leading-tight tabular-nums sm:text-2xl">{joined}<span className="text-ink-400">/{s.roster.length}</span></p>
+          </div>
         </div>
-        <div className="text-center"><p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Students</p><p className="text-lg font-bold">{joined}/{s.roster.length}</p></div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant={s.session.lockdown ? "primary" : "secondary"} aria-pressed={s.session.lockdown}
+        <div className="flex flex-wrap items-center gap-2 [&_.btn-secondary:hover]:bg-white/15 [&_.btn-secondary]:border-white/20 [&_.btn-secondary]:bg-white/5 [&_.btn-secondary]:text-white">
+          <Button size="sm" variant={s.session.lockdown ? "accent" : "secondary"} aria-pressed={s.session.lockdown}
             title={s.session.lockdown ? "Students must share their screen and stay in the full-screen lesson; leaving alerts you." : "Students can leave the lesson without an alert."}
             onClick={async () => {
               try { await rpc("set_session_lockdown", { p_session: sessionId, p_on: !s.session.lockdown }); void state.reload(); toast(s.session.lockdown ? "Lockdown off" : "Lockdown on", "info"); }
@@ -170,8 +179,8 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
         </div>
       )}
 
-      <div className="grid flex-1 lg:grid-cols-[220px_1fr] xl:grid-cols-[230px_1fr_300px]">
-        <aside className="border-b border-ink-200 bg-white p-3 lg:sticky lg:top-14 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r" aria-label="Student screens">
+      <div className="grid flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_300px]">
+        <aside className="min-w-0 border-b border-ink-200 bg-white p-3 lg:sticky lg:top-16 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r" aria-label="Student screens">
           <ScreenRail state={s} screens={screens} focus={focus} onFocus={setFocus} />
         </aside>
         <section className="min-w-0 p-4">
