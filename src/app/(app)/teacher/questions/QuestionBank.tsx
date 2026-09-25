@@ -19,7 +19,7 @@ export function QuestionBank({ me }: { me: { id: string; tenantId: string } }) {
 
   const rows = useLoader(async () => {
     let q = createClient().from("questions")
-      .select("id,kind,prompt,points,explanation,config,answer_key,tags,difficulty,in_bank,position,owner_id,activity_id,question_options(id,label,is_correct,feedback,position)")
+      .select("id,kind,prompt,points,explanation,config,answer_key,tags,difficulty,bloom_level,in_bank,position,owner_id,activity_id,question_options(id,label,is_correct,feedback,position)")
       .or(`in_bank.eq.true,and(owner_id.eq.${me.id},activity_id.is.null)`).order("created_at", { ascending: false }).limit(200);
     if (search.trim()) q = q.ilike("prompt", `%${search.trim().replace(/[%_]/g, "")}%`);
     if (kind) q = q.eq("kind", kind);

@@ -10,7 +10,7 @@ Recommended stack: **Vercel** (app) + **Supabase Pro** (database, auth, storage)
 
 1. **Upgrade the project to Pro.** Project → Settings → Billing. The free tier pauses inactive projects, has no backups, and caps realtime at about 200 connections, which is too few for several live classes.
 2. **Backups.** Pro includes daily backups kept for 7 days. For schools, also turn on **Point-in-Time Recovery** (Settings → Add-ons) so you can restore to any minute.
-3. **Apply the latest schema.** SQL Editor → New query → paste all of `supabase/updates/2026-09-24_production_release.sql` → Run. The last row should show `lockdown_ready`, `operations_ready` and `scale_ready` all `true`. It's safe to run twice. If you already ran it before 2026-09-25, also run `supabase/updates/2026-09-25_classroom_update.sql` (live screens over Realtime, anti-gaming rules, parental monitoring consent). `/api/health` should then show `"schema":"0780"`.
+3. **Apply the latest schema.** SQL Editor → New query → paste all of `supabase/updates/2026-09-24_production_release.sql` → Run. The last row should show `lockdown_ready`, `operations_ready` and `scale_ready` all `true`. It's safe to run twice. If you already ran it before 2026-09-25, also run `supabase/updates/2026-09-25_classroom_update.sql` (live screens over Realtime, anti-gaming rules, parental monitoring consent, differentiated and gamified learning). `/api/health` should then show `"schema":"0790"`.
 4. **Realtime.** Project Settings → Realtime: turn **off** "Allow public access", so only private channels (checked by `app.can_listen` / `app.can_send`) can be joined. For large deployments, raise the connection and message quotas with Supabase (see [SCALING.md](SCALING.md)).
 5. **Hourly maintenance.** Database → Extensions → enable **pg_cron**, then run the update file again once. It schedules `swiftcipher-maintenance` every hour. Check it with `select * from cron.job;`.
 6. **Rotate the service-role key** if it has ever been pasted anywhere (chat, email, screenshots): Settings → API → JWT Settings → *Generate new secret*. Then update it in Vercel and GitHub (below).
@@ -43,7 +43,7 @@ Recommended stack: **Vercel** (app) + **Supabase Pro** (database, auth, storage)
 | `NEXT_PUBLIC_TURN_*` | optional, for strict school networks ([SETUP.md §7](SETUP.md)) |
 
 3. **Domain.** Vercel → Domains → add your domain, then set the DNS records Vercel shows. HTTPS is automatic.
-4. Deploy. Then open `https://your-domain/api/health`. It should return `{"ok":true,"db":"up","schema":"0780",...}`, and `missing_legal_details` should be `[]`.
+4. Deploy. Then open `https://your-domain/api/health`. It should return `{"ok":true,"db":"up","schema":"0790",...}`, and `missing_legal_details` should be `[]`.
 
 Self-hosting instead? `docker build` with the same `NEXT_PUBLIC_*` values as `--build-arg`, then run the image with the server-only variables. The image has a health check built in.
 
@@ -71,7 +71,7 @@ Turn on email for failed workflows: GitHub → Settings → Notifications → Ac
 
 - [ ] Supabase Pro, PITR on, pg_cron scheduled (`select * from cron.job`), Realtime public access off
 - [ ] Load test passed on staging at your expected peak ([SCALING.md §5](SCALING.md))
-- [ ] `2026-09-24_production_release.sql` applied; `/api/health` shows `"schema":"0780"`
+- [ ] `2026-09-24_production_release.sql` applied; `/api/health` shows `"schema":"0790"`
 - [ ] Service-role key rotated; new key in Vercel and GitHub only
 - [ ] Custom SMTP working: sign up a test account and receive the email
 - [ ] Auth Site URL and Redirect URLs set to the production domain

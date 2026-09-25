@@ -909,6 +909,87 @@ test("parental monitoring consent: signed undertakings, parent portal, optional 
   await db.rpc(S.teacherA, "end_session", { p_session: s.id });
 });
 
+test("engaging learning: differentiated levels, reasoning, XP, badges, leaderboard, insights", async () => {
+  const t = S.teacherA;
+  // A differentiated activity: one easy, one core, one challenge and one untagged question.
+  const [act] = await db.as(t, `insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+    values ($1, $2, $3, 'quiz', 'Fractions', '{"differentiate":true,"show_feedback":"immediately"}') returning id`, [S.tenantA, S.lesson, t]);
+  const mk = async (prompt, difficulty, config = {}, pos = 0) => {
+    const [q] = await db.as(t, `insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, difficulty, config, points, position, bloom_level)
+      values ($1,$2,$3,'mcq',$4,$5,$6,1,$7,'analyze') returning id`, [S.tenantA, act.id, t, prompt, difficulty, JSON.stringify(config), pos]);
+    const opts = await db.as(t, `insert into public.question_options (tenant_id, question_id, label, is_correct, position)
+      values ($1,$2,'Right',true,0), ($1,$2,'Wrong',false,1) returning id, is_correct`, [S.tenantA, q.id]);
+    return { id: q.id, right: opts.find((o) => o.is_correct).id, wrong: opts.find((o) => !o.is_correct).id };
+  };
+  const easy = await mk("1/2 + 1/2?", 1, {}, 0);
+  const core = await mk("Which is bigger, 2/3 or 3/5?", 3, { require_reasoning: true }, 1);
+  const hard = await mk("Prove 1/n - 1/(n+1) = 1/(n(n+1))", 5, {}, 2);
+  const open = await mk("Any fraction equal to 0.5?", null, {}, 3);
+
+  // Levels: Ada chooses Extension herself (badge), the teacher puts Alan on Support.
+  await db.rpc(S.stu1, "choose_level", { p_class: S.classA, p_level: 3 });
+  await db.rpc(t, "set_student_level", { p_class: S.classA, p_student: S.stu2, p_level: 1 });
+  await rejects(db.rpc(S.stu1, "set_student_level", { p_class: S.classA, p_student: S.stu2, p_level: 3 }), /Not your class/);
+  assert.equal((await db.as(S.stu1, "select 1 from public.student_badges where badge = 'challenger'")).length, 1);
+
+  const adaBefore = (await db.rpc(S.stu1, "my_progress", {})).xp;
+  const alanBefore = (await db.rpc(S.stu2, "my_progress", {})).xp;
+  const s = await db.rpc(t, "start_session", { p_class: S.classA });
+  for (const u of [S.stu1, S.stu2]) await db.rpc(u, "join_session", { p_code: s.join_code });
+  await db.rpc(t, "set_session_state", { p_session: s.id, p_activity: act.id });
+  const ada = await db.rpc(S.stu1, "start_attempt", { p_activity: act.id, p_session: s.id });
+  const alan = await db.rpc(S.stu2, "start_attempt", { p_activity: act.id, p_session: s.id });
+  const ids = (a) => a.questions.map((q) => q.id).sort();
+  assert.deepEqual(ids(ada), [core.id, hard.id, open.id].sort(), "Extension: difficulty 3–5 + untagged");
+  assert.deepEqual(ids(alan), [easy.id, core.id, open.id].sort(), "Support: difficulty 1–3 + untagged");
+  assert.equal(ada.attempt.level, 3);
+  // The server enforces the band: Alan can't answer the challenge question.
+  await rejects(db.rpc(S.stu2, "submit_answer", { p_attempt: alan.attempt.id, p_question: hard.id, p_response: J({ option_id: hard.right }) }), /not part of your challenge level/);
+
+  // Critical thinking: reasoning required, confidence 1–5.
+  await rejects(db.rpc(S.stu1, "submit_answer", { p_attempt: ada.attempt.id, p_question: core.id, p_response: J({ option_id: core.right }) }), /Explain your reasoning/);
+  await rejects(db.rpc(S.stu1, "submit_answer", { p_attempt: ada.attempt.id, p_question: core.id, p_response: J({ option_id: core.right, reasoning: "Because 2/3 is 10/15 and 3/5 is 9/15.", confidence: 9 }) }), /Confidence/);
+  await db.rpc(S.stu1, "submit_answer", { p_attempt: ada.attempt.id, p_question: core.id, p_response: J({ option_id: core.right, reasoning: "Because 2/3 is 10/15 and 3/5 is 9/15.", confidence: 5 }) });
+  await db.rpc(S.stu1, "submit_answer", { p_attempt: ada.attempt.id, p_question: hard.id, p_response: J({ option_id: hard.right }) });
+  await db.rpc(S.stu1, "submit_answer", { p_attempt: ada.attempt.id, p_question: open.id, p_response: J({ option_id: open.right }) });
+  // Alan is confident but wrong: a likely misconception for the teacher.
+  await db.rpc(S.stu2, "submit_answer", { p_attempt: alan.attempt.id, p_question: core.id, p_response: J({ option_id: core.wrong, reasoning: "3/5 has bigger numbers so it is bigger.", confidence: 5 }) });
+  await db.rpc(S.stu1, "finish_attempt", { p_attempt: ada.attempt.id });
+
+  // XP: core 10 + reasoning 5 + challenge 20 + untagged 10 + completion 20 + perfect 20 = 85.
+  const p = await db.rpc(S.stu1, "my_progress", {});
+  assert.equal(p.xp - adaBefore, 85);
+  assert.equal(p.level, Math.max(1, Math.floor((1 + Math.sqrt(1 + 0.08 * p.xp)) / 2)));
+  assert.ok(p.badges.some((b) => b.badge === "first_steps") && p.badges.some((b) => b.badge === "perfectionist"));
+  assert.ok(p.classes.some((c) => c.class_id === S.classA && c.level === 3 && c.level_set_by === "student"));
+  assert.equal((await db.rpc(S.stu2, "my_progress", {})).xp - alanBefore, 5, "reasoning earns XP even when the answer is wrong");
+  assert.ok((await db.as(S.stu1, "select 1 from public.notifications where kind = 'badge'")).length >= 1, "badges notify");
+
+  // Teacher shout-out; leaderboard shows first name + initial to classmates.
+  await db.rpc(t, "award_xp", { p_student: S.stu2, p_points: 20, p_reason: "Great explanation to the class", p_class: S.classA });
+  await rejects(db.rpc(S.stu1, "award_xp", { p_student: S.stu1, p_points: 50, p_reason: "me" }), /Not your student/);
+  const board = await db.rpc(S.stu2, "class_leaderboard", { p_class: S.classA, p_period: "week" });
+  assert.equal(board.rows[0].name, "Ada L.");
+  assert.ok(board.rows.some((r) => r.me && r.name === "Alan Turing"));
+  assert.equal((await db.rpc(t, "class_leaderboard", { p_class: S.classA })).rows[0].name, "Ada Lovelace");
+  await db.rpc(t, "set_class_engagement", { p_class: S.classA, p_leaderboard: false, p_student_choice: false });
+  assert.equal((await db.rpc(S.stu2, "class_leaderboard", { p_class: S.classA })).enabled, false);
+  await rejects(db.rpc(S.stu2, "choose_level", { p_class: S.classA, p_level: 3 }), /teacher sets the challenge level/);
+  await rejects(db.rpc(S.adminB, "class_leaderboard", { p_class: S.classA }), /not found/);
+
+  // Teacher insights: confident-but-wrong and the reasoning; level suggestions.
+  const ins = await db.rpc(t, "question_insights", { p_activity: act.id, p_session: s.id });
+  const qi = ins.find((q) => q.question_id === core.id);
+  assert.equal(qi.confident_wrong, 1);
+  assert.equal(qi.bloom_level, "analyze");
+  assert.ok(qi.reasoning.some((r) => /bigger numbers/.test(r.text) && r.correct === false && r.confidence === 5));
+  await rejects(db.rpc(S.stu1, "question_insights", { p_activity: act.id }), /not found/);
+  const lv = await db.rpc(t, "class_levels", { p_class: S.classA });
+  assert.ok(lv.some((r) => r.student_id === S.stu1 && r.level === 3));
+  await db.rpc(t, "set_class_engagement", { p_class: S.classA, p_leaderboard: true, p_student_choice: true });
+  await db.rpc(t, "end_session", { p_session: s.id });
+});
+
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {
   const before = (await db.admin("select count(*)::int n from public.users where tenant_id = $1", [S.tenantA]))[0].n;
   assert.ok(before > 3);

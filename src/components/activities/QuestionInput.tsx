@@ -24,18 +24,73 @@ export function Prompt({ q }: { q: PublicQuestion }) {
   );
 }
 
-/**
- * Answer widget for every question kind. `value` is the JSON response the
- * server grades (see app.grade_response in migration 0610).
- */
-export function QuestionInput({ q, value, onChange, disabled, uploadPrefix, reveal }: {
+/** Kinds where a student can (or must) explain their thinking alongside the answer. */
+const REASONING_KINDS = new Set(["mcq", "multi_select", "true_false", "short", "fill_blank", "ordering", "matching", "categorize"]);
+const MIN_REASONING = 15;
+export const requiresReasoning = (q: PublicQuestion) =>
+  REASONING_KINDS.has(q.kind) && !!(q.config as { require_reasoning?: boolean }).require_reasoning;
+
+type AnswerProps = {
   q: PublicQuestion;
   value: Answer | undefined;
   onChange: (v: Answer) => void;
   disabled?: boolean;
   uploadPrefix?: string;
   reveal?: { correct_option_ids?: string[] };
-}) {
+};
+
+/**
+ * The answer plus, for reasoning-friendly kinds, "Explain your reasoning" and a
+ * confidence rating (critical thinking + metacognition). Required when the teacher
+ * asks for it; otherwise optional and worth +5 XP.
+ */
+export function QuestionInput(props: AnswerProps) {
+  const { q, value, onChange, disabled } = props;
+  const v = value ?? {};
+  const reasoning = (v.reasoning as string | undefined) ?? "";
+  const confidence = v.confidence as number | undefined;
+  const extra = { ...(reasoning ? { reasoning } : {}), ...(confidence ? { confidence } : {}) };
+  // Answer widgets replace the whole response; keep the student's reasoning and confidence.
+  const widget = <AnswerWidget {...props} onChange={(next) => onChange({ ...next, ...extra })} />;
+  if (!REASONING_KINDS.has(q.kind)) return widget;
+  const required = requiresReasoning(q);
+  const set = (p: Answer) => onChange({ ...v, ...p });
+  return (
+    <div className="space-y-4">
+      {widget}
+      <div className={cn("space-y-3 rounded-xl border p-4", required ? "border-brand-200 bg-brand-50/50" : "border-ink-200 bg-ink-50")}>
+        <label className="block">
+          <span className="label">{required ? "Explain your reasoning (required)" : "Explain your reasoning (optional, +5 XP)"}</span>
+          <Textarea rows={3} maxLength={2000} disabled={disabled} value={reasoning}
+            placeholder="Why is this your answer? What evidence or steps led you there?"
+            onChange={(e) => set({ reasoning: e.target.value })} />
+          {required && reasoning.trim().length > 0 && reasoning.trim().length < MIN_REASONING && (
+            <span className="hint block">Write at least a full sentence.</span>
+          )}
+        </label>
+        <fieldset>
+          <legend className="label">How sure are you?</legend>
+          <div className="flex flex-wrap gap-2" role="radiogroup">
+            {[["1", "Guessing"], ["2", "Unsure"], ["3", "Fairly sure"], ["4", "Sure"], ["5", "Certain"]].map(([n, label]) => (
+              <button key={n} type="button" role="radio" aria-checked={confidence === Number(n)} disabled={disabled}
+                onClick={() => set({ confidence: Number(n) })}
+                className={cn("rounded-full border px-3 py-1 text-xs font-medium",
+                  confidence === Number(n) ? "border-brand-600 bg-brand-600 text-white" : "border-ink-300 bg-white text-ink-700 hover:border-brand-400")}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Answer widget for every question kind. `value` is the JSON response the
+ * server grades (see app.grade_response in migration 0610).
+ */
+function AnswerWidget({ q, value, onChange, disabled, uploadPrefix, reveal }: AnswerProps) {
   const v = value ?? {};
   switch (q.kind) {
     case "mcq":
@@ -147,6 +202,7 @@ export function QuestionInput({ q, value, onChange, disabled, uploadPrefix, reve
 /** Is the response complete enough to submit? */
 export function isAnswered(q: PublicQuestion, v: Answer | undefined): boolean {
   if (!v) return false;
+  if (requiresReasoning(q) && ((v.reasoning as string | undefined) ?? "").trim().length < MIN_REASONING) return false;
   switch (q.kind) {
     case "mcq": case "true_false": case "poll": return !!v.option_id;
     case "multi_select": return ((v.option_ids as string[]) ?? []).length > 0;

@@ -79,6 +79,8 @@ export type ActivitySettings = {
   attempts_allowed?: number;
   shuffle_questions?: boolean;
   shuffle_options?: boolean;
+  /** Give each student the questions for their challenge level (migration 0790). */
+  differentiate?: boolean;
   show_feedback?: "immediately" | "after_submit" | "never";
   rubric_id?: string;
 };

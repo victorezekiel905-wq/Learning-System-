@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Item, QuestionKind } from "@/lib/types";
+import { BLOOM } from "@/lib/progress";
 import { uid } from "@/lib/utils";
 import { Badge, Button, Field, Input, Select, Textarea, Toggle, useToast } from "@/components/ui";
 
@@ -17,6 +18,7 @@ export type EditableQuestion = {
   options: EditableOption[];
   tags: string[];
   difficulty: number | null;
+  bloom_level: string | null;
   in_bank: boolean;
   position: number;
 };
@@ -28,7 +30,7 @@ export const KIND_LABEL: Record<QuestionKind, string> = {
 };
 
 export function blankQuestion(kind: QuestionKind, position = 0): EditableQuestion {
-  const base: EditableQuestion = { kind, prompt: "", points: kind === "poll" ? 0 : 1, explanation: null, config: {}, answer_key: {}, options: [], tags: [], difficulty: null, in_bank: false, position };
+  const base: EditableQuestion = { kind, prompt: "", points: kind === "poll" ? 0 : 1, explanation: null, config: {}, answer_key: {}, options: [], tags: [], difficulty: null, bloom_level: null, in_bank: false, position };
   if (kind === "mcq" || kind === "multi_select") base.options = [{ label: "", is_correct: true }, { label: "", is_correct: false }, { label: "", is_correct: false }];
   if (kind === "poll") base.options = [{ label: "", is_correct: false }, { label: "", is_correct: false }];
   if (kind === "true_false") base.options = [{ label: "True", is_correct: true }, { label: "False", is_correct: false }];
@@ -55,7 +57,7 @@ export async function saveQuestion(q: EditableQuestion, ctx: { tenantId: string;
   const row = {
     tenant_id: ctx.tenantId, owner_id: ctx.ownerId, activity_id: ctx.activityId, kind: q.kind, prompt: q.prompt.trim(),
     points: q.points, explanation: q.explanation || null, config, answer_key: key, tags: q.tags, difficulty: q.difficulty,
-    in_bank: q.in_bank, position: q.position
+    bloom_level: q.bloom_level, in_bank: q.in_bank, position: q.position
   };
   const { data, error } = q.id
     ? await sb.from("questions").update(row).eq("id", q.id).select("id").single()
@@ -247,10 +249,25 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Points"><Input type="number" min={0} max={1000} step="0.5" value={q.points} onChange={(e) => set({ points: Number(e.target.value) })} /></Field>
-        <Field label="Difficulty"><Select value={q.difficulty ?? ""} onChange={(e) => set({ difficulty: e.target.value ? Number(e.target.value) : null })}>
-          <option value="">—</option>{[1, 2, 3, 4, 5].map((d) => <option key={d} value={d}>{d}</option>)}
-        </Select></Field>
+        <Field label="Difficulty" hint="Used for differentiation: Support gets 1–3, Core 2–4, Extension 3–5. Leave blank for everyone.">
+          <Select value={q.difficulty ?? ""} onChange={(e) => set({ difficulty: e.target.value ? Number(e.target.value) : null })}>
+            <option value="">Everyone</option>
+            {[[1, "1 · Foundation"], [2, "2 · Easy"], [3, "3 · Core"], [4, "4 · Stretch"], [5, "5 · Challenge"]].map(([d, l]) => <option key={d} value={d}>{l}</option>)}
+          </Select>
+        </Field>
         <Field label="Tags"><Input value={tagText} onChange={(e) => setTagText(e.target.value)} onBlur={() => set({ tags: tagText.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean).slice(0, 10) })} placeholder="html, week 2" /></Field>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Thinking skill (Bloom's)" hint="Shows in insights so you can balance recall with higher-order thinking.">
+          <Select value={q.bloom_level ?? ""} onChange={(e) => set({ bloom_level: e.target.value || null })}>
+            <option value="">Not set</option>
+            {BLOOM.map((b) => <option key={b.v} value={b.v}>{b.label}: {b.hint}</option>)}
+          </Select>
+        </Field>
+        {["mcq", "multi_select", "true_false", "short", "fill_blank", "ordering", "matching", "categorize"].includes(q.kind) && (
+          <Toggle checked={Boolean(q.config.require_reasoning)} onChange={(v) => setConfig({ require_reasoning: v })}
+            label="Students must explain their reasoning" description="Plus a confidence rating. You'll see confident-but-wrong answers (likely misconceptions)." />
+        )}
       </div>
       <Field label="Explanation shown after answering (optional)"><Textarea rows={2} value={q.explanation ?? ""} onChange={(e) => set({ explanation: e.target.value })} /></Field>
       <Toggle checked={q.in_bank} onChange={(v) => set({ in_bank: v })} label="Share in the school question bank" description="Other teachers in your school can reuse it." />

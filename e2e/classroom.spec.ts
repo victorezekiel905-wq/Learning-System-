@@ -105,6 +105,12 @@ test.describe("live classroom", () => {
     await expect(sPage.getByRole("dialog")).toBeHidden();
     await expect(tile.getByText("LEFT CLASS", { exact: true })).toHaveCount(0, { timeout: 30_000 });
     await expect(tPage.getByText(/E2E Student is back in the lesson/).first()).toBeVisible({ timeout: 15_000 });
+
+    // Closing the tab is leaving too: the teacher is told straight away.
+    const closedAt = Date.now();
+    await sPage.close({ runBeforeUnload: true });
+    await expect(tPage.getByText(/E2E Student left the lesson: Closed the lesson/).first()).toBeVisible({ timeout: 15_000 });
+    console.log(`teacher told of closed tab after ${((Date.now() - closedAt) / 1000).toFixed(1)} s`);
     const { count } = await admin().from("environment_events").select("id", { count: "exact", head: true })
       .eq("class_session_id", sessionId).is("resolved_at", null);
     expect(count).toBe(0);

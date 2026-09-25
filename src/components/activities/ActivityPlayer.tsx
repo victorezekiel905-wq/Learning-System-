@@ -9,9 +9,10 @@ import type { ActivitySettings, PublicQuestion } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CollabBoard } from "./CollabBoard";
 import { isAnswered, Prompt, QuestionInput, type Answer } from "./QuestionInput";
+import { BADGE_LABEL, CHALLENGE, type Progress } from "@/lib/progress";
 
 type Started = {
-  attempt: { id: string; attempt_no: number; deadline_at: string | null; status: string; server_now: string };
+  attempt: { id: string; attempt_no: number; deadline_at: string | null; status: string; server_now: string; level?: 1 | 2 | 3 | null };
   activity: { id: string; kind: string; title: string; instructions: string | null; settings: ActivitySettings };
   questions: PublicQuestion[];
   answers: Record<string, Answer>;
@@ -40,6 +41,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   const [index, setIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [finished, setFinished] = useState<Finished | null>(null);
+  const [reward, setReward] = useState<{ xp: number; level: number; levelUp: boolean; badges: string[] } | null>(null);
   const [skew, setSkew] = useState(0);
   const [shownAt, setShownAt] = useState(() => Date.now());
   const { pending } = useOfflineQueue((m) => toast(`An offline answer was rejected: ${m}`, "error"));
@@ -107,8 +109,15 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   async function finish() {
     setSaving(true);
     try {
+      const before = await rpc<Progress>("my_progress").catch(() => null);
       const r = await rpc<Finished>("finish_attempt", { p_attempt: data!.attempt.id });
       setFinished(r);
+      const after = await rpc<Progress>("my_progress").catch(() => null);
+      if (before && after) {
+        const had = new Set(before.badges.map((b) => b.badge));
+        setReward({ xp: after.xp - before.xp, level: after.level, levelUp: after.level > before.level,
+                    badges: after.badges.map((b) => b.badge).filter((b) => !had.has(b)) });
+      }
       onFinished?.();
     } catch (e) { toast(errorText(e), "error"); }
     setSaving(false);
@@ -125,6 +134,13 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
             <Badge tone="brand" className="text-sm">{Number(finished.attempt.score ?? 0)} / {Number(finished.attempt.max_score)}{pendingReview && " so far"}</Badge>
           ) : null}
         </div>
+        {reward && reward.xp > 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900" role="status">
+            <span className="font-display text-2xl font-extrabold">+{reward.xp} XP</span>
+            <span className="text-sm">{reward.levelUp ? `Level up! You're now level ${reward.level}.` : `Level ${reward.level}`}</span>
+            {reward.badges.map((b) => <Badge key={b} tone="amber">🏅 {BADGE_LABEL[b] ?? b}</Badge>)}
+          </div>
+        )}
         {pendingReview && <Alert>Some answers will be marked by your teacher. You'll get a notification when they're reviewed.</Alert>}
         {finished.results && (
           <ul className="space-y-3">
@@ -165,6 +181,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
           {questions.length > 1 && <p className="text-xs text-ink-500">Question {index + 1} of {questions.length} · {answeredCount} answered</p>}
         </div>
         <div className="flex items-center gap-2">
+          {data.attempt.level && <span title={CHALLENGE[data.attempt.level].hint}><Badge tone="brand">{CHALLENGE[data.attempt.level].name} challenge</Badge></span>}
           {pending > 0 && <Badge tone="amber">{pending} waiting to sync</Badge>}
           {remaining !== null && <Badge tone={remaining < 30 ? "red" : "gray"}>⏱ {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</Badge>}
         </div>

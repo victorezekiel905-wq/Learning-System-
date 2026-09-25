@@ -36,7 +36,8 @@ function toEditable(row: Record<string, unknown>): EditableQuestion {
     id: row.id as string, kind: row.kind as QuestionKind, prompt: row.prompt as string, points: Number(row.points),
     explanation: (row.explanation as string) ?? null, config: (row.config as Record<string, unknown>) ?? {},
     answer_key: (row.answer_key as Record<string, unknown>) ?? {}, tags: (row.tags as string[]) ?? [],
-    difficulty: (row.difficulty as number) ?? null, in_bank: Boolean(row.in_bank), position: Number(row.position ?? 0),
+    difficulty: (row.difficulty as number) ?? null, bloom_level: (row.bloom_level as string) ?? null,
+    in_bank: Boolean(row.in_bank), position: Number(row.position ?? 0),
     options: ((row.question_options as (EditableOption & { position: number })[]) ?? [])
       .sort((a, b) => a.position - b.position)
       .map((o) => ({ id: o.id, label: o.label, is_correct: o.is_correct, feedback: o.feedback }))
@@ -55,7 +56,7 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
 
   const questions = useLoader(async () => {
     const { data, error } = await createClient().from("questions")
-      .select("id,kind,prompt,points,explanation,config,answer_key,tags,difficulty,in_bank,position,question_options(id,label,is_correct,feedback,position)")
+      .select("id,kind,prompt,points,explanation,config,answer_key,tags,difficulty,bloom_level,in_bank,position,question_options(id,label,is_correct,feedback,position)")
       .eq("activity_id", activity.id).order("position").order("created_at");
     if (error) throw error;
     return (data ?? []).map((r) => toEditable(r as Record<string, unknown>));
@@ -106,6 +107,7 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
           <Field label="Attempts allowed (0 = unlimited)"><Input type="number" min={0} max={20} value={meta.settings.attempts_allowed ?? 1} onChange={(e) => setSettings({ attempts_allowed: Number(e.target.value) })} /></Field>
           <Toggle checked={Boolean(meta.settings.shuffle_questions)} onChange={(v) => setSettings({ shuffle_questions: v })} label="Randomise question order" description="Each attempt gets its own reproducible order." />
           <Toggle checked={Boolean(meta.settings.shuffle_options)} onChange={(v) => setSettings({ shuffle_options: v })} label="Shuffle answer options" />
+          <Toggle checked={Boolean(meta.settings.differentiate)} onChange={(v) => setSettings({ differentiate: v })} label="Differentiate by challenge level" description="Each student gets the questions for their level (Support 1–3, Core 2–4, Extension 3–5 by difficulty). Set levels on the class page; students can choose their own if you allow it." />
           {rubrics && (meta.kind === "short_answer" || meta.kind === "quiz" || meta.kind === "open_ended") && (
             <Field label="Rubric for review"><Select value={meta.settings.rubric_id ?? ""} onChange={(e) => setSettings({ rubric_id: e.target.value || undefined })}>
               <option value="">None</option>{rubrics.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
@@ -175,7 +177,7 @@ function BankPicker({ allowed, onClose, onPick }: { allowed: QuestionKind[]; onC
   const [busy, setBusy] = useState(false);
   const bank = useLoader(async () => {
     let q = createClient().from("questions")
-      .select("id,kind,prompt,points,explanation,config,answer_key,tags,difficulty,in_bank,position,question_options(id,label,is_correct,feedback,position)")
+      .select("id,kind,prompt,points,explanation,config,answer_key,tags,difficulty,bloom_level,in_bank,position,question_options(id,label,is_correct,feedback,position)")
       .or("in_bank.eq.true,activity_id.is.null").in("kind", allowed).order("created_at", { ascending: false }).limit(100);
     if (search.trim()) q = q.ilike("prompt", `%${search.trim().replace(/[%_]/g, "")}%`);
     const { data } = await q;

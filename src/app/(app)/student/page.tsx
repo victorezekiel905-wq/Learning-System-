@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/session";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { formatDateTime } from "@/lib/utils";
+import { ProgressPanel } from "./ProgressPanel";
 
 export const metadata = { title: "Home" };
 
@@ -41,6 +42,8 @@ export default async function StudentHome() {
       {h.live.some((s) => s.environment_active) && h.devices > 0 && (
         <div className="mb-4"><Alert>A managed class session is active. While it runs, your teacher can see the site you're on and a low-resolution picture of your screen. <Link href="/student/device">What's shared?</Link></Alert></div>
       )}
+
+      <ProgressPanel />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2" title={`To do (${todo.length})`}>

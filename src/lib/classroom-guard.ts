@@ -224,11 +224,18 @@ export function useClassroomGuard(sessionId: string, opts: {
   useEffect(() => {
     if (!opts.live) return;
     let hiddenShot: number | undefined;
+    let hiddenReport: number | undefined;
+    let leaving = false;
     let nudge: Notification | null = null;
     const onChange = () => {
+      if (leaving) return;
       const v = lessonInFront(), f = isFullscreen();
       setVisible(v); setFullscreen(f);
-      void report({ visible: v, fullscreen: f });
+      window.clearTimeout(hiddenReport);
+      // Closing a tab fires "hidden" just before "pagehide". Wait a moment so a close
+      // is reported as "Closed the lesson" (below) rather than "switched tab".
+      if (document.hidden) hiddenReport = window.setTimeout(() => { if (!leaving) void report({ visible: v, fullscreen: f }); }, 400);
+      else void report({ visible: v, fullscreen: f });
       window.clearTimeout(hiddenShot);
       const leftLesson = !v || (!f && !!directivesRef.current?.lockdown && canFullscreen());
       // Store what they switched to, as evidence for the teacher's alert.
@@ -245,16 +252,31 @@ export function useClassroomGuard(sessionId: string, opts: {
         nudge?.close(); nudge = null;
       }
     };
+    // Closing the tab or browser (or navigating away): tell the server at once, so the
+    // teacher's "left the lesson" pop-up is instant rather than waiting for silence.
+    const bye = () => {
+      leaving = true;
+      window.clearTimeout(hiddenReport);
+      try {
+        navigator.sendBeacon("/api/live/leave", new Blob([JSON.stringify({ session_id: sessionId })], { type: "application/json" }));
+      } catch { /* best effort; the server also notices the silence */ }
+    };
+    // Coming back from the back/forward cache: the lesson is open again.
+    const back = (e: PageTransitionEvent) => { if (e.persisted) { leaving = false; onChange(); } };
     const input = () => { lastInput.current = Date.now(); };
     const events: [EventTarget, string][] = [[document, "visibilitychange"], [document, "fullscreenchange"], [window, "blur"], [window, "focus"]];
     events.forEach(([t, e]) => t.addEventListener(e, onChange));
+    window.addEventListener("pagehide", bye);
+    window.addEventListener("pageshow", back);
     ["pointermove", "keydown", "touchstart"].forEach((e) => window.addEventListener(e, input, { passive: true }));
     onChange();
-    const tick = window.setInterval(() => void report(), tickMs);
+    const tick = window.setInterval(() => { if (!leaving) void report(); }, tickMs);
     return () => {
       events.forEach(([t, e]) => t.removeEventListener(e, onChange));
+      window.removeEventListener("pagehide", bye);
+      window.removeEventListener("pageshow", back);
       ["pointermove", "keydown", "touchstart"].forEach((e) => window.removeEventListener(e, input));
-      window.clearInterval(tick); window.clearTimeout(hiddenShot); nudge?.close();
+      window.clearInterval(tick); window.clearTimeout(hiddenShot); window.clearTimeout(hiddenReport); nudge?.close();
     };
   }, [opts.live, report, storeFrame, tickMs, sessionId]);
 

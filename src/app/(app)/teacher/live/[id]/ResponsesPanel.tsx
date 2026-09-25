@@ -5,10 +5,11 @@ import { CollabBoard } from "@/components/activities/CollabBoard";
 import { Alert, Badge, Button, Card, Empty, Select, useToast } from "@/components/ui";
 import type { ActivityResults, SessionState } from "@/components/live/types";
 import { createClient } from "@/lib/supabase/client";
-import { useLoader } from "@/lib/hooks";
+import { useLoader, useRpc } from "@/lib/hooks";
 import { errorText, rpc } from "@/lib/rpc";
 import { pct } from "@/lib/utils";
 import type { Me } from "./LiveRoom";
+import { ThinkingInsights, type Insight } from "./ThinkingInsights";
 
 export function ResponsesPanel({ state, me, reload }: { state: SessionState; me: Me; reload: () => Promise<void> }) {
   const toast = useToast();
@@ -32,6 +33,9 @@ export function ResponsesPanel({ state, me, reload }: { state: SessionState; me:
   }, [activityId, state.activity], { intervalMs: 5000 });
 
   const act = (activities.data ?? []).find((a) => a.id === activityId);
+  // One request for all questions' reasoning and misconception counts.
+  const insights = useRpc<Insight[]>("question_insights", { p_activity: activityId, p_session: s.id }, [activityId, s.id],
+    { intervalMs: 8000, enabled: !!activityId && act?.kind !== "collab_board" });
   const r = results.data;
 
   async function launch(id: string | null) {
@@ -87,6 +91,7 @@ export function ResponsesPanel({ state, me, reload }: { state: SessionState; me:
                     </ul>
                   )}
                   {q.avg_elapsed_ms ? <p className="mt-2 text-xs text-ink-500">Average time {Math.round(q.avg_elapsed_ms / 1000)}s</p> : null}
+                  <ThinkingInsights insight={insights.data?.find((x) => x.question_id === q.question_id)} />
                 </Card>
               );
             })}
