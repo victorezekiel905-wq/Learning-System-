@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { RichText } from "@/components/RichText";
+import { ReadAloud } from "@/components/ReadAloud";
 import { Whiteboard } from "@/components/slides/Whiteboard";
 import { Textarea } from "@/components/ui";
 import { useSignedUrl } from "@/lib/media";
@@ -13,12 +14,20 @@ export type Answer = Record<string, unknown>;
 
 const LETTERS = "ABCDEFGH";
 
-/** Prompt text with "___" rendered as blanks for fill-in questions. */
-export function Prompt({ q }: { q: PublicQuestion }) {
+/**
+ * Prompt text with "___" rendered as blanks for fill-in questions, a Read aloud
+ * button (question and choices), and credit when a classmate wrote the question.
+ */
+export function Prompt({ q, readAloud }: { q: PublicQuestion; readAloud?: "offer" | "emphasis" }) {
   const img = useSignedUrl(q.media?.media_path);
+  const spoken = [q.prompt, ...q.options.map((o, i) => `${LETTERS[i] ?? ""}: ${o.label}`)].join(". ");
   return (
     <div className="space-y-3">
-      {q.kind !== "fill_blank" && <RichText text={q.prompt} className="text-lg font-semibold text-ink-900" />}
+      <div className="flex items-start justify-between gap-3">
+        {q.kind !== "fill_blank" ? <RichText text={q.prompt} className="min-w-0 text-lg font-semibold text-ink-900" /> : <span />}
+        {readAloud && <ReadAloud text={spoken} emphasis={readAloud === "emphasis"} />}
+      </div>
+      {q.config.authored_by && <p className="text-[13px] font-medium text-ink-500">Question written by {q.config.authored_by}</p>}
       {(img || q.media?.url) && <img src={img ?? q.media.url} alt={q.media.alt ?? ""} className="max-h-64 rounded-lg border border-ink-200" />}
     </div>
   );

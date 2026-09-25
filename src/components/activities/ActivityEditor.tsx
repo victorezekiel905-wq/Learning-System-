@@ -7,6 +7,7 @@ import type { ActivityKind, ActivitySettings, PublicQuestion, QuestionKind } fro
 import { Alert, Badge, Button, Card, Field, Input, Modal, Select, Textarea, Toggle, useToast } from "@/components/ui";
 import { blankQuestion, KIND_LABEL, QuestionEditor, saveQuestion, type EditableOption, type EditableQuestion } from "./QuestionEditor";
 import { Prompt, QuestionInput } from "./QuestionInput";
+import { StudentQuestions } from "./StudentQuestions";
 
 export const ACTIVITY_LABEL: Record<ActivityKind, string> = {
   multiple_choice: "Multiple choice", poll: "Poll", open_ended: "Open-ended response", quiz: "Quiz (multiple questions)",
@@ -108,6 +109,8 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
           <Toggle checked={Boolean(meta.settings.shuffle_questions)} onChange={(v) => setSettings({ shuffle_questions: v })} label="Randomise question order" description="Each attempt gets its own reproducible order." />
           <Toggle checked={Boolean(meta.settings.shuffle_options)} onChange={(v) => setSettings({ shuffle_options: v })} label="Shuffle answer options" />
           <Toggle checked={Boolean(meta.settings.differentiate)} onChange={(v) => setSettings({ differentiate: v })} label="Differentiate by challenge level" description="Each student gets the questions for their level (Support 1–3, Core 2–4, Extension 3–5 by difficulty). Set levels on the class page; students can choose their own if you allow it." />
+          <Toggle checked={Boolean(meta.settings.redemption)} onChange={(v) => setSettings({ redemption: v, ...(v ? { show_feedback: "immediately" as const } : {}) })}
+            label="Second chance on wrong answers" description="A wrong answer gets one more try for half the points before the answer is shown. Turns on instant feedback. Answers can't be changed once the answer is shown." />
           {rubrics && (meta.kind === "short_answer" || meta.kind === "quiz" || meta.kind === "open_ended") && (
             <Field label="Rubric for review"><Select value={meta.settings.rubric_id ?? ""} onChange={(e) => setSettings({ rubric_id: e.target.value || undefined })}>
               <option value="">None</option>{rubrics.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
@@ -156,6 +159,8 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
           </ul>
         </Card>
       )}
+
+      {(meta.kind === "quiz" || meta.kind === "multiple_choice") && <StudentQuestions activityId={activity.id} onAdded={() => void questions.reload()} />}
 
       {bankOpen && <BankPicker allowed={allowed} onClose={() => setBankOpen(false)} onPick={async (qs) => {
         for (const [i, q] of qs.entries()) {

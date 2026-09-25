@@ -7,6 +7,7 @@ import { useLoader } from "@/lib/hooks";
 import { api, errorText, rpc } from "@/lib/rpc";
 import { formatDate } from "@/lib/utils";
 import { LevelsPanel } from "./LevelsPanel";
+import { SupportsPanel } from "./SupportsPanel";
 import {
   Alert, Avatar, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, PageHeader, Select, Tabs, Textarea, useToast
 } from "@/components/ui";
@@ -17,7 +18,7 @@ type Member = { user_id: string; role: string; joined_at: string; users: { full_
 export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
   cls: Cls; canManage: boolean; isAdmin: boolean; policies: { id: string; name: string }[]; teachers: { id: string; full_name: string }[];
 }) {
-  const [tab, setTab] = useState<"roster" | "levels" | "groups" | "attendance" | "settings">("roster");
+  const [tab, setTab] = useState<"roster" | "levels" | "supports" | "groups" | "attendance" | "settings">("roster");
   const members = useLoader(async () => {
     const { data, error } = await createClient().from("class_members")
       .select("user_id,role,joined_at,users(full_name,email)").eq("class_id", cls.id).order("role", { ascending: false });
@@ -32,6 +33,7 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
         subtitle={[cls.subject, cls.grade_level].filter(Boolean).join(" · ") || undefined}
         actions={canManage && <>
           <Link href={`/teacher/insights?class=${cls.id}`} className="btn btn-secondary no-underline">Analytics</Link>
+          <a href={`/api/classes/${cls.id}/gradebook`} className="btn btn-secondary no-underline" download>Export gradebook</a>
           <Link href={`/teacher/live/new?class=${cls.id}`} className="btn btn-primary no-underline">Go live</Link>
         </>} />
 
@@ -39,7 +41,7 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
 
       <Tabs className="mb-5" value={tab} onChange={setTab} tabs={[
         { id: "roster", label: `Roster (${students.length})` },
-        ...(canManage ? [{ id: "levels" as const, label: "Levels & XP" }] : []),
+        ...(canManage ? [{ id: "levels" as const, label: "Levels & XP" }, { id: "supports" as const, label: "Supports" }] : []),
         { id: "groups", label: "Groups" },
         { id: "attendance", label: "Attendance" },
         ...(canManage ? [{ id: "settings" as const, label: "Settings" }] : [])
@@ -47,6 +49,7 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
 
       {tab === "roster" && <Roster cls={cls} canManage={canManage} members={members.data ?? []} loading={members.loading} reload={members.reload} />}
       {tab === "levels" && canManage && <LevelsPanel classId={cls.id} />}
+      {tab === "supports" && canManage && <SupportsPanel classId={cls.id} />}
       {tab === "groups" && <Groups cls={cls} canManage={canManage} students={students} policies={policies} />}
       {tab === "attendance" && <Attendance cls={cls} canManage={canManage} students={students} />}
       {tab === "settings" && canManage && <Settings cls={cls} isAdmin={isAdmin} teachers={teachers} />}

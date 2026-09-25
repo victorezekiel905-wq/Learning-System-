@@ -990,6 +990,137 @@ test("engaging learning: differentiated levels, reasoning, XP, badges, leaderboa
   await db.rpc(t, "end_session", { p_session: s.id });
 });
 
+test("fair play: answers lock once revealed, second chance, untimed games, class goal, lobby lock", async () => {
+  const t = S.teacherA;
+  const mkQuiz = async (title, settings) => {
+    const [act] = await db.as(t, `insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+      values ($1, $2, $3, 'quiz', $4, $5) returning id`, [S.tenantA, S.lesson, t, title, J(settings)]);
+    const [q] = await db.as(t, `insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, explanation)
+      values ($1,$2,$3,'mcq','3 x 4?',2,'Three groups of four make twelve.') returning id`, [S.tenantA, act.id, t]);
+    const opts = await db.as(t, `insert into public.question_options (tenant_id, question_id, label, is_correct, position)
+      values ($1,$2,'12',true,0), ($1,$2,'7',false,1) returning id, is_correct`, [S.tenantA, q.id]);
+    return { act: act.id, q: q.id, right: opts.find((o) => o.is_correct).id, wrong: opts.find((o) => !o.is_correct).id };
+  };
+  const s = await db.rpc(t, "start_session", { p_class: S.classA });
+  for (const u of [S.stu1, S.stu2]) await db.rpc(u, "join_session", { p_code: s.join_code });
+
+  // Instant feedback without a second chance: the revealed answer is final (no copying the answer back in).
+  const a = await mkQuiz("Times tables", { show_feedback: "immediately" });
+  await db.rpc(t, "set_session_state", { p_session: s.id, p_activity: a.act });
+  const at1 = await db.rpc(S.stu1, "start_attempt", { p_activity: a.act, p_session: s.id });
+  const r1 = await db.rpc(S.stu1, "submit_answer", { p_attempt: at1.attempt.id, p_question: a.q, p_response: J({ option_id: a.wrong }) });
+  assert.equal(r1.is_correct, false);
+  assert.ok(r1.correct_option_ids.includes(a.right), "answer shown");
+  assert.match(r1.explanation, /twelve/);
+  await rejects(db.rpc(S.stu1, "submit_answer", { p_attempt: at1.attempt.id, p_question: a.q, p_response: J({ option_id: a.right }) }), /already answered/);
+
+  // Second chance: a wrong first try hides the answer; the retry earns half.
+  const b = await mkQuiz("Times tables redemption", { show_feedback: "immediately", redemption: true });
+  await db.rpc(t, "set_session_state", { p_session: s.id, p_activity: b.act });
+  const at2 = await db.rpc(S.stu2, "start_attempt", { p_activity: b.act, p_session: s.id });
+  const first = await db.rpc(S.stu2, "submit_answer", { p_attempt: at2.attempt.id, p_question: b.q, p_response: J({ option_id: b.wrong }) });
+  assert.equal(first.second_chance, true);
+  assert.equal(first.correct_option_ids, undefined, "no answer revealed before the second try");
+  const again = await db.rpc(S.stu2, "start_attempt", { p_activity: b.act, p_session: s.id });
+  assert.equal(again.locked[b.q].tries, 1, "reloading keeps the second chance");
+  const second = await db.rpc(S.stu2, "submit_answer", { p_attempt: at2.attempt.id, p_question: b.q, p_response: J({ option_id: b.right }) });
+  assert.equal(second.is_correct, true);
+  assert.equal(Number(second.score), 1, "half of 2 points");
+  await rejects(db.rpc(S.stu2, "submit_answer", { p_attempt: at2.attempt.id, p_question: b.q, p_response: J({ option_id: b.right }) }), /already answered/);
+  // A right first try gets full marks and is final.
+  const at3 = await db.rpc(S.stu1, "start_attempt", { p_activity: b.act, p_session: s.id });
+  assert.equal(Number((await db.rpc(S.stu1, "submit_answer", { p_attempt: at3.attempt.id, p_question: b.q, p_response: J({ option_id: b.right }) })).score), 2);
+
+  // Games: untimed means no speed bonus and no countdown; class goal hides ranks; the lobby can be locked.
+  const set = (await db.admin(`select app.game_settings('{"question_seconds":0,"speed_bonus":true,"class_goal":true,"rank_visibility":"after_each"}') s`))[0].s;
+  assert.equal(set.question_seconds, 0);
+  assert.equal(set.speed_bonus, false);
+  assert.equal(set.rank_visibility, "hidden");
+  assert.equal((await db.admin(`select app.game_settings('{"question_seconds":2}') s`))[0].s.question_seconds, 5, "timed games keep the 5 s minimum");
+  const g = await db.rpc(t, "create_game", { p_class: S.classA, p_activity: a.act, p_settings: J({ question_seconds: 0, class_goal: true, goal_percent: 50 }) });
+  await db.rpc(S.stu1, "join_game", { p_code: g.join_code });
+  await db.rpc(t, "game_control", { p_game: g.id, p_action: "lock" });
+  await rejects(db.rpc(S.stu2, "join_game", { p_code: g.join_code }), /locked/);
+  await db.rpc(S.stu1, "join_game", { p_code: g.join_code }); // already in: fine
+  await rejects(db.rpc(S.stu1, "game_control", { p_game: g.id, p_action: "unlock" }), /Only the host/);
+  await db.rpc(t, "game_control", { p_game: g.id, p_action: "unlock" });
+  await db.rpc(S.stu2, "join_game", { p_code: g.join_code });
+  await db.rpc(t, "game_control", { p_game: g.id, p_action: "start" });
+  const gs = await db.rpc(S.stu1, "game_state", { p_game: g.id });
+  assert.ok(new Date(gs.question_ends_at) - new Date(gs.question_started_at) >= 3_000_000, "untimed: open until the teacher moves on");
+  await db.rpc(S.stu1, "game_answer", { p_game: g.id, p_index: 0, p_choice: J({ option_id: a.right }), p_client_elapsed_ms: 100 });
+  const [ans] = await db.admin("select speed_bonus from public.game_answers where game_id = $1", [g.id]);
+  assert.equal(ans.speed_bonus, 0);
+  const goal = await db.rpc(S.stu2, "game_goal", { p_game: g.id });
+  assert.deepEqual([goal.enabled, goal.correct, goal.target], [true, 1, 1]);
+  await rejects(db.rpc(S.adminB, "game_goal", { p_game: g.id }), /not found|Not your game/);
+  await db.rpc(t, "game_control", { p_game: g.id, p_action: "end" });
+  await db.rpc(t, "end_session", { p_session: s.id });
+});
+
+test("learning supports, student-written questions, gradebook export", async () => {
+  const t = S.teacherA;
+  // Supports are private: the student sees their own (without the staff note); other students see nothing.
+  await db.rpc(t, "set_student_supports", { p_class: S.classA, p_student: S.stu2, p_read_aloud: true, p_readable_font: true,
+    p_extra_time_pct: 50, p_calm_mode: true, p_note: "EAL, first term" });
+  await rejects(db.rpc(t, "set_student_supports", { p_class: S.classA, p_student: S.stu2, p_read_aloud: true, p_readable_font: false,
+    p_extra_time_pct: 30, p_calm_mode: false }), /Extra time/);
+  await rejects(db.rpc(S.stu1, "set_student_supports", { p_class: S.classA, p_student: S.stu1, p_read_aloud: true, p_readable_font: false,
+    p_extra_time_pct: 100, p_calm_mode: false }), /Not your class/);
+  const mine = await db.rpc(S.stu2, "my_supports", {});
+  assert.deepEqual(mine, { read_aloud: true, readable_font: true, extra_time_pct: 50, calm_mode: true });
+  assert.equal((await db.as(S.stu1, "select * from public.student_supports")).length, 0);
+  assert.equal((await db.rpc(t, "class_supports", { p_class: S.classA })).find((r) => r.student_id === S.stu2).note, "EAL, first term");
+
+  // Extra time stretches a timed activity's deadline for that student only.
+  const [act] = await db.as(t, `insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+    values ($1, $2, $3, 'quiz', 'Timed check', '{"time_limit_seconds":600}') returning id`, [S.tenantA, S.lesson, t]);
+  await db.as(t, `insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points) values ($1,$2,$3,'short','Name a prime',1)`, [S.tenantA, act.id, t]);
+  const s = await db.rpc(t, "start_session", { p_class: S.classA });
+  for (const u of [S.stu1, S.stu2]) await db.rpc(u, "join_session", { p_code: s.join_code });
+  await db.rpc(t, "set_session_state", { p_session: s.id, p_activity: act.id });
+  const secs = (x) => Math.round((new Date(x.attempt.deadline_at) - new Date(x.attempt.server_now)) / 1000);
+  assert.equal(secs(await db.rpc(S.stu1, "start_attempt", { p_activity: act.id, p_session: s.id })), 600);
+  assert.equal(secs(await db.rpc(S.stu2, "start_attempt", { p_activity: act.id, p_session: s.id })), 900);
+  await db.rpc(t, "end_session", { p_session: s.id });
+
+  // Students write questions; the teacher approves one into the quiz and returns another with feedback.
+  const [quiz] = await db.as(t, `insert into public.activities (tenant_id, lesson_id, owner_id, kind, title) values ($1,$2,$3,'quiz','Class-made quiz') returning id`,
+    [S.tenantA, S.lesson, t]);
+  await rejects(db.rpc(S.stu1, "open_question_collab", { p_class: S.classA, p_activity: quiz.id, p_open: true }), /Not your class/);
+  const c = await db.rpc(t, "open_question_collab", { p_class: S.classA, p_activity: quiz.id, p_open: true, p_prompt: "Questions about primes" });
+  const open = await db.rpc(S.stu1, "my_collabs", {});
+  assert.equal(open.find((x) => x.id === c.id).title, "Class-made quiz");
+  const opts = J([{ label: "7", correct: true }, { label: "9", correct: false }]);
+  await rejects(db.rpc(S.stu1, "submit_question", { p_collab: c.id, p_prompt: "Which is prime?", p_options: J([{ label: "7", correct: true }, { label: "5", correct: true }]), p_explanation: "Seven has two factors." }), /exactly one/);
+  await rejects(db.rpc(S.stu1, "submit_question", { p_collab: c.id, p_prompt: "Which is prime?", p_options: opts, p_explanation: "It is." }), /Explain why/);
+  const sub1 = await db.rpc(S.stu1, "submit_question", { p_collab: c.id, p_prompt: "Which number is prime?", p_options: opts, p_explanation: "7 has exactly two factors, 1 and 7; 9 is 3 x 3." });
+  const sub2 = await db.rpc(S.stu2, "submit_question", { p_collab: c.id, p_prompt: "Is 1 prime or not prime?", p_options: J([{ label: "Prime", correct: true }, { label: "Not prime", correct: false }]), p_explanation: "Because it is only divisible by itself." });
+  await rejects(db.rpc(S.adminB, "submit_question", { p_collab: c.id, p_prompt: "Hack?", p_options: opts, p_explanation: "Trying to get in." }), /another class|profile|not found/);
+  assert.equal((await db.as(S.stu1, "select * from public.question_submissions")).length, 1, "students only see their own");
+  const xpBefore = (await db.rpc(S.stu1, "my_progress", {})).xp;
+  const approved = await db.rpc(t, "review_question_submission", { p_submission: sub1.id, p_action: "approve" });
+  const [q] = await db.admin("select kind, explanation, config from public.questions where id = $1", [approved.question_id]);
+  assert.equal(q.kind, "mcq");
+  assert.equal(q.config.authored_by, "Ada L.");
+  assert.equal((await db.admin("select count(*)::int n from public.question_options where question_id = $1 and is_correct", [approved.question_id]))[0].n, 1);
+  assert.equal((await db.rpc(S.stu1, "my_progress", {})).xp - xpBefore, 25);
+  assert.ok((await db.rpc(S.stu1, "my_progress", {})).badges.some((b) => b.badge === "author"));
+  await rejects(db.rpc(t, "review_question_submission", { p_submission: sub2.id, p_action: "return" }), /what to improve/);
+  await db.rpc(t, "review_question_submission", { p_submission: sub2.id, p_action: "return", p_feedback: "1 has only one factor. Check the definition of prime." });
+  const back = (await db.rpc(S.stu2, "my_collabs", {})).find((x) => x.id === c.id).mine[0];
+  assert.equal(back.status, "returned");
+  assert.match(back.feedback, /one factor/);
+  assert.equal((await db.rpc(t, "collab_submissions", { p_activity: quiz.id })).length, 2);
+  await db.rpc(t, "open_question_collab", { p_class: S.classA, p_activity: quiz.id, p_open: false });
+  await rejects(db.rpc(S.stu1, "submit_question", { p_collab: c.id, p_prompt: "Another question?", p_options: opts, p_explanation: "Because seven is prime." }), /closed/);
+
+  // Gradebook: every student, every published assignment, scores scaled to the assignment's points.
+  const gb = await db.rpc(t, "class_gradebook", { p_class: S.classA });
+  assert.ok(Array.isArray(gb.assignments) && gb.students.some((s) => s.id === S.stu1));
+  await rejects(db.rpc(S.stu1, "class_gradebook", { p_class: S.classA }), /Not your class/);
+});
+
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {
   const before = (await db.admin("select count(*)::int n from public.users where tenant_id = $1", [S.tenantA]))[0].n;
   assert.ok(before > 3);

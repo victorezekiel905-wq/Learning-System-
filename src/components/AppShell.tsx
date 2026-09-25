@@ -14,6 +14,7 @@ import { paletteVars } from "@/lib/theme";
 import { Logo } from "./Logo";
 import { Avatar } from "./ui";
 import { Icon, type IconName } from "./Icon";
+import { useSupports } from "@/lib/supports";
 
 /** The school's own logo and name when set (tenant branding), otherwise SwiftCipher's. */
 function SchoolBrand({ logoPath, name, compact, onDark }: { logoPath?: string | null; name?: string | null; compact?: boolean; onDark?: boolean }) {
@@ -85,6 +86,9 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
   const tabs = TABS[role].map((h) => items.find((n) => n.href === h)).filter((n): n is NavItem => !!n);
   const focus = FOCUS.some((r) => r.test(pathname));
   const { quality } = useNetwork();
+  // Students' private learning supports: the easy-to-read font applies app-wide.
+  const supports = useSupports(role === "student");
+  useEffect(() => { document.documentElement.classList.toggle("readable", supports.readable_font); }, [supports.readable_font]);
 
   useEffect(() => setMenuOpen(false), [pathname]);
   useEffect(() => {

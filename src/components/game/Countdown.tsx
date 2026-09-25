@@ -8,6 +8,7 @@ export function Countdown({ endsAt, serverNow, fetchedAt, total, className }: {
 }) {
   const now = useNow(250);
   if (!endsAt) return null;
+  if (total === 0) return <p className={cn("text-sm font-medium text-ink-600", className)}>No timer: take your time and think it through.</p>;
   const skew = new Date(serverNow).getTime() - fetchedAt;
   const left = Math.max(0, (new Date(endsAt).getTime() - (now + skew)) / 1000);
   const frac = Math.min(1, left / total);

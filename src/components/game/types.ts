@@ -23,4 +23,8 @@ export const BADGE: Record<string, string> = {
   perfect: "Perfect score", streak_5: "5-answer streak", speedster: "Fastest correct answers"
 };
 
-export const OPTION_COLORS = ["bg-rose-500", "bg-sky-500", "bg-amber-500", "bg-emerald-500", "bg-violet-500", "bg-teal-500"];
+// White text on every colour passes WCAG AA; each answer also has a shape so colour is never the only cue.
+export const OPTION_COLORS = ["bg-rose-700", "bg-blue-700", "bg-amber-700", "bg-emerald-700", "bg-violet-700", "bg-teal-700"];
+export const OPTION_SHAPES = ["triangle", "diamond", "circle", "square", "hexagon", "star"] as const;
+
+export type GameGoal = { enabled: boolean; correct: number; target: number; possible_so_far: number; goal_percent: number };

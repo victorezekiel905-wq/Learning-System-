@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/session";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { firstName, formatDateTime } from "@/lib/utils";
 import { ProgressPanel } from "./ProgressPanel";
+import { WriteQuestion } from "./WriteQuestion";
 import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "Home" };
@@ -58,6 +59,7 @@ export default async function StudentHome() {
       )}
 
       <ProgressPanel />
+      <WriteQuestion />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2" title={`To do (${todo.length})`}>

@@ -83,6 +83,15 @@
 /* Long codes, URLs and emails never push the page wider than the screen. */
 main, .page, .card { overflow-wrap: anywhere; }
 
+/* "Easy-to-read font" learning support (set privately by a teacher): Atkinson Hyperlegible,
+   wider letter and line spacing, on every screen the student sees. */
+html.readable body, html.readable .font-sans, html.readable .font-display,
+html.readable h1, html.readable h2, html.readable h3, html.readable h4 {
+  font-family: var(--font-readable), var(--font-inter), system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+html.readable body { line-height: 1.75; word-spacing: 0.08em; }
+
 /* Room for the phone/tablet tab bar and the iPhone home indicator. */
 .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem); }
 

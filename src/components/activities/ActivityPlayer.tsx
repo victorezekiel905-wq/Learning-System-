@@ -11,15 +11,24 @@ import { CollabBoard } from "./CollabBoard";
 import { isAnswered, Prompt, QuestionInput, type Answer } from "./QuestionInput";
 import { BADGE_LABEL, CHALLENGE, type Progress } from "@/lib/progress";
 import { Icon } from "@/components/Icon";
+import { useSupports } from "@/lib/supports";
 
 type Started = {
   attempt: { id: string; attempt_no: number; deadline_at: string | null; status: string; server_now: string; level?: 1 | 2 | 3 | null };
   activity: { id: string; kind: string; title: string; instructions: string | null; settings: ActivitySettings };
   questions: PublicQuestion[];
   answers: Record<string, Answer>;
+  /** Answers already shown as right/wrong (final) or waiting for their second chance (migration 0800). */
+  locked?: Record<string, { revealed: boolean; tries: number; is_correct: boolean | null }>;
 };
 
-type Feedback = { is_correct?: boolean; score?: number; status: string; correct_option_ids?: string[]; explanation?: string | null; queued?: boolean };
+type Feedback = {
+  is_correct?: boolean; score?: number; status: string; correct_option_ids?: string[]; explanation?: string | null; queued?: boolean;
+  /** Wrong first try with a second chance left: the answer is not shown yet. */
+  second_chance?: boolean; tries?: number;
+  /** Revealed earlier (e.g. before a reload): the answer can't change. */
+  final?: boolean;
+};
 type Finished = {
   attempt: { status: string; score: number | null; max_score: number | null };
   results: { question_id: string; is_correct: boolean | null; score: number | null; status: string; feedback: string | null; explanation: string | null; correct_option_ids: string[] }[] | null;
@@ -47,6 +56,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   const [shownAt, setShownAt] = useState(() => Date.now());
   const { pending } = useOfflineQueue((m) => toast(`An offline answer was rejected: ${m}`, "error"));
   const now = useNow(1000);
+  const supports = useSupports();
 
   useEffect(() => {
     let live = true;
@@ -55,6 +65,10 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
         if (!live) return;
         setData(d);
         setAnswers(d.answers ?? {});
+        // Restore which answers are final and which still have their second chance.
+        setFeedback(Object.fromEntries(Object.entries(d.locked ?? {}).map(([id, l]) => [id,
+          l.revealed ? { status: "auto_graded", is_correct: l.is_correct ?? undefined, final: true, tries: l.tries }
+                     : { status: "auto_graded", is_correct: false, second_chance: true, tries: l.tries }])));
         setSkew(new Date(d.attempt.server_now).getTime() - Date.now());
       })
       .catch((e) => live && setErr(errorText(e)));
@@ -172,6 +186,10 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
 
   if (!q) return <Alert>This activity has no questions yet.</Alert>;
   const fb = feedback[q.id];
+  // Once the right answer has been shown, the answer is final (no copying it back in).
+  const locked = !!fb && !fb.queued && (!!fb.correct_option_ids || !!fb.final);
+  // Calm mode: no countdown pressure until the last two minutes.
+  const showTimer = remaining !== null && (!supports.calm_mode || remaining <= 120);
   const answeredCount = questions.filter((x) => feedback[x.id] || data.answers[x.id]).length;
 
   return (
@@ -184,24 +202,34 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
         <div className="flex items-center gap-2">
           {data.attempt.level && <span title={CHALLENGE[data.attempt.level].hint}><Badge tone="brand">{CHALLENGE[data.attempt.level].name} challenge</Badge></span>}
           {pending > 0 && <Badge tone="amber">{pending} waiting to sync</Badge>}
-          {remaining !== null && <Badge tone={remaining < 30 ? "red" : "gray"}>⏱ {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</Badge>}
+          {showTimer && remaining !== null && <Badge tone={remaining < 30 && !supports.calm_mode ? "red" : "gray"}><Icon name="clock" className="h-3.5 w-3.5" /> {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</Badge>}
         </div>
       </div>
       {index === 0 && data.activity.instructions && <RichText text={data.activity.instructions} className="text-sm text-ink-600" />}
 
-      <Prompt q={q} />
-      <QuestionInput q={q} value={answers[q.id]} onChange={(v) => { setAnswers((a) => ({ ...a, [q.id]: v })); setFeedback((f) => { const n = { ...f }; delete n[q.id]; return n; }); }}
+      <Prompt q={q} readAloud={supports.read_aloud ? "emphasis" : "offer"} />
+      <QuestionInput q={q} value={answers[q.id]} disabled={locked}
+        onChange={(v) => {
+          setAnswers((a) => ({ ...a, [q.id]: v }));
+          // Changing an answer clears "saved"; a pending second chance stays so the retry is counted.
+          setFeedback((f) => { if (f[q.id]?.second_chance) return f; const n = { ...f }; delete n[q.id]; return n; });
+        }}
         uploadPrefix={`${tenantId}/${userId}/${data.attempt.id}`} reveal={fb?.correct_option_ids ? { correct_option_ids: fb.correct_option_ids } : undefined} />
 
-      {fb && !fb.queued && fb.status === "auto_graded" && fb.is_correct !== undefined && (
-        <Alert tone={fb.is_correct ? "success" : "warn"}>{fb.is_correct ? "Correct!" : "Not quite."}{fb.explanation ? ` ${fb.explanation}` : ""}</Alert>
+      {fb?.second_chance && (
+        <Alert tone="warn" title="Not quite. You have one more try.">Look again and change your answer. A right answer now earns half the points.</Alert>
+      )}
+      {fb && !fb.queued && !fb.second_chance && fb.status === "auto_graded" && fb.is_correct !== undefined && (
+        <Alert tone={fb.is_correct ? "success" : "warn"}>
+          {fb.is_correct ? (fb.tries === 2 ? "Correct on your second try!" : "Correct!") : "Not quite."}{fb.explanation ? ` ${fb.explanation}` : ""}
+        </Alert>
       )}
       {fb && (fb.status === "pending_review" || fb.status === "ungraded" || (fb.status === "auto_graded" && fb.is_correct === undefined)) && <Alert tone="success">Answer saved.</Alert>}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
           {questions.length > 1 && <Button variant="secondary" disabled={index === 0} onClick={() => setIndex(index - 1)}>Back</Button>}
-          <Button variant="secondary" loading={saving} onClick={() => save(q)}>{fb ? "Update answer" : "Save answer"}</Button>
+          {!locked && <Button variant="secondary" loading={saving} onClick={() => save(q)}>{fb?.second_chance ? "Try again" : fb ? "Update answer" : "Save answer"}</Button>}
         </div>
         {index < questions.length - 1 ? (
           <Button onClick={async () => { if (!fb && isAnswered(q, answers[q.id])) await save(q); setIndex(index + 1); }}>Next</Button>

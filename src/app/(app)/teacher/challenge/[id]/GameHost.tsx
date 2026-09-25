@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Countdown } from "@/components/game/Countdown";
+import { GoalBar } from "@/components/game/GoalBar";
+import { OptionShape } from "@/components/game/Shape";
+import { Lock, LockOpen, Pencil, X } from "lucide-react";
 import { BADGE, OPTION_COLORS, type GameState, type Leaderboard } from "@/components/game/types";
 import { RichText } from "@/components/RichText";
 import { Alert, Badge, Button, Card, useToast } from "@/components/ui";
@@ -41,6 +44,14 @@ export function GameHost({ gameId, school }: { gameId: string; school: string })
           {g.status !== "ended" && <div className="text-center"><p className="text-[11px] font-semibold text-ink-500">Join code</p><p className="font-mono text-3xl font-extrabold tracking-[0.2em] text-brand-700">{g.join_code}</p></div>}
           <div className="text-center"><p className="text-[11px] font-semibold text-ink-500">Players</p><p className="font-display text-2xl font-bold">{g.players}</p></div>
           {!!g.flags && <Badge tone="amber" className="self-center">{g.flags} pattern flag(s)</Badge>}
+          {g.status !== "ended" && (
+            <Button variant={g.settings.locked ? "ink" : "secondary"} aria-pressed={!!g.settings.locked}
+              title={g.settings.locked ? "No one new can join. Players already in stay in." : "Stop anyone else joining with the code"}
+              onClick={() => control(g.settings.locked ? "unlock" : "lock")}>
+              {g.settings.locked ? <Lock className="h-4 w-4" aria-hidden /> : <LockOpen className="h-4 w-4" aria-hidden />}
+              {g.settings.locked ? "Game locked" : "Lock game"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -49,16 +60,18 @@ export function GameHost({ gameId, school }: { gameId: string; school: string })
           <p className="mb-3 text-sm text-ink-500">Students join at <strong>/student/join</strong> with code <strong className="font-mono">{g.join_code}</strong>.</p>
           <div className="flex flex-wrap gap-2">
             {(g.roster ?? []).map((p) => (
-              <span key={p.player_id} className="group inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-800" title={p.full_name}>
+              <span key={p.player_id} className="inline-flex items-center gap-0.5 rounded-full border border-ink-200 bg-white py-1 pl-3 pr-1 text-sm font-medium text-ink-900" title={p.full_name}>
                 {p.name}
-                <button className="hidden text-xs text-ink-500 group-hover:inline" onClick={() => moderate(p.player_id, "rename")}>✎</button>
-                <button className="hidden text-xs text-rose-600 group-hover:inline" onClick={() => moderate(p.player_id, "remove")}>✕</button>
+                <button className="grid h-6 w-6 place-items-center rounded-full text-ink-500 hover:bg-ink-100 hover:text-ink-900" aria-label={`Rename ${p.name}`} onClick={() => moderate(p.player_id, "rename")}><Pencil className="h-3 w-3" aria-hidden /></button>
+                <button className="grid h-6 w-6 place-items-center rounded-full text-rose-700 hover:bg-rose-50" aria-label={`Remove ${p.name}`} onClick={() => moderate(p.player_id, "remove")}><X className="h-3.5 w-3.5" aria-hidden /></button>
               </span>
             ))}
             {!g.players && <p className="text-sm text-ink-500">Waiting for players…</p>}
           </div>
         </Card>
       )}
+
+      {g.settings.class_goal && g.status !== "lobby" && <GoalBar gameId={gameId} refreshKey={`${g.status}-${g.current_index}-${g.answered}`} />}
 
       {(g.status === "question" || g.status === "review") && q && (
         <Card>
@@ -71,7 +84,7 @@ export function GameHost({ gameId, school }: { gameId: string; school: string })
               const count = g.review?.distribution[o.id] ?? 0;
               return (
                 <div key={o.id} className={cn("flex items-center justify-between rounded-xl px-5 py-4 text-lg font-semibold text-white", OPTION_COLORS[i % OPTION_COLORS.length], g.status === "review" && !correct && "opacity-40")}>
-                  <span>{correct && "✓ "}{o.label}</span>{g.status === "review" && <span className="rounded-full bg-black/20 px-2 text-sm">{count}</span>}
+                  <span className="flex items-center gap-3"><OptionShape i={i} />{o.label}{correct && <span className="sr-only"> (correct)</span>}</span>{g.status === "review" && <span className="rounded-full bg-black/20 px-2 text-sm">{count}</span>}
                 </div>
               );
             })}
@@ -84,7 +97,7 @@ export function GameHost({ gameId, school }: { gameId: string; school: string })
         </Card>
       )}
 
-      {(g.status === "review" || g.status === "ended") && board.data && <Standings board={board.data} ended={g.status === "ended"} school={school} title={g.title} certificates={g.settings.certificates} />}
+      {(g.status === "review" || g.status === "ended") && board.data && !(g.settings.class_goal && g.status === "review") && <Standings board={board.data} ended={g.status === "ended"} school={school} title={g.title} certificates={g.settings.certificates} />}
 
       {g.status !== "ended" && g.status !== "lobby" && <div className="text-right"><Button variant="ghost" onClick={() => { if (confirm("End the game now?")) void control("end"); }}>End game</Button></div>}
     </div>
@@ -129,7 +142,7 @@ function Standings({ board, ended, school, title, certificates }: { board: Leade
             const w = window.open("", "_blank", "width=900,height=700");
             if (!w) return;
             const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-            w.document.write(`<title>Certificates</title><style>body{font-family:system-ui;margin:0}.c{page-break-after:always;border:12px double #4f46e5;margin:24px;padding:48px;text-align:center}h1{font-size:40px;margin:0 0 8px}p{font-size:20px}</style>` +
+            w.document.write(`<title>Certificates</title><style>body{font-family:system-ui;margin:0}.c{page-break-after:always;border:12px double #151411;margin:24px;padding:48px;text-align:center}h1{font-size:40px;margin:0 0 8px}p{font-size:20px}</style>` +
               board.top.filter((p) => p.badges.length).map((p) => `<div class="c"><p>${esc(school)}</p><h1>Certificate of Achievement</h1><p>awarded to</p><h2 style="font-size:34px">${esc(p.name)}</h2><p>${p.badges.map((b) => esc(BADGE[b] ?? b)).join(" · ")}</p><p>in the Challenge "${esc(title)}", with ${p.score} points</p><p>${new Date().toLocaleDateString()}</p></div>`).join(""));
             w.document.close(); w.print();
           }}>Print certificates</Button>

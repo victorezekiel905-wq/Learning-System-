@@ -79,6 +79,8 @@ export type ActivitySettings = {
   attempts_allowed?: number;
   shuffle_questions?: boolean;
   shuffle_options?: boolean;
+  /** One more try at a wrong answer for half the points; the answer is shown after it (migration 0800). */
+  redemption?: boolean;
   /** Give each student the questions for their challenge level (migration 0790). */
   differentiate?: boolean;
   show_feedback?: "immediately" | "after_submit" | "never";
@@ -105,6 +107,8 @@ export type PublicQuestion = {
     partial_credit?: boolean;
     case_sensitive?: boolean;
     max_chars?: number;
+    /** A student wrote this question and the teacher approved it (migration 0800). */
+    authored_by?: string;
   };
   options: Item[];
   points: number;
@@ -122,6 +126,11 @@ export type GameSettings = {
   shuffle_options: boolean;
   podium_size: number;
   certificates: boolean;
+  /** Whole class works towards one target; rankings hidden (migration 0800). */
+  class_goal?: boolean;
+  goal_percent?: number;
+  /** No one new can join (the teacher locked the lobby). */
+  locked?: boolean;
 };
 
 export type EnvironmentPolicy = {

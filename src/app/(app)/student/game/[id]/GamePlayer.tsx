@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Countdown } from "@/components/game/Countdown";
+import { GoalBar } from "@/components/game/GoalBar";
+import { OptionShape } from "@/components/game/Shape";
+import { Icon } from "@/components/Icon";
+import { useSupports } from "@/lib/supports";
 import { BADGE, OPTION_COLORS, type GameState, type Leaderboard } from "@/components/game/types";
 import { RichText } from "@/components/RichText";
 import { Alert, Button, Card, Field, Input, useToast } from "@/components/ui";
@@ -23,6 +27,8 @@ export function GamePlayer({ gameId }: { gameId: string }) {
   const [joinErr, setJoinErr] = useState<string | null>(null);
   const shownAt = useRef<number>(Date.now());
   const g = state.data;
+  // Calm mode (a private learning support): no rankings, just the student's own progress.
+  const calm = useSupports().calm_mode;
 
   useEffect(() => setFetchedAt(Date.now()), [g?.server_now]);
   useEffect(() => { shownAt.current = Date.now(); setPicked([]); }, [g?.current_index]);
@@ -71,8 +77,10 @@ export function GamePlayer({ gameId }: { gameId: string }) {
     <div className="page max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
         <div><p className="text-[13px] font-semibold text-ink-500">Challenge</p><h1 className="text-lg font-bold">{g.title}</h1></div>
-        {g.me && <div className="text-right"><p className="text-xs text-ink-500">{g.me.name}</p><p className="font-display text-2xl font-extrabold tabular-nums">{g.me.score}</p>{g.me.streak > 1 && <p className="text-xs font-semibold text-orange-600">🔥 {g.me.streak} streak</p>}</div>}
+        {g.me && <div className="text-right"><p className="text-xs text-ink-500">{g.me.name}</p><p className="font-display text-2xl font-extrabold tabular-nums">{g.me.score}</p>{g.me.streak > 1 && <p className="flex items-center justify-end gap-1 text-xs font-semibold text-orange-700"><Icon name="flame" className="h-3.5 w-3.5" />{g.me.streak} in a row</p>}</div>}
       </div>
+
+      {g.settings.class_goal && g.status !== "lobby" && <GoalBar gameId={gameId} refreshKey={`${g.status}-${g.current_index}`} />}
 
       {g.status === "lobby" && <Card><p className="py-10 text-center text-lg">You're in! Waiting for your teacher to start…</p></Card>}
 
@@ -81,13 +89,13 @@ export function GamePlayer({ gameId }: { gameId: string }) {
           <p className="mb-1 text-sm text-ink-500">Question {g.current_index + 1} of {g.total}</p>
           <RichText text={q.prompt} className="text-xl font-bold" />
           <Countdown className="my-4" endsAt={g.question_ends_at} serverNow={g.server_now} fetchedAt={fetchedAt} total={g.settings.question_seconds} />
-          {answered ? <p className="py-8 text-center text-lg font-semibold text-brand-700">Answer locked in. Waiting for the others…</p> : (
+          {answered ? <p className="py-8 text-center text-lg font-semibold text-ink-800">Answer locked in. Waiting for the others…</p> : (
             <>
               <div className="grid gap-3 sm:grid-cols-2">
                 {q.options.map((o, i) => (
                   <button key={o.id} onClick={() => multi ? setPicked((p) => p.includes(o.id) ? p.filter((x) => x !== o.id) : [...p, o.id]) : answer({ option_id: o.id })}
-                    className={cn("rounded-xl px-5 py-6 text-left text-lg font-semibold text-white shadow transition active:scale-[.98]", OPTION_COLORS[i % OPTION_COLORS.length], multi && picked.includes(o.id) && "ring-4 ring-ink-900")}>
-                    {o.label}
+                    className={cn("flex items-center gap-3 rounded-xl px-5 py-6 text-left text-lg font-semibold text-white transition active:scale-[.98]", OPTION_COLORS[i % OPTION_COLORS.length], multi && picked.includes(o.id) && "ring-4 ring-ink-900 ring-offset-2")}>
+                    <OptionShape i={i} />{o.label}
                   </button>
                 ))}
               </div>
@@ -105,11 +113,17 @@ export function GamePlayer({ gameId }: { gameId: string }) {
               <p className="mt-1 text-lg">+{g.me.last.points} points</p>
             </div>
           ) : <p className="text-center text-ink-500">No answer this round.</p>}
-          {g.review?.explanation && <p className="mt-3 text-sm text-ink-600">{g.review.explanation}</p>}
+          {g.review?.explanation && <p className="mt-4 rounded-xl bg-ink-50 p-4 text-[15px] leading-relaxed text-ink-800"><span className="font-semibold">Why: </span>{g.review.explanation}</p>}
         </Card>
       )}
 
-      {board.data && (g.status === "review" || g.status === "ended") && (
+      {board.data?.me && g.status === "ended" && (g.settings.class_goal || calm) && (
+        <Card title="Your game">
+          <p className="text-lg">You got <strong>{board.data.me.correct}</strong> of {g.total} right and scored <strong>{board.data.me.score}</strong> points.</p>
+        </Card>
+      )}
+
+      {board.data && (g.status === "review" || g.status === "ended") && !g.settings.class_goal && !calm && (
         <Card title={g.status === "ended" ? "Final results" : "Standings"}>
           {board.data.me && <p className="mb-3 text-lg">You are <strong>#{board.data.me.rank}</strong> of {board.data.players} with <strong>{board.data.me.score}</strong> points.</p>}
           {board.data.visible ? (
