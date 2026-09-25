@@ -1167,6 +1167,19 @@ test("audit fixes: no right/wrong leak before submit, second try never lowers a 
   await rejects(db.rpc(S.stu1, "reorder_slides", { p_lesson: S.lesson, p_order: `{${all.join(",")}}` }), /can't edit/);
   await rejects(db.rpc(S.adminB, "reorder_slides", { p_lesson: S.lesson, p_order: `{${all.join(",")}}` }), /can't edit|profile/);
   await db.admin("delete from public.lesson_slides where id = any($1::uuid[])", [slides.map((x) => x.id)]);
+
+  // Join-code guessing: wrong codes are counted (returned, not raised) and capped at 8 per 15 minutes.
+  const guesser = await db.signUp("guesser@x.test", "Code Guesser");
+  for (let i = 0; i < 8; i++) {
+    const r = await db.rpc(guesser, "redeem_code", { p_code: `ZZZZZ${i}` });
+    assert.equal(r.code, "P0002");
+  }
+  await rejects(db.rpc(guesser, "redeem_code", { p_code: S.classCode }), /Too many wrong codes/);
+  assert.equal((await db.admin("select count(*)::int n from public.users where id = $1", [guesser]))[0].n, 0, "never enrolled");
+  await rejects(db.as(guesser, "select * from public.code_attempts"), /permission denied/);
+  // Another account is unaffected.
+  const fresh = await db.signUp("fresh@x.test", "Fresh Student");
+  assert.equal((await db.rpc(fresh, "redeem_code", { p_code: S.classCode })).kind, "class");
 });
 
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {

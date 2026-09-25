@@ -1,6 +1,7 @@
 import { createClient as createBase, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { logServerError } from "@/lib/api";
+import { allow, clientIp } from "@/lib/rate-limit";
 import { messageForError, statusForError, type RpcError } from "@/lib/errors";
 import { createClient as cookieClient } from "@/lib/supabase/server";
 
@@ -47,14 +48,21 @@ const pick = (b: Record<string, unknown>, keys: string[]) => Object.fromEntries(
 // [method, pattern, handler]; ":x" segments are captured in order.
 const ROUTES: [string, string, Handler][] = [
   // 10.1 Authentication
-  ["POST", "auth/login", async ({ body }) => {
+  ["POST", "auth/login", async ({ body, req }) => {
+    // Every login reaches Supabase from this server's address, so limit per caller here:
+    // otherwise one client could guess passwords, or use up the shared allowance for everyone.
+    const email = String(body.email ?? "").toLowerCase();
+    if (!allow(`v1-login-ip:${clientIp(req)}`, 10) || !allow(`v1-login-email:${email}`, 5)) {
+      return json({ error: "Too many sign-in attempts. Wait a minute and try again." }, 429);
+    }
     const sb = createBase(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
     const { data, error } = await sb.auth.signInWithPassword({ email: String(body.email ?? ""), password: String(body.password ?? "") });
     if (error || !data.session) return json({ error: error?.message ?? "Invalid login" }, 401);
     return json({ access_token: data.session.access_token, refresh_token: data.session.refresh_token, expires_at: data.session.expires_at, user_id: data.user.id });
   }],
   ["POST", "auth/logout", async ({ sb }) => { await sb.auth.signOut(); return json({ ok: true }); }],
-  ["POST", "auth/refresh", async ({ body }) => {
+  ["POST", "auth/refresh", async ({ body, req }) => {
+    if (!allow(`v1-refresh-ip:${clientIp(req)}`, 30)) return json({ error: "Too many requests." }, 429);
     const sb = createBase(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
     const { data, error } = await sb.auth.refreshSession({ refresh_token: String(body.refresh_token ?? "") });
     if (error || !data.session) return json({ error: error?.message ?? "Invalid refresh token" }, 401);

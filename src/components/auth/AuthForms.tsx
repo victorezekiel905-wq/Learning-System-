@@ -174,7 +174,9 @@ export async function completeIntent(intent: Intent, fullName: string) {
   if (intent.intent === "school") {
     await rpc("bootstrap_school", { p_school_name: intent.school_name, p_full_name: fullName });
   } else {
-    await rpc("redeem_code", { p_code: intent.code, p_full_name: fullName });
+    const r = await rpc<{ error?: string }>("redeem_code", { p_code: intent.code, p_full_name: fullName });
+    // A wrong code comes back as a value (so the server can count it), not an exception.
+    if (r?.error) throw new Error(r.error);
   }
   // The profile exists now: record the acceptance given on the signup form.
   await Promise.all([

@@ -2,6 +2,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { messageForError, statusForError } from "./errors";
 import { createAnonClient } from "./supabase/service";
+import { allow, clientIp } from "./rate-limit";
 
 /**
  * Gateway for the browser extension (§21). The extension never holds a user
@@ -24,19 +25,6 @@ function reply(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: CORS });
 }
 
-// Best-effort per-instance limiter; the database enforces the hard limits.
-const buckets = new Map<string, { tokens: number; at: number }>();
-function allow(key: string, perMinute: number) {
-  const now = Date.now();
-  const b = buckets.get(key) ?? { tokens: perMinute, at: now };
-  b.tokens = Math.min(perMinute, b.tokens + ((now - b.at) / 60_000) * perMinute);
-  b.at = now;
-  if (b.tokens < 1) { buckets.set(key, b); return false; }
-  b.tokens -= 1;
-  buckets.set(key, b);
-  if (buckets.size > 50_000) buckets.clear();
-  return true;
-}
 
 export function appHost(): string | null {
   try { return process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL).hostname : null; } catch { return null; }
@@ -58,7 +46,7 @@ export async function deviceCall(
   } catch {
     return reply({ error: "Invalid JSON." }, 400);
   }
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  const ip = clientIp(req);
   const key = opts.requireDevice === false ? `ip:${ip}` : `dev:${String(body.device_id ?? ip)}`;
   if (opts.requireDevice !== false && !UUID.test(String(body.device_id ?? ""))) return reply({ error: "device_id required." }, 400);
   if (!allow(`${opts.fn}:${key}`, opts.perMinute)) return reply({ error: "Too many requests." }, 429);

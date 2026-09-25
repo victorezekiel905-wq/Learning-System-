@@ -32,7 +32,9 @@ function JoinForm() {
           if (!notFound(e)) throw e;
         }
       }
-      const r = await rpc<{ class_name?: string; kind: string }>("redeem_code", { p_code: c });
+      const r = await rpc<{ class_name?: string; kind: string; error?: string; code?: string }>("redeem_code", { p_code: c });
+      // A wrong code comes back as a value (so the server can count it), not an exception.
+      if (r.error) throw new ActionError(r.error, r.code);
       setOk(r.kind === "class" ? `You've joined ${r.class_name}.` : "Code accepted.");
       setCode("");
       router.refresh();
