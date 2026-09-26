@@ -14,7 +14,8 @@
     "build:e2e": "cross-env-shell NEXT_DIST_DIR=.next-prod next build",
     "start:e2e": "cross-env-shell NEXT_DIST_DIR=.next-prod next start -p 3100",
     "test:e2e": "playwright test",
-    "keep-alive": "node scripts/keep-alive.mjs"
+    "keep-alive": "node scripts/keep-alive.mjs",
+    "pentest": "node --experimental-strip-types --no-warnings scripts/pentest.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

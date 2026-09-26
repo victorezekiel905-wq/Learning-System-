@@ -67,7 +67,7 @@ test.describe("fair play", () => {
     await dialog.getByLabel("Choice 2", { exact: true }).fill("99");
     await dialog.getByLabel("Why is the correct answer right?").fill("Nine nines are eighty-one because 9 x 10 is 90, minus 9.");
     await dialog.getByRole("button", { name: "Send to teacher" }).click();
-    await expect(page.getByText("Waiting for your teacher")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Waiting for your teacher", { exact: true })).toBeVisible({ timeout: 20_000 });
 
     // The teacher adds it to the quiz; the student is credited.
     const tCtx = await browser.newContext();
@@ -77,7 +77,7 @@ test.describe("fair play", () => {
     expect(sub).toBeTruthy();
     await call(teacher.client, "review_question_submission", { p_submission: sub!.id, p_action: "approve" });
     await page.reload();
-    await expect(page.getByText("Added to the quiz")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Added to the quiz", { exact: true })).toBeVisible({ timeout: 20_000 });
 
     // Supports tab: private per-student supports.
     await t.goto(`/teacher/classes/${classId}`);

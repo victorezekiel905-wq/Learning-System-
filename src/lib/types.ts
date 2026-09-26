@@ -17,6 +17,8 @@ export type TenantSettings = {
   store_event_screenshots: boolean;
   require_monitoring_consent: boolean;
   parent_portal_enabled: boolean;
+  /** Parents see leave details, not just counts (migration 0820). */
+  parent_focus_details?: boolean;
   email_alerts_enabled: boolean;
   nickname_mode: "first_name_initial" | "approved_nickname" | "anonymous";
   learning_retention_days: number;

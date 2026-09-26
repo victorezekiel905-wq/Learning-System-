@@ -205,7 +205,11 @@ export function SettingsClient({ tenant, settings, schools, flags, plan }: {
           <Field label="Default leaderboard names"><Select value={s.nickname_mode} onChange={(e) => set({ nickname_mode: e.target.value as TenantSettings["nickname_mode"] })}>
             <option value="first_name_initial">First name + last initial</option><option value="approved_nickname">Teacher-approved nicknames</option><option value="anonymous">Anonymous</option>
           </Select></Field>
-          <Toggle checked={s.parent_portal_enabled} onChange={(v) => set({ parent_portal_enabled: v })} label="Parent portal" description="Linked parents see attendance, released grades and screen-time summaries." />
+          <Toggle checked={s.parent_portal_enabled} onChange={(v) => set({ parent_portal_enabled: v })} label="Parent portal" description="Linked parents see daily and weekly reports per subject, released grades, and can message teachers." />
+          {"parent_focus_details" in s && (
+            <Toggle checked={!!s.parent_focus_details} onChange={(v) => set({ parent_focus_details: v })} label="Show parents what happened when their child left a lesson"
+              description="When on, parents see the time, the lesson, where their child went (site and page title on managed browsers) and for how long. When off, parents see only how many times. Screenshots are never shared with parents." />
+          )}
           <Toggle checked={s.email_alerts_enabled} onChange={(v) => set({ email_alerts_enabled: v })} label="Email alerts to teachers" description="Critical environment alerts are also emailed (requires email set up)." />
         </div>
       </Card>

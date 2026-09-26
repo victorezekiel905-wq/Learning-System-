@@ -37,14 +37,15 @@ function Block({ block }: { block: string }) {
   );
 }
 
-const TOKEN = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\((?:https?:\/\/|\/)[^)\s]+\))/g;
+// Links: https?:// or a same-site path ("/x", never "//other-site").
+const TOKEN = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\((?:https?:\/\/|\/(?!\/))[^)\s]+\))/g;
 
 function inline(text: string): ReactNode[] {
   return text.split(TOKEN).filter(Boolean).map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) return <strong key={i}>{part.slice(2, -2)}</strong>;
     if (part.startsWith("`") && part.endsWith("`")) return <code key={i} className="rounded bg-ink-100 px-1 font-mono text-[0.9em]">{part.slice(1, -1)}</code>;
     if (part.startsWith("*") && part.endsWith("*") && part.length > 2) return <em key={i}>{part.slice(1, -1)}</em>;
-    const link = /^\[([^\]]+)\]\(((?:https?:\/\/|\/)[^)\s]+)\)$/.exec(part);
+    const link = /^\[([^\]]+)\]\(((?:https?:\/\/|\/(?!\/))[^)\s]+)\)$/.exec(part);
     if (link) {
       const external = link[2]!.startsWith("http");
       return <a key={i} href={link[2]} className="underline" {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>{link[1]}</a>;

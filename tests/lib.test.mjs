@@ -83,3 +83,14 @@ test("a dropped connection is reported as a network problem (and never as a serv
   assert.equal(errors.messageForError({ message: "You already answered this question.", code: "P0001" }), "You already answered this question.");
   assert.equal(errors.messageForError({ message: "boom" }), "Something went wrong. Please try again.");
 });
+
+test("pen-test fixes: formula-safe CSV headers, safe link schemes, no protocol-relative links", async () => {
+  const utils = await load("src/lib/utils.ts");
+  const csv = utils.toCsv([{ "=cmd|' /C calc'!A0": 1, Name: "Ada" }]);
+  assert.ok(csv.startsWith("'=cmd"), "header neutralised");
+  assert.equal(utils.safeHref("javascript:alert(1)"), null);
+  assert.equal(utils.safeHref("data:text/html,<script>alert(1)</script>"), null);
+  assert.equal(utils.safeHref("https://example.org/x"), "https://example.org/x");
+  assert.equal(utils.safeHref("mailto:office@school.org"), "mailto:office@school.org");
+  assert.equal(utils.safeHref("not a url"), null);
+});

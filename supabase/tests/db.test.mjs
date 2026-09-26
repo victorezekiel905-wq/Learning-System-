@@ -1167,6 +1167,8 @@ test("audit fixes: no right/wrong leak before submit, second try never lowers a 
   await rejects(db.rpc(S.stu1, "reorder_slides", { p_lesson: S.lesson, p_order: `{${all.join(",")}}` }), /can't edit/);
   await rejects(db.rpc(S.adminB, "reorder_slides", { p_lesson: S.lesson, p_order: `{${all.join(",")}}` }), /can't edit|profile/);
   await db.admin("delete from public.lesson_slides where id = any($1::uuid[])", [slides.map((x) => x.id)]);
+  const extra = new Set(slides.map((x) => x.id));
+  await db.rpc(t, "reorder_slides", { p_lesson: S.lesson, p_order: `{${all.filter((id) => !extra.has(id)).join(",")}}` }); // back to 0..n-1
 
   // Join-code guessing: wrong codes are counted (returned, not raised) and capped at 8 per 15 minutes.
   const guesser = await db.signUp("guesser@x.test", "Code Guesser");
@@ -1180,6 +1182,122 @@ test("audit fixes: no right/wrong leak before submit, second try never lowers a 
   // Another account is unaffected.
   const fresh = await db.signUp("fresh@x.test", "Fresh Student");
   assert.equal((await db.rpc(fresh, "redeem_code", { p_code: S.classCode })).kind, "class");
+});
+
+test("parent reports: daily/weekly by subject, participation, focus with context, alerts, parent–teacher messages", async () => {
+  const t = S.teacherA;
+  await db.as(S.adminA, "update public.tenant_settings set parent_portal_enabled = true, parent_focus_details = true");
+  await db.rpc(S.parentA, "set_parent_alerts", { p_student: S.stu1, p_alert_on_leave: true, p_weekly_digest: true, p_low_score_below: 80 });
+  await rejects(db.rpc(S.parentA, "set_parent_alerts", { p_student: S.stu2, p_alert_on_leave: true, p_weekly_digest: true }), /Not your child/);
+  assert.deepEqual(await db.rpc(S.parentA, "parent_alerts", { p_student: S.stu1 }), { alert_on_leave: true, weekly_digest: true, low_score_below: 80 });
+
+  // Earlier tests already have Ada active today: measure what this lesson adds.
+  const mathsNow = async () => (await db.rpc(S.parentA, "parent_report", { p_student: S.stu1, p_period: "day" })).subjects.find((x) => x.class_id === S.classA).now;
+  const before = await mathsNow();
+  // A lesson with a titled slide; Ada joins, answers with reasoning, raises a hand, then leaves.
+  await db.admin("update public.lesson_slides set content = jsonb_set(coalesce(content, '{}'), '{heading}', '\"Adding fractions\"') where lesson_id = $1 and position = 0", [S.lesson]);
+  const s = await db.rpc(t, "start_session", { p_class: S.classA, p_lesson: S.lesson });
+  await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
+  const [act] = await db.as(t, `insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+    values ($1,$2,$3,'quiz','Warm-up','{}') returning id`, [S.tenantA, S.lesson, t]);
+  const [q] = await db.as(t, `insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points) values ($1,$2,$3,'mcq','1/2+1/4?',1) returning id`, [S.tenantA, act.id, t]);
+  const [ok] = await db.as(t, `insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1,$2,'3/4',true,0) returning id`, [S.tenantA, q.id]);
+  await db.rpc(t, "set_session_state", { p_session: s.id, p_activity: act.id });
+  const at = await db.rpc(S.stu1, "start_attempt", { p_activity: act.id, p_session: s.id });
+  await db.rpc(S.stu1, "submit_answer", { p_attempt: at.attempt.id, p_question: q.id, p_response: J({ option_id: ok.id, reasoning: "Half is two quarters, plus one quarter is three." }) });
+  await db.rpc(S.stu1, "finish_attempt", { p_attempt: at.attempt.id });
+  await db.as(S.stu1, "insert into public.raise_hands (tenant_id, session_id, student_id, status) values ($1,$2,$3,'open')", [S.tenantA, s.id, S.stu1]);
+  // Leaving the lesson (as the web lockdown or the extension records it).
+  await db.admin(`insert into public.environment_events (tenant_id, class_session_id, class_id, student_id, kind, severity, rule, domain, page_title)
+    values ($1,$2,$3,$4,'domain_blocked','critical','Game sites are blocked','coolmathgames.com','Run 3 - Cool Math Games')`, [S.tenantA, s.id, S.classA, S.stu1]);
+  const [ev] = await db.admin("select lesson_context, away_started_at from public.environment_events where class_session_id = $1 and student_id = $2", [s.id, S.stu1]);
+  assert.equal(ev.lesson_context.slide, 1);
+  assert.equal(ev.lesson_context.slide_heading, "Adding fractions");
+  assert.equal(ev.lesson_context.activity, "Warm-up");
+  assert.ok(ev.away_started_at);
+  const alerts = await db.as(S.parentA, "select title, body from public.notifications where kind = 'child_left_lesson' and body like '%Cool Math%'");
+  assert.equal(alerts.length, 1, "opted-in parent told at once");
+  assert.match(alerts[0].body, /Cool Math Games/);
+  assert.match(alerts[0].body, /Warm-up/);
+  await db.admin("update public.environment_events set resolved_at = now() + interval '3 minutes' where class_session_id = $1", [s.id]);
+
+  // The daily report, per subject.
+  const day = await db.rpc(S.parentA, "parent_report", { p_student: S.stu1, p_period: "day" });
+  const maths = day.subjects.find((x) => x.class_id === S.classA);
+  assert.equal(maths.now.sessions_attended - before.sessions_attended, 1);
+  assert.equal(maths.now.answers - before.answers, 1);
+  assert.ok(maths.now.accuracy >= 0 && maths.now.accuracy <= 100);
+  assert.equal(maths.now.reasoned - before.reasoned, 1);
+  assert.equal(maths.now.hands_raised - before.hands_raised, 1);
+  assert.equal(maths.now.focus_events - before.focus_events, 1);
+  assert.ok(maths.now.participation > 0 && maths.now.participation <= 100);
+  const f = maths.now.focus.find((x) => x.page_title === "Run 3 - Cool Math Games");
+  assert.equal(f.page_title, "Run 3 - Cool Math Games");
+  assert.equal(f.site, "coolmathgames.com");
+  assert.equal(f.context.slide_heading, "Adding fractions");
+  assert.equal(f.returned, true);
+  assert.ok(f.away_minutes >= 1);
+  assert.equal(maths.trend.length, 6, "six weeks of progress");
+  const week = await db.rpc(S.parentA, "parent_report", { p_student: S.stu1, p_period: "week" });
+  assert.ok(week.subjects.find((x) => x.class_id === S.classA).now.answers >= 1);
+
+  // The school can limit parents to counts; staff still see details.
+  await db.as(S.adminA, "update public.tenant_settings set parent_focus_details = false");
+  const limited = (await db.rpc(S.parentA, "parent_report", { p_student: S.stu1, p_period: "day" })).subjects.find((x) => x.class_id === S.classA);
+  assert.ok(limited.now.focus_events >= 1);
+  assert.deepEqual(limited.now.focus, []);
+  assert.ok((await db.rpc(t, "parent_report", { p_student: S.stu1, p_period: "day" })).subjects.find((x) => x.class_id === S.classA).now.focus.length >= 1);
+  await db.as(S.adminA, "update public.tenant_settings set parent_focus_details = true");
+
+  // Only the child's own guardians and staff.
+  await rejects(db.rpc(S.parentA, "parent_report", { p_student: S.stu2, p_period: "day" }), /not found/);
+  await rejects(db.rpc(S.stu2, "parent_report", { p_student: S.stu1, p_period: "day" }), /not found/);
+  await rejects(db.rpc(S.adminB, "parent_report", { p_student: S.stu1, p_period: "day" }), /not found|profile/);
+
+  // A released grade below the parent's threshold.
+  const [asg] = await db.admin(`insert into public.assignments (tenant_id, class_id, title, points_possible, created_by) values ($1,$2,'Fractions homework',10,$3) returning id`, [S.tenantA, S.classA, t]);
+  const [sub] = await db.admin(`insert into public.submissions (tenant_id, assignment_id, student_id) values ($1,$2,$3) returning id`, [S.tenantA, asg.id, S.stu1]);
+  await db.admin(`insert into public.grades (tenant_id, submission_id, grader_id, score, released_at) values ($1,$2,$3,6,now())`, [S.tenantA, sub.id, t]);
+  const low = await db.as(S.parentA, "select title, body from public.notifications where kind = 'child_low_score'");
+  assert.equal(low.length, 1);
+  assert.match(low[0].body, /60%/);
+  assert.equal(typeof (await db.admin("select app.send_parent_digests() n"))[0].n, "number");
+
+  // Parent ↔ teacher messages: private to the two of them.
+  const thread = await db.rpc(S.parentA, "open_parent_thread", { p_student: S.stu1, p_class: S.classA });
+  await db.rpc(S.parentA, "send_message", { p_thread: thread, p_body: "Hello, how is Ada getting on with fractions?" });
+  await db.rpc(t, "send_message", { p_thread: thread, p_body: "Very well: she explains her thinking clearly." });
+  assert.equal((await db.as(t, "select * from public.chat_messages where thread_id = $1", [thread])).length, 2);
+  assert.equal((await db.as(S.stu1, "select * from public.chat_threads where id = $1", [thread])).length, 0, "the child can't see it");
+  assert.equal((await db.as(S.stu1, "select app.can_listen($1) ok", [`thread:${thread}`]))[0].ok, false);
+  assert.equal((await db.as(S.parentA, "select app.can_listen($1) ok", [`thread:${thread}`]))[0].ok, true);
+  await rejects(db.rpc(S.stu1, "send_message", { p_thread: thread, p_body: "hi" }), /Not your conversation/);
+  await rejects(db.rpc(S.parentA, "open_parent_thread", { p_student: S.stu2, p_class: S.classA }), /Not your child/);
+  assert.equal(await db.rpc(t, "open_parent_thread", { p_student: S.stu1, p_class: S.classA, p_parent: S.parentA }), thread, "the teacher reaches the same thread");
+  assert.ok((await db.rpc(t, "class_parents", { p_class: S.classA })).some((p) => p.parent_id === S.parentA));
+  await db.rpc(t, "end_session", { p_session: s.id });
+});
+
+test("pen-test fixes: school admins can't unlock paid features; anonymous error reports can't crowd out real ones", async () => {
+  // School B on the free plan (no device control, but games included).
+  await db.admin("update public.tenants set plan_code = 'free_teacher' where id = $1", [S.tenantB]);
+  await rejects(db.as(S.adminB, "insert into public.feature_flags (tenant_id, key, enabled) values ($1, 'device_control', true)", [S.tenantB]), /row-level security|violates/);
+  assert.equal((await db.admin("select app.feature($1, 'device_control') f", [S.tenantB]))[0].f, false);
+  // Even a flag planted directly can't switch a feature on beyond the plan.
+  await db.admin("insert into public.feature_flags (tenant_id, key, enabled) values ($1, 'device_control', true)", [S.tenantB]);
+  assert.equal((await db.admin("select app.feature($1, 'device_control') f", [S.tenantB]))[0].f, false);
+  // Switching an included feature off is still the school's choice.
+  await db.as(S.adminB, "insert into public.feature_flags (tenant_id, key, enabled) values ($1, 'games', false)", [S.tenantB]);
+  assert.equal((await db.admin("select app.feature($1, 'games') f", [S.tenantB]))[0].f, false);
+  await db.admin("delete from public.feature_flags where tenant_id = $1", [S.tenantB]);
+  assert.equal((await db.admin("select app.feature($1, 'games') f", [S.tenantB]))[0].f, true);
+
+  // Anonymous error reports are capped at 150 new rows an hour; signed-in reports still get through.
+  for (let i = 0; i < 160; i++) await db.rpc(null, "log_error", { p_source: "client", p_message: `junk ${i}` });
+  const [{ n }] = await db.admin("select count(*)::int n from public.error_events where user_id is null and first_seen_at > now() - interval '1 hour'");
+  assert.equal(n, 150);
+  await db.rpc(S.teacherA, "log_error", { p_source: "client", p_message: "real error after the flood" });
+  assert.equal((await db.admin("select count(*)::int n from public.error_events where message = 'real error after the flood'"))[0].n, 1);
 });
 
 test("deleting a school with real data removes everything (no FK ordering errors)", async () => {

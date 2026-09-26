@@ -61,7 +61,8 @@ export function toCsv(rows: Record<string, unknown>[]): string {
     const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
     return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
-  return [cols.join(","), ...rows.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\n");
+  // Headers too: the gradebook uses assignment titles as column names.
+  return [cols.map(esc).join(","), ...rows.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\n");
 }
 
 const TITLES = /^(mr|mrs|ms|miss|mx|dr|prof|sir|rev)\.?$/i;
@@ -81,4 +82,15 @@ export function dayPart(timeZone?: string | null, now = new Date()): "morning" |
   let h = now.getHours();
   try { h = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: timeZone || undefined }).format(now)); } catch { /* unknown zone: server time */ }
   return h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+}
+
+/** Only web and email links from user content (never javascript:, data: or other schemes). */
+export function safeHref(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url.trim());
+    return ["https:", "http:", "mailto:"].includes(u.protocol) ? u.toString() : null;
+  } catch {
+    return null;
+  }
 }

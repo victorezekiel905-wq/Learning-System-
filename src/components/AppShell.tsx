@@ -57,7 +57,7 @@ const NAV: NavItem[] = [
   { href: "/student/work", label: "My work", icon: "clipboard", roles: ["student"], group: "Learn" },
   { href: "/student/device", label: "This device", icon: "laptop", roles: ["student"], group: "Learn" },
   { href: "/parent", label: "My children", short: "Children", icon: "users", roles: ["parent"], group: "Family" },
-  { href: "/messages", label: "Messages", icon: "chat", roles: ["student", "teacher", "school_admin", "platform_admin"], group: "School" },
+  { href: "/messages", label: "Messages", icon: "chat", roles: ["student", "teacher", "school_admin", "platform_admin", "parent"], group: "School" },
   { href: "/admin", label: "School admin", short: "Admin", icon: "building", roles: A, group: "School" },
   { href: "/account", label: "Settings", icon: "settings", roles: EVERYONE, group: "School" }
 ];
@@ -69,7 +69,7 @@ const TABS: Record<Role, string[]> = {
   platform_admin: ["/teacher", "/teacher/classes", "/teacher/live", "/admin"],
   it_admin: ["/guard", "/guard/environments", "/teacher/classes", "/teacher/reports"],
   student: ["/student", "/student/join", "/student/work", "/messages"],
-  parent: ["/parent", "/account"]
+  parent: ["/parent", "/messages", "/account"]
 };
 
 // Full-attention screens (live lesson, editors, games) hide the tab bar; Menu stays in the header.

@@ -19,7 +19,7 @@ test("update file upgrades a live database from 0730 and is safe to re-run", asy
     const r = await db.pg.exec(sql);
     assert.deepEqual(r.at(-1).rows[0], { lockdown_ready: true, operations_ready: true, scale_ready: true });
   }
-  assert.equal((await db.rpc(null, "health", {})).schema, "0810");
+  assert.equal((await db.rpc(null, "health", {})).schema, "0830");
   // Existing data still works through the new code paths.
   const s = await db.rpc(admin, "start_session", { p_class: cls.id });
   await db.rpc(student, "join_session", { p_code: s.join_code });
@@ -55,15 +55,36 @@ test("2026-09-25 classroom update applies on a database at 0760 and lets a stude
   assert.equal(await can(admin, `screen:${s.id}:${stu}`), true);
 });
 
-test("2026-09-26 update (fair play + audit fixes) applies on a database at 0790 and is safe to re-run", async () => {
+test("2026-09-27 RUN_THIS update takes a live 0790 database to 0830, all checks true, safe to re-run", async () => {
   const db = await createDb("20260901000790_engaging_learning.sql");
   const admin = await db.signUp("a@fair.test", "Fair Admin");
   await db.rpc(admin, "bootstrap_school", { p_school_name: "Fair School", p_full_name: "Fair Admin" });
   const cls = await db.rpc(admin, "create_class", { p_name: "Fair 1" });
-  const sql = readFileSync(new URL("../updates/2026-09-26_fair_play.sql", import.meta.url), "utf8");
-  for (let i = 0; i < 2; i++) assert.equal((await db.pg.exec(sql)).at(-1).rows[0].schema, "0810");
+  const sql = readFileSync(new URL("../updates/2026-09-27_RUN_THIS_update.sql", import.meta.url), "utf8");
+  for (let i = 0; i < 2; i++) {
+    assert.deepEqual((await db.pg.exec(sql)).at(-1).rows[0], { schema: "0830", fair_play_ready: true, code_guessing_blocked: true,
+      slide_order_ready: true, parent_reports_ready: true, parent_messages_ready: true, paid_features_protected: true });
+  }
   const stu = await db.signUp("s@fair.test", "Fair Student");
   await db.rpc(stu, "redeem_code", { p_code: cls.join_code });
   await db.rpc(admin, "set_student_supports", { p_class: cls.id, p_student: stu, p_read_aloud: true, p_readable_font: false, p_extra_time_pct: 25, p_calm_mode: false });
   assert.equal((await db.rpc(stu, "my_supports", {})).extra_time_pct, 25);
+});
+
+test("2026-09-27 RUN_THIS update also applies on a live database already at 0810 (with data), twice", async () => {
+  const db = await createDb("20260901000810_audit_fixes.sql");
+  const admin = await db.signUp("a@0810.test", "Admin 0810");
+  const tenant = (await db.rpc(admin, "bootstrap_school", { p_school_name: "School 0810", p_full_name: "Admin 0810" })).tenant_id;
+  await db.admin("update public.tenants set plan_code = 'school' where id = $1", [tenant]);
+  const cls = await db.rpc(admin, "create_class", { p_name: "Class 0810" });
+  const stu = await db.signUp("s@0810.test", "Student 0810");
+  await db.rpc(stu, "redeem_code", { p_code: cls.join_code });
+  const t = await db.rpc(stu, "open_direct_thread", { p_class: cls.id });
+  await db.rpc(stu, "send_message", { p_thread: t, p_body: "written before the update" });
+  const sql = readFileSync(new URL("../updates/2026-09-27_RUN_THIS_update.sql", import.meta.url), "utf8");
+  for (let i = 0; i < 2; i++) assert.equal((await db.pg.exec(sql)).at(-1).rows[0].schema, "0830");
+  // Existing conversations survive the chat_threads change, and the new features work on old data.
+  assert.equal((await db.as(stu, "select count(*)::int n from public.chat_messages where thread_id = $1", [t]))[0].n, 1);
+  const r = await db.rpc(admin, "parent_report", { p_student: stu, p_period: "week" });
+  assert.ok(r.subjects.some((s) => s.class_id === cls.id));
 });

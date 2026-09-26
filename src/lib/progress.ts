@@ -9,13 +9,15 @@ export type Progress = {
 
 export const BADGE_LABEL: Record<string, string> = {
   first_steps: "First steps", rising_star: "Rising star", scholar: "Scholar", deep_thinker: "Deep thinker",
-  perfectionist: "Perfectionist", challenger: "Challenger", shout_out: "Teacher shout-out", game_on: "Game on"
+  perfectionist: "Perfectionist", challenger: "Challenger", shout_out: "Teacher shout-out", game_on: "Game on",
+  author: "Question author"
 };
 
 export const BADGE_HINT: Record<string, string> = {
   first_steps: "Earned your first XP", rising_star: "Reached 100 XP", scholar: "Reached 1,000 XP",
   deep_thinker: "Explained your reasoning 10 times", perfectionist: "Got a perfect score",
-  challenger: "Chose the Extension challenge", shout_out: "Your teacher gave you a shout-out", game_on: "Played 3 class games"
+  challenger: "Chose the Extension challenge", shout_out: "Your teacher gave you a shout-out", game_on: "Played 3 class games",
+  author: "Wrote a question your teacher added to a quiz"
 };
 
 export const CHALLENGE: Record<1 | 2 | 3, { name: string; hint: string }> = {

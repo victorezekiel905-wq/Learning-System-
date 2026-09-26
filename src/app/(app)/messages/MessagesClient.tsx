@@ -8,7 +8,20 @@ import { useLoader } from "@/lib/hooks";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn } from "@/lib/utils";
 
-type Thread = { id: string; class_id: string; student_id: string; teacher_id: string; classes: { name: string } | null; student: { full_name: string } | null; teacher: { full_name: string } | null };
+type Thread = {
+  id: string; kind?: "direct" | "parent"; class_id: string; student_id: string; teacher_id: string; parent_id?: string | null;
+  classes: { name: string } | null; student: { full_name: string } | null; teacher: { full_name: string } | null; parent?: { full_name: string } | null;
+};
+
+/** Who the conversation is with, from the viewer's side. Parent threads name the child they're about. */
+function withWhom(t: Thread, meId: string) {
+  if (t.kind === "parent") {
+    return meId === t.parent_id
+      ? { name: t.teacher?.full_name ?? "Teacher", sub: `about ${t.student?.full_name ?? "your child"} · ${t.classes?.name ?? ""}` }
+      : { name: t.parent?.full_name ?? "Parent", sub: `parent of ${t.student?.full_name ?? "a student"} · ${t.classes?.name ?? ""}` };
+  }
+  return { name: (meId === t.student_id ? t.teacher?.full_name : t.student?.full_name) ?? "?", sub: t.classes?.name ?? "" };
+}
 
 export function MessagesClient({ threads, classes, me, initialThread, initialClass }: {
   threads: Thread[]; classes: { id: string; name: string; teacher?: string }[]; me: { id: string; role: string }; initialThread?: string; initialClass?: string;
@@ -19,6 +32,7 @@ export function MessagesClient({ threads, classes, me, initialThread, initialCla
   const [cls, setCls] = useState(initialClass ?? classes[0]?.id ?? "");
   const [student, setStudent] = useState("");
   const isStudent = me.role === "student";
+  const isParent = me.role === "parent";
 
   const roster = useLoader(async () => {
     if (isStudent || !cls) return [];
@@ -44,20 +58,22 @@ export function MessagesClient({ threads, classes, me, initialThread, initialCla
   return (
     <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
       <div className="space-y-4">
-        <Card title="New conversation">
+        {isParent ? (
+          <Card title="New conversation"><p className="text-sm text-ink-600">Open your child's report and choose <strong>Message teacher</strong> on any subject.</p></Card>
+        ) : <Card title="New conversation">
           <div className="space-y-2">
             <Field label="Class"><Select value={cls} onChange={(e) => setCls(e.target.value)}>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}{c.teacher ? ` (${c.teacher})` : ""}</option>)}</Select></Field>
             {!isStudent && <Field label="Student"><Select value={student} onChange={(e) => setStudent(e.target.value)}><option value="">Choose…</option>{(roster.data ?? []).map((r) => <option key={r.user_id} value={r.user_id}>{r.users?.full_name}</option>)}</Select></Field>}
             <Button className="w-full" disabled={!cls || (!isStudent && !student)} onClick={() => start(cls, isStudent ? undefined : student)}>{isStudent ? "Message my teacher" : "Open chat"}</Button>
           </div>
-        </Card>
+        </Card>}
         <Card title="Conversations" pad={false}>
           {threads.length === 0 ? <p className="p-4 text-sm text-ink-500">No conversations yet.</p> : (
             <ul>{threads.map((t) => {
-              const other = me.id === t.student_id ? t.teacher?.full_name : t.student?.full_name;
+              const w = withWhom(t, me.id);
               return (
-                <li key={t.id}><button onClick={() => setActive(t.id)} className={cn("flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-ink-50", active === t.id && "bg-brand-50")}>
-                  <Avatar name={other ?? "?"} /><span className="min-w-0"><span className="block truncate text-sm font-medium">{other}</span><span className="block truncate text-xs text-ink-500">{t.classes?.name}</span></span>
+                <li key={t.id}><button onClick={() => setActive(t.id)} aria-current={active === t.id || undefined} className={cn("flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-ink-50", active === t.id && "bg-ink-100")}>
+                  <Avatar name={w.name} /><span className="min-w-0"><span className="block truncate text-sm font-semibold">{w.name}</span><span className="block truncate text-[12px] text-ink-500">{w.sub}</span></span>
                 </button></li>
               );
             })}</ul>
@@ -67,8 +83,8 @@ export function MessagesClient({ threads, classes, me, initialThread, initialCla
       <Card pad={false} className="overflow-hidden">
         {active ? (
           <>
-            {current && <p className="border-b border-ink-100 px-4 py-2 text-sm font-semibold">{me.id === current.student_id ? current.teacher?.full_name : current.student?.full_name} · {current.classes?.name}</p>}
-            <ThreadView threadId={active} meId={me.id} canModerate={!isStudent} className="h-[65vh]" />
+            {current && <p className="border-b border-ink-100 px-4 py-3 text-sm"><span className="font-semibold">{withWhom(current, me.id).name}</span> <span className="text-ink-500">· {withWhom(current, me.id).sub}</span></p>}
+            <ThreadView threadId={active} meId={me.id} canModerate={!isStudent && !isParent} className="h-[65vh]" />
           </>
         ) : <div className="p-6"><Empty title="Pick a conversation" /></div>}
       </Card>

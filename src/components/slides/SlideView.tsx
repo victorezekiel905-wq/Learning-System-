@@ -2,6 +2,8 @@
 import type { ReactNode } from "react";
 import { RichText } from "@/components/RichText";
 import { embedUrl, isDirectVideo, useSignedUrl } from "@/lib/media";
+import { safeHref } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
 import type { Shape, SlideContent, SlideKind } from "@/lib/types";
 import { BOARD_H, BOARD_W, StrokeLayer } from "./Whiteboard";
 
@@ -107,7 +109,7 @@ export function SlideView({ slide, activitySlot, overlay, onVideoTime, videoRef 
         <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
           {c.heading && <h2 className="text-2xl font-bold">{c.heading}</h2>}
           <RichText text={c.body} className="max-w-xl text-ink-600" />
-          {c.url && <a href={c.url} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-lg no-underline">{c.label || "Open link"} ↗</a>}
+          {safeHref(c.url) && <a href={safeHref(c.url)!} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-lg no-underline">{c.label || "Open link"}<Icon name="external" className="h-4 w-4" /></a>}
         </div>
       );
       break;

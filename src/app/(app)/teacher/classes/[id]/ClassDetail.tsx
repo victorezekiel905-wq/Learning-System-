@@ -62,6 +62,20 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
   const dialog = useDialog();
   const [importOpen, setImportOpen] = useState(false);
   const [codeModal, setCodeModal] = useState<{ title: string; code: string; note: string } | null>(null);
+  const [parents, setParents] = useState<{ student: string; list: { parent_id: string; parent: string; relation: string }[]; studentId: string } | null>(null);
+  const router = useRouter();
+
+  async function messageParent(studentId: string, name: string) {
+    const all = await rpc<{ student_id: string; parent_id: string; parent: string; relation: string }[]>("class_parents", { p_class: cls.id });
+    const list = all.filter((x) => x.student_id === studentId);
+    if (!list.length) { toast(`No parent is linked to ${name} yet. Send them a parent invite first.`, "info"); return; }
+    if (list.length === 1) { await openParent(studentId, list[0]!.parent_id); return; }
+    setParents({ student: name, list, studentId });
+  }
+  async function openParent(studentId: string, parentId: string) {
+    const id = await rpc<string>("open_parent_thread", { p_student: studentId, p_class: cls.id, p_parent: parentId });
+    router.push(`/messages?thread=${id}`);
+  }
   const joinUrl = typeof window !== "undefined" ? `${window.location.origin}/join?code=${cls.join_code}` : "";
 
   async function remove(userId: string) {
@@ -103,6 +117,8 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
                   {canManage && (
                     <td className="text-right">
                       {m.role === "student" && <div className="flex justify-end gap-1">
+                        <Link href={`/teacher/students/${m.user_id}`} className="btn btn-ghost btn-sm no-underline">Report</Link>
+                        <Button size="sm" variant="ghost" onClick={() => messageParent(m.user_id, m.users?.full_name ?? "this student")}>Message parent</Button>
                         <Button size="sm" variant="ghost" onClick={() => parentInvite(m.user_id, m.users?.full_name ?? "student")}>Parent invite</Button>
                         <Button size="sm" variant="ghost" onClick={() => pairDevice(m.user_id, m.users?.full_name ?? "student")}>Pair device</Button>
                         <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => remove(m.user_id)}>Remove</Button>
@@ -123,6 +139,14 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
       </Card>
 
       {importOpen && <RosterImport cls={cls} onClose={() => { setImportOpen(false); void reload(); }} />}
+      <Modal open={!!parents} onClose={() => setParents(null)} title={`Message a parent of ${parents?.student ?? ""}`}>
+        <ul className="space-y-2">{parents?.list.map((x) => (
+          <li key={x.parent_id} className="flex items-center justify-between gap-3 rounded-xl border border-ink-200 px-3 py-2">
+            <span><span className="font-semibold">{x.parent}</span> <span className="text-[13px] capitalize text-ink-500">{x.relation}</span></span>
+            <Button size="sm" onClick={() => openParent(parents.studentId, x.parent_id)}>Message</Button>
+          </li>
+        ))}</ul>
+      </Modal>
       <Modal open={!!codeModal} onClose={() => setCodeModal(null)} title={codeModal?.title ?? ""}>
         {codeModal && <div className="space-y-3 text-center">
           <p className="font-mono text-4xl font-extrabold tracking-[0.25em] text-brand-700">{codeModal.code}</p>
