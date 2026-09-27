@@ -2,11 +2,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ThreadView } from "@/components/chat/ThreadView";
-import { Avatar, Button, Card, Empty, Field, Select, useToast } from "@/components/ui";
+import { Avatar, Button, Card, Field, Select, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
 
 type Thread = {
   id: string; kind?: "direct" | "parent"; class_id: string; student_id: string; teacher_id: string; parent_id?: string | null;
@@ -86,7 +87,15 @@ export function MessagesClient({ threads, classes, me, initialThread, initialCla
             {current && <p className="border-b border-ink-100 px-4 py-3 text-sm"><span className="font-semibold">{withWhom(current, me.id).name}</span> <span className="text-ink-500">· {withWhom(current, me.id).sub}</span></p>}
             <ThreadView threadId={active} meId={me.id} canModerate={!isStudent && !isParent} className="h-[65vh]" />
           </>
-        ) : <div className="p-6"><Empty title="Pick a conversation" /></div>}
+        ) : (
+          <div className="grid min-h-[40vh] place-items-center p-8 text-center">
+            <div className="max-w-sm">
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-ink-100 text-ink-700"><Icon name="chat" className="h-5 w-5" /></span>
+              <p className="mt-4 font-display text-base font-bold text-ink-900">Pick a conversation</p>
+              <p className="mt-1.5 text-sm text-ink-600">{isStudent ? "Choose a conversation, or message your teacher from the list." : isParent ? "Choose a conversation, or message your child's teacher." : "Choose a conversation on the left, or start one with a student or their parent."} Messages are private and kept in your school's records.</p>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

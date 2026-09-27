@@ -3,11 +3,11 @@ import { useState } from "react";
 import { ArrowDownRight, ArrowUpRight, Minus, Printer } from "lucide-react";
 import { ThreadView } from "@/components/chat/ThreadView";
 import { Icon } from "@/components/Icon";
-import { Alert, Badge, Button, Card, Empty, Modal, Spinner, Tabs, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Empty, Modal, Spinner, Tabs, useToast } from "@/components/ui";
 import { useRpc } from "@/lib/hooks";
 import { BADGE_LABEL } from "@/lib/progress";
 import { errorText, rpc } from "@/lib/rpc";
-import { cn } from "@/lib/utils";
+import { cn, plural } from "@/lib/utils";
 
 type Stats = {
   sessions_held: number; sessions_attended: number; minutes: number; answers: number; accuracy: number | null; reasoned: number;
@@ -45,6 +45,8 @@ const shift = (date: string, days: number) => {
   const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10);
 };
 const fmtDay = (date: string, opts: Intl.DateTimeFormatOptions) => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { timeZone: "UTC", ...opts });
+/** 212 -> "3 h 32 min"; 45 -> "45 min". */
+const fmtMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`);
 const fmtTime = (iso: string, tz: string) => new Date(iso).toLocaleString(undefined, { timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit" });
 
 function Change({ now, before, unit = "" }: { now: number | null; before: number | null; unit?: string }) {
@@ -114,8 +116,8 @@ export function ChildReport({ studentId, viewer, meId, openThread, initialPeriod
             <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
               {[
                 ["Participation", avgParticipation === null ? "—" : `${avgParticipation}`, participationLabel(avgParticipation).text],
-                ["Accuracy", avgAccuracy === null ? "—" : `${avgAccuracy}%`, `${sum("answers")} answers`],
-                ["In class", `${sum("minutes")} min`, `${sum("sessions_attended")} of ${sum("sessions_held")} lessons`],
+                ["Accuracy", avgAccuracy === null ? "—" : `${avgAccuracy}%`, plural(sum("answers"), "answer")],
+                ["In class", fmtMinutes(sum("minutes")), `${sum("sessions_attended")} of ${plural(sum("sessions_held"), "lesson")}`],
                 ["Left a lesson", `${sum("focus_events")}`, sum("focus_events") === 0 ? "Stayed focused" : "See details below"]
               ].map(([k, v, sub]) => (
                 <div key={k}>
@@ -133,7 +135,7 @@ export function ChildReport({ studentId, viewer, meId, openThread, initialPeriod
           </section>
 
           {all.length === 0 ? <Empty title="No classes yet" icon={<Icon name="book" />}>When your child joins a class, their report appears here.</Empty> : (
-            <div className="grid gap-5 xl:grid-cols-2">
+            <div className="space-y-5">
               {all.map((s) => <SubjectCard key={s.class_id} s={s} r={r} viewer={viewer} onMessage={() => messageTeacher(s)} />)}
             </div>
           )}
@@ -158,9 +160,15 @@ function SubjectCard({ s, r, viewer, onMessage }: { s: Subject; r: Report; viewe
   const p = participationLabel(s.now.participation);
   const maxXp = Math.max(1, ...s.trend.map((w) => w.xp));
   return (
-    <Card title={<span className="flex flex-wrap items-center gap-2">{s.subject ?? s.class}<span className="text-[13px] font-normal text-ink-500">{s.class}{s.teacher && ` · ${s.teacher}`}</span></span>}
-      actions={viewer === "parent" && <Button size="sm" variant="secondary" onClick={onMessage}><Icon name="chat" className="h-4 w-4" />Message teacher</Button>}>
-      <div className="space-y-5">
+    <section className="card overflow-hidden" aria-label={s.subject ?? s.class}>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4 sm:px-6">
+        <div className="min-w-0">
+          <h3 className="font-display text-lg font-extrabold tracking-tight">{s.subject ?? s.class}</h3>
+          <p className="text-[13px] text-ink-500">{s.class}{s.teacher && ` · ${s.teacher}`}</p>
+        </div>
+        {viewer === "parent" && <Button size="sm" variant="secondary" onClick={onMessage}><Icon name="chat" className="h-4 w-4" />Message teacher</Button>}
+      </header>
+      <div className="space-y-6 p-5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[13px] font-semibold text-ink-500">Participation</p>
@@ -174,10 +182,10 @@ function SubjectCard({ s, r, viewer, onMessage }: { s: Subject; r: Report; viewe
           </div>
         )}
 
-        <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+        <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           {[
             ["Lessons", `${s.now.sessions_attended}/${s.now.sessions_held}`],
-            ["Time in class", `${s.now.minutes} min`],
+            ["Time in class", fmtMinutes(s.now.minutes)],
             ["Answers", `${s.now.answers}`],
             ["Accuracy", s.now.accuracy === null ? "—" : `${s.now.accuracy}%`],
             ["Explained reasoning", `${s.now.reasoned}`],
@@ -190,17 +198,22 @@ function SubjectCard({ s, r, viewer, onMessage }: { s: Subject; r: Report; viewe
         </dl>
 
         <div>
-          <p className="mb-2 text-[13px] font-semibold text-ink-600">Learning progress, last 6 weeks</p>
-          <ol className="grid h-24 grid-cols-6 items-end gap-2" aria-label="Weekly XP and accuracy">
-            {s.trend.map((w) => (
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-[13px] font-semibold text-ink-600">Learning progress, last 6 weeks</p>
+            <p className="flex items-center gap-3 text-[12px] text-ink-500">
+              <span className="inline-flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-accent-500" />XP earned</span>
+              <span className="inline-flex items-center gap-1.5"><span aria-hidden className="font-bold text-ink-700">%</span>accuracy</span>
+            </p>
+          </div>
+          <ol className="grid h-28 grid-cols-6 items-end gap-2 sm:gap-4" aria-label="Weekly XP and accuracy">
+            {s.trend.map((w, i) => (
               <li key={w.week} className="flex h-full flex-col items-center justify-end gap-1" title={`Week of ${w.week}: ${w.xp} XP, accuracy ${w.accuracy ?? "—"}%`}>
                 <span className="text-[11px] font-semibold tabular-nums text-ink-600">{w.accuracy === null ? "" : `${w.accuracy}%`}</span>
-                <span className="w-full rounded-t-md bg-accent-500" style={{ height: `${Math.max(4, (w.xp / maxXp) * 60)}px` }} />
+                <span className={cn("w-full max-w-[3.5rem] rounded-t-md", i === s.trend.length - 1 ? "bg-accent-500" : "bg-accent-300")} style={{ height: `${Math.max(4, (w.xp / maxXp) * 64)}px` }} />
                 <span className="text-[10px] text-ink-500">{fmtDay(w.week, { day: "numeric", month: "short" })}</span>
               </li>
             ))}
           </ol>
-          <p className="mt-1 text-[12px] text-ink-500">Bars: XP earned each week. Numbers: accuracy.</p>
         </div>
 
         {(s.assignments.due > 0 || s.grades.length > 0) && (
@@ -248,6 +261,6 @@ function SubjectCard({ s, r, viewer, onMessage }: { s: Subject; r: Report; viewe
           )}
         </div>
       </div>
-    </Card>
+    </section>
   );
 }

@@ -1,5 +1,6 @@
 import { fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
 import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
+import { appOrigin } from "@/lib/app-url";
 
 type Row = { email: string; full_name: string; code: string | null; status: string };
 
@@ -45,7 +46,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
   const iEmail = col("email"), iFull = col("full_name"), iFirst = col("first_name"), iLast = col("last_name");
   if (iEmail < 0) return fail(400, "Missing an 'email' column.");
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
+  const origin = appOrigin(new URL(req.url).origin);
   const service = body.send_email && hasServiceRole() ? createServiceClient() : null;
   const rows: Row[] = [];
   let emailed = 0;

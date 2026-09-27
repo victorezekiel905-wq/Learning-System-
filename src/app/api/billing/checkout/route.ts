@@ -1,4 +1,5 @@
 import { fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
+import { appOrigin } from "@/lib/app-url";
 
 const PRICE_ENV: Record<string, string> = {
   teacher_pro: "STRIPE_PRICE_TEACHER_PRO",
@@ -17,7 +18,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
   const price = envName ? process.env[envName] : undefined;
   if (!price) return fail(400, "That plan can't be bought online.");
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
+  const origin = appOrigin(new URL(req.url).origin);
   const form = new URLSearchParams({
     mode: "subscription",
     "line_items[0][price]": price,

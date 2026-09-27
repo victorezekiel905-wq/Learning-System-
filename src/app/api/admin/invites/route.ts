@@ -1,5 +1,6 @@
 import { callRpc, fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
 import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
+import { appOrigin } from "@/lib/app-url";
 
 /** Create a staff/parent invite; email it through Supabase Auth when the service role is configured. */
 export const POST = withErrorLog(async function POST(req: Request) {
@@ -17,7 +18,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
 
   let emailed = false;
   if (email && hasServiceRole()) {
-    const origin = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
+    const origin = appOrigin(new URL(req.url).origin);
     const { error } = await createServiceClient().auth.admin.inviteUserByEmail(email, {
       data: { intent: "code", code }, redirectTo: `${origin}/auth/callback?next=/onboarding`
     });

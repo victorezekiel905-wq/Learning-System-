@@ -15,8 +15,10 @@ export function KeyboardScroll() {
         if (scrolls && !el.hasAttribute("tabindex")) {
           el.tabIndex = 0;
           el.dataset.kbdScroll = "1";
-          // Never override an element's own role (e.g. a tab list that scrolls on phones).
-          if (!el.hasAttribute("role") && !el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby") && el.tagName !== "TABLE") {
+          // Only plain containers get a role. Never override an element's own role, stated
+          // (a tab list that scrolls on phones) or built in (a <ul> nav, a <table>): a list
+          // turned into a "region" is no longer announced as a list.
+          if ((el.tagName === "DIV" || el.tagName === "SPAN") && !el.hasAttribute("role") && !el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby")) {
             el.setAttribute("role", "region");
             el.setAttribute("aria-label", "Scrollable content");
             el.dataset.kbdRole = "1";

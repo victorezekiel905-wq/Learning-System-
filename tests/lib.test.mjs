@@ -94,3 +94,16 @@ test("pen-test fixes: formula-safe CSV headers, safe link schemes, no protocol-r
   assert.equal(utils.safeHref("mailto:office@school.org"), "mailto:office@school.org");
   assert.equal(utils.safeHref("not a url"), null);
 });
+
+test("links use the real address, never a leftover localhost setting", async () => {
+  const { appOrigin } = await load("src/lib/app-url.ts");
+  const was = process.env.NEXT_PUBLIC_APP_URL;
+  process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
+  assert.equal(appOrigin("https://app.synergyswift.com"), "https://app.synergyswift.com", "production visit ignores a localhost setting");
+  assert.equal(appOrigin("http://localhost:3100"), "http://localhost:3000", "local development keeps it");
+  process.env.NEXT_PUBLIC_APP_URL = "https://app.synergyswift.com/";
+  assert.equal(appOrigin("https://preview.vercel.app"), "https://app.synergyswift.com", "a real setting wins");
+  delete process.env.NEXT_PUBLIC_APP_URL;
+  assert.equal(appOrigin("https://school.example"), "https://school.example");
+  if (was !== undefined) process.env.NEXT_PUBLIC_APP_URL = was;
+});

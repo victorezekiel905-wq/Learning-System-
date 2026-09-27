@@ -74,14 +74,20 @@
 }
 
 /* Phones and small tablets: wide tables scroll sideways inside their card instead of
-   stretching the page. Desktop layout is unchanged. */
+   stretching the page. Desktop layout is unchanged. "relative" keeps absolutely
+   positioned content (screen-reader-only labels) inside the scroll area; without it
+   they escape the clip and widen the whole page. */
 @media (max-width: 767px) {
-  .table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table { position: relative; display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .table th, .table td { white-space: nowrap; }
 }
 
-/* Long codes, URLs and emails never push the page wider than the screen. */
-main, .page, .card { overflow-wrap: anywhere; }
+/* Long codes, URLs and emails wrap instead of pushing the page wider. "break-word"
+   (not "anywhere") so ordinary words keep their width: with "anywhere", tables and
+   flex rows could squeeze text to one letter per line. */
+main, .page, .card { overflow-wrap: break-word; }
+.table th, .table td { overflow-wrap: normal; }
+.table td { word-break: normal; }
 
 /* "Easy-to-read font" learning support (set privately by a teacher): Atkinson Hyperlegible,
    wider letter and line spacing, on every screen the student sees. */

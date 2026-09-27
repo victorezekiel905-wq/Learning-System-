@@ -10,7 +10,7 @@ import { LevelsPanel } from "./LevelsPanel";
 import { SupportsPanel } from "./SupportsPanel";
 import { Icon } from "@/components/Icon";
 import {
-  Alert, Avatar, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, PageHeader, Select, Tabs, Textarea, useToast, useDialog } from "@/components/ui";
+  Alert, Avatar, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, PageHeader, Select, Tabs, Textarea, useToast, useDialog, Menu } from "@/components/ui";
 
 type Cls = { id: string; name: string; subject: string | null; grade_level: string | null; join_code: string; archived_at: string | null; teacher_id: string; tenant_id: string };
 type Member = { user_id: string; role: string; joined_at: string; users: { full_name: string; email: string } | null };
@@ -106,22 +106,32 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
           <div className="p-5"><Empty title="No students yet">Share the class code <strong className="font-mono">{cls.join_code}</strong>, or import a CSV.</Empty></div>
         ) : (
           <table className="table">
-            <thead><tr><th>Name</th><th>Role</th><th>Joined</th>{canManage && <th className="text-right">Actions</th>}</tr></thead>
+            <thead><tr><th>Name</th><th className="hidden sm:table-cell">Role</th><th className="hidden sm:table-cell">Joined</th>{canManage && <th className="text-right"><span className="sr-only">Actions</span></th>}</tr></thead>
             <tbody>
               {members.map((m) => (
                 <tr key={m.user_id}>
-                  <td><div className="flex items-center gap-2"><Avatar name={m.users?.full_name ?? "?"} className="h-7 w-7" />
-                    <div><p className="font-medium">{m.users?.full_name}</p><p className="text-xs text-ink-500">{m.users?.email}</p></div></div></td>
-                  <td><Badge tone={m.role === "teacher" ? "brand" : "gray"}>{m.role}</Badge></td>
-                  <td className="text-ink-500">{formatDate(m.joined_at)}</td>
+                  <td className="min-w-[11rem] sm:min-w-[14rem]"><div className="flex items-center gap-3"><Avatar name={m.users?.full_name ?? "?"} className="h-9 w-9" />
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2">
+                        {m.role === "student"
+                          ? <Link href={`/teacher/students/${m.user_id}`} className="max-w-[9rem] truncate font-semibold text-ink-900 no-underline hover:text-brand-700 hover:underline sm:max-w-[16rem]">{m.users?.full_name}</Link>
+                          : <span className="max-w-[9rem] truncate font-semibold text-ink-900 sm:max-w-[16rem]">{m.users?.full_name}</span>}
+                        {m.role === "teacher" && <Badge tone="ink" className="sm:hidden">Teacher</Badge>}
+                      </p>
+                      <p className="max-w-[9rem] truncate text-[13px] text-ink-500 sm:max-w-[18rem]">{m.users?.email}</p>
+                    </div></div></td>
+                  <td className="hidden sm:table-cell"><Badge tone={m.role === "teacher" ? "ink" : "gray"}>{m.role === "teacher" ? "Teacher" : "Student"}</Badge></td>
+                  <td className="hidden text-ink-500 sm:table-cell">{formatDate(m.joined_at)}</td>
                   {canManage && (
                     <td className="text-right">
-                      {m.role === "student" && <div className="flex justify-end gap-1">
-                        <Link href={`/teacher/students/${m.user_id}`} className="btn btn-ghost btn-sm no-underline">Report</Link>
-                        <Button size="sm" variant="ghost" onClick={() => messageParent(m.user_id, m.users?.full_name ?? "this student")}>Message parent</Button>
-                        <Button size="sm" variant="ghost" onClick={() => parentInvite(m.user_id, m.users?.full_name ?? "student")}>Parent invite</Button>
-                        <Button size="sm" variant="ghost" onClick={() => pairDevice(m.user_id, m.users?.full_name ?? "student")}>Pair device</Button>
-                        <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => remove(m.user_id)}>Remove</Button>
+                      {m.role === "student" && <div className="flex items-center justify-end gap-1">
+                        <Link href={`/teacher/students/${m.user_id}`} className="btn btn-secondary btn-sm hidden no-underline sm:inline-flex">Report</Link>
+                        <Menu label={`More for ${m.users?.full_name ?? "this student"}`} items={[
+                          { label: "Message parent", icon: <Icon name="chat" className="h-4 w-4" />, onSelect: () => messageParent(m.user_id, m.users?.full_name ?? "this student") },
+                          { label: "Parent invite code", icon: <Icon name="users" className="h-4 w-4" />, onSelect: () => parentInvite(m.user_id, m.users?.full_name ?? "student") },
+                          { label: "Pair a device", icon: <Icon name="laptop" className="h-4 w-4" />, onSelect: () => pairDevice(m.user_id, m.users?.full_name ?? "student") },
+                          { label: "Remove from class", icon: <Icon name="trash" className="h-4 w-4" />, tone: "danger", onSelect: () => remove(m.user_id) }
+                        ]} />
                       </div>}
                     </td>
                   )}
@@ -133,7 +143,7 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
       </Card>
       <Card title="Invite students">
         <p className="text-sm text-ink-600">Students join at <strong>/join</strong> with this code:</p>
-        <p className="my-3 rounded-lg bg-brand-50 py-4 text-center font-mono text-3xl font-extrabold tracking-[0.3em] text-brand-700">{cls.join_code}</p>
+        <p className="my-4 rounded-2xl bg-accent-500 py-5 text-center font-mono text-4xl font-extrabold tracking-[0.25em] text-accent-ink">{cls.join_code}</p>
         <div className="flex flex-wrap gap-2"><CopyButton value={cls.join_code} label="Copy code" /><CopyButton value={joinUrl} label="Copy join link" /></div>
         <p className="hint mt-3">Students who already have an account enter the code under "Join with code".</p>
       </Card>
@@ -149,7 +159,7 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
       </Modal>
       <Modal open={!!codeModal} onClose={() => setCodeModal(null)} title={codeModal?.title ?? ""}>
         {codeModal && <div className="space-y-3 text-center">
-          <p className="font-mono text-4xl font-extrabold tracking-[0.25em] text-brand-700">{codeModal.code}</p>
+          <p className="rounded-2xl bg-accent-500 py-4 font-mono text-4xl font-extrabold tracking-[0.25em] text-accent-ink">{codeModal.code}</p>
           <CopyButton value={codeModal.code} />
           <p className="text-sm text-ink-600">{codeModal.note}</p>
         </div>}

@@ -12,7 +12,7 @@ export default async function ChallengeList() {
   return (
     <div className="page">
       <PageHeader eyebrow="SwiftCipher Challenge" title="Challenge" subtitle="Competitive quiz games with speed and streak bonuses, teams and privacy-aware leaderboards."
-        actions={<Link href="/teacher/challenge/new" className="btn btn-primary no-underline">New Challenge</Link>} />
+        actions={<Link href="/teacher/challenge/new" className="btn btn-primary no-underline">New challenge</Link>} />
       {games.length === 0 ? <Empty title="No games yet">Turn any quiz or multiple-choice activity into a live game.</Empty> : (
         <div className="card overflow-hidden"><table className="table">
           <thead><tr><th>Game</th><th>Class</th><th>Players</th><th>Status</th><th>Created</th><th /></tr></thead>

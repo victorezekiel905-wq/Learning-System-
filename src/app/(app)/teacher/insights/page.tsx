@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireRole, TEACHERS } from "@/lib/session";
 import { Alert, Badge, Card, Empty, PageHeader, Stat } from "@/components/ui";
-import { pct } from "@/lib/utils";
+import { pct, plural } from "@/lib/utils";
 import { Bars } from "@/components/charts";
 
 export const metadata = { title: "Analytics" };
@@ -40,7 +40,7 @@ export default async function InsightsPage(props: { searchParams: Promise<{ clas
               <section>
                 <h2 className="mb-3 font-display text-[15px] font-bold text-ink-900">Learning</h2>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                  <Stat label="Participation" value={pct(a.participation_rate)} sub={`${a.sessions} sessions · ${a.students} students`} />
+                  <Stat label="Participation" value={pct(a.participation_rate)} sub={`${plural(a.sessions, "lesson")} · ${plural(a.students, "student")}`} />
                   <Stat label="Question accuracy" value={pct(a.question_accuracy)} />
                   <Stat label="Avg response time" value={a.avg_response_ms ? `${Math.round(a.avg_response_ms / 1000)}s` : "—"} />
                   <Stat label="Assignment completion" value={pct(a.assignment_completion)} />
@@ -63,7 +63,7 @@ export default async function InsightsPage(props: { searchParams: Promise<{ clas
                 )}
               </section>
               <section>
-                <h2 className="mb-3 font-display text-[15px] font-bold text-ink-900">Classroom focus (device telemetry)</h2>
+                <h2 className="mb-3 font-display text-[15px] font-bold text-ink-900">Focus in live lessons</h2>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <Stat label="Leave events / session" value={a.environment_leave_rate ?? "—"} />
                   <Stat label="Off-task alerts / session" value={a.off_task_rate ?? "—"} />

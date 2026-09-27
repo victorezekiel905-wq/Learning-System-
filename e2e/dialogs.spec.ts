@@ -21,6 +21,35 @@ test.describe("dialogs", () => {
   });
   test.afterAll(async () => { await cleanup(created); });
 
+  test("roster: the More actions menu works by mouse and keyboard and runs the chosen action", async ({ browser, baseURL }) => {
+    const ctx = await browser.newContext();
+    await ctx.addCookies(await sessionCookies(teacher, baseURL!));
+    const page = await ctx.newPage();
+    await page.goto(`/teacher/classes/${classId}`);
+    const more = page.getByRole("button", { name: "More for E2E Student" });
+    const menu = page.getByRole("menu", { name: "More for E2E Student" });
+
+    // Opens with focus on the first item; arrow keys move; Escape closes and returns focus.
+    await more.click();
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole("menuitem").first()).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(menu.getByRole("menuitem", { name: "Parent invite code" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await expect(more).toBeFocused();
+
+    // Choosing an item runs it: a single-use parent invite for this student.
+    await more.click();
+    await menu.getByRole("menuitem", { name: "Parent invite code" }).click();
+    await expect(menu).toHaveCount(0);
+    const dlg = page.getByRole("dialog", { name: "Parent invite for E2E Student" });
+    await expect(dlg).toBeVisible();
+    const inv = await admin().from("invites").select("code").eq("student_id", student.id).eq("role", "parent").single();
+    await expect(dlg.getByText(inv.data!.code, { exact: true })).toBeVisible();
+    await ctx.close();
+  });
+
   test("confirm and type-to-confirm dialogs", async ({ browser, baseURL }) => {
     const ctx = await browser.newContext();
     await ctx.addCookies(await sessionCookies(teacher, baseURL!));

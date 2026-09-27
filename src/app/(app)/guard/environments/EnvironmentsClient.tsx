@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, Badge, Button, Card, Empty, Field, Input, Modal, Select, Tabs, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
-import { CATEGORIES, type EnvironmentPolicy } from "@/lib/types";
+import { CATEGORIES, type EnvironmentPolicy, CATEGORY_LABEL } from "@/lib/types";
 import { splitList } from "@/lib/utils";
 import { Icon } from "@/components/Icon";
 
@@ -33,18 +33,34 @@ export function EnvironmentsClient({ policies, scenes, me, initialTab }: { polic
       {tab === "policies" && (policies.length === 0 ? <Empty title="No environments yet">Start with a lesson environment: allow your class resources and block games and social media.</Empty> : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {policies.map((p) => (
-            <Card key={p.id} title={<span className="flex items-center gap-2">{p.name}{p.is_template && <Badge tone="cyan">template</Badge>}</span>}
-              actions={(p.owner_id === me.id || me.isIt) && <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>}>
-              <div className="space-y-2 text-sm">
-                {p.description && <p className="text-ink-600">{p.description}</p>}
-                <p><span className="font-medium text-emerald-700">Allowed:</span> {[...p.allowed_domains, ...(p.lesson_url ? [p.lesson_url] : [])].join(", ") || "—"}</p>
-                <p><span className="font-medium text-rose-700">Blocked:</span> {[...p.blocked_domains, ...p.blocked_categories.map((c) => `#${c}`)].join(", ") || "—"}</p>
-                <div className="flex flex-wrap gap-1">
-                  {p.focus_mode && <Badge tone="brand">Focus mode</Badge>}{p.lock_screen && <Badge tone="brand">Lock</Badge>}
-                  {p.tab_limit && <Badge>≤ {p.tab_limit} tabs</Badge>}<Badge>grace {p.grace_seconds}s</Badge><Badge>idle {Math.round(p.idle_seconds / 60)}m</Badge>
+            <section key={p.id} className="card flex flex-col">
+              <header className="flex items-start justify-between gap-3 border-b border-ink-100 px-5 py-4">
+                <div className="min-w-0">
+                  <h2 className="font-display text-[15px] font-bold leading-snug tracking-tight">{p.name}</h2>
+                  {p.is_template && <Badge tone="cyan" className="mt-1.5">Ready-made</Badge>}
                 </div>
+                {(p.owner_id === me.id || me.isIt) && <Button size="sm" variant="secondary" onClick={() => setEditing(p)}>Edit</Button>}
+              </header>
+              <div className="flex-1 space-y-3 p-5 text-sm">
+                {p.description && <p className="text-ink-600">{p.description}</p>}
+                <div>
+                  <p className="text-[12px] font-semibold text-emerald-800">Allowed</p>
+                  <p className="text-ink-800">{[...p.allowed_domains, ...(p.lesson_url ? [p.lesson_url] : [])].join(", ") || "Any site except the blocked ones"}</p>
+                </div>
+                <div>
+                  <p className="text-[12px] font-semibold text-rose-800">Blocked</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {p.blocked_categories.map((c) => <Badge key={c} tone="red">{CATEGORY_LABEL[c as keyof typeof CATEGORY_LABEL] ?? c}</Badge>)}
+                    {p.blocked_domains.map((d) => <Badge key={d} tone="gray">{d}</Badge>)}
+                    {!p.blocked_categories.length && !p.blocked_domains.length && <span className="text-ink-600">Nothing</span>}
+                  </div>
+                </div>
+                <p className="border-t border-ink-100 pt-3 text-[13px] text-ink-600">
+                  Alert after <strong>{p.grace_seconds} s</strong> away · idle after <strong>{Math.round(p.idle_seconds / 60)} min</strong>
+                  {p.tab_limit ? <> · at most <strong>{p.tab_limit} tabs</strong></> : null}{p.focus_mode && " · focus mode"}{p.lock_screen && " · screen lock"}
+                </p>
               </div>
-            </Card>
+            </section>
           ))}
         </div>
       ))}
@@ -112,7 +128,7 @@ function PolicyEditor({ value, me, onClose, onSaved }: { value: Partial<Environm
           <div className="flex flex-wrap gap-2">{CATEGORIES.map((c) => {
             const on = (p.blocked_categories ?? []).includes(c);
             return <button key={c} type="button" aria-pressed={on} onClick={() => set({ blocked_categories: on ? p.blocked_categories!.filter((x) => x !== c) : [...(p.blocked_categories ?? []), c] })}
-              className={`badge border capitalize ${on ? "border-rose-300 bg-rose-50 text-rose-800" : "border-ink-200 bg-white text-ink-600"}`}><Icon name={on ? "x" : "plus"} className="h-3 w-3" />{c}</button>;
+              className={`badge border ${on ? "border-rose-300 bg-rose-50 text-rose-800" : "border-ink-200 bg-white text-ink-600"}`}><Icon name={on ? "x" : "plus"} className="h-3 w-3" />{CATEGORY_LABEL[c]}</button>;
           })}</div>
         </div>
         <div className="space-y-3">

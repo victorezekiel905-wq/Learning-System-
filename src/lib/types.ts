@@ -167,3 +167,23 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const CATEGORIES = [
   "games", "social", "video", "streaming", "shopping", "chat", "gambling", "adult"
 ] as const;
+
+/** How site categories are named to people. */
+export const CATEGORY_LABEL: Record<(typeof CATEGORIES)[number], string> = {
+  games: "Games", social: "Social media", video: "Video sites", streaming: "Streaming", shopping: "Shopping",
+  chat: "Chat apps", gambling: "Gambling", adult: "Adult content"
+};
+
+/** What each notification is about, in words (the database stores a machine "kind"). */
+const NOTIFICATION_LABEL: Record<string, string> = {
+  student_joined: "Class", submission: "Assignment", grade_updated: "Grades", grade_released: "Grades",
+  child_low_score: "Grades", game_created: "Challenge", session_started: "Live class", spotlight: "Live class",
+  chat_message: "Message", environment_left: "Left the class", child_left_lesson: "Left the class",
+  student_returned: "Back in class", badge: "Badge", xp: "XP", question_collab: "Questions",
+  question_returned: "Questions", weekly_report: "Weekly report"
+};
+
+export function notificationLabel(kind: string): string {
+  const s = NOTIFICATION_LABEL[kind] ?? kind.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

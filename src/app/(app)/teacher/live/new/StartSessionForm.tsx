@@ -11,7 +11,8 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
 }) {
   const router = useRouter();
   const [cls, setCls] = useState(defaultClass ?? classes[0]?.id ?? "");
-  const [lesson, setLesson] = useState(defaultLesson ?? "");
+  // Most teachers go live with the lesson they worked on last (the list is newest first).
+  const [lesson, setLesson] = useState(defaultLesson ?? lessons[0]?.id ?? "");
   const [mode, setMode] = useState("live_participation");
   // Game/social blocking on by default: the school's ready-made "Lesson focus" environment.
   const [env, setEnv] = useState(envs.find((e) => e.name.startsWith("Lesson focus"))?.id ?? "");
@@ -30,8 +31,8 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
     <Card>
       <div className="space-y-4">
         <Field label="Class"><Select value={cls} onChange={(e) => setCls(e.target.value)}>{classes.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.students} students)</option>)}</Select></Field>
-        <Field label="Lesson" hint="Optional: run a session without slides for monitoring, chat and quick activities.">
-          <Select value={lesson} onChange={(e) => setLesson(e.target.value)}><option value="">No lesson</option>{lessons.map((l) => <option key={l.id} value={l.id}>{l.title}{l.status !== "published" ? " (draft)" : ""}</option>)}</Select>
+        <Field label="Lesson" hint="Your most recent lesson is picked. Choose &quot;No lesson&quot; to watch screens and run quick activities only.">
+          <Select value={lesson} onChange={(e) => setLesson(e.target.value)}>{lessons.map((l) => <option key={l.id} value={l.id}>{l.title}{l.status !== "published" ? " (draft)" : ""}</option>)}<option value="">No lesson: screens, chat and quick activities only</option></Select>
         </Field>
         <Field label="Delivery mode">
           <Select value={mode} onChange={(e) => setMode(e.target.value)}>

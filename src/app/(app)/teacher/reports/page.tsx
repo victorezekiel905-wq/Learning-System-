@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireRole, STAFF } from "@/lib/session";
 import { Badge, Card, Empty, PageHeader, Stat } from "@/components/ui";
 import { formatDateTime } from "@/lib/utils";
+import { Icon } from "@/components/Icon";
+import { ALERT_LABEL } from "@/components/live/types";
 import { GenerateReport } from "./GenerateReport";
 
 export const metadata = { title: "Reports" };
@@ -29,15 +31,15 @@ export default async function ReportsPage(props: { searchParams: Promise<{ sessi
         actions={<GenerateReport classes={(classes as { id: string; name: string }[]) ?? []} />} />
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <Card title="All reports" pad={false}>
-          {list.length === 0 ? <p className="p-5 text-sm text-ink-500">No reports yet.</p> : (
+          {list.length === 0 ? <p className="p-5 text-sm text-ink-600">No reports yet. One appears here each time a live lesson ends, or use Generate report for a class.</p> : (
             <ul className="max-h-[70vh] divide-y divide-ink-100 overflow-y-auto">{list.map((r) => (
               <li key={r.id}><Link href={`/teacher/reports?id=${r.id}`} className={`block px-4 py-2 no-underline ${selected?.id === r.id ? "bg-brand-50" : "hover:bg-ink-50"}`}>
-                <p className="text-sm font-medium text-ink-800">{r.title}</p><p className="text-xs text-ink-500"><Badge>{r.kind.replace("_", " ")}</Badge> {formatDateTime(r.created_at)}</p>
+                <p className="text-sm font-medium text-ink-800">{r.title}</p><p className="text-xs text-ink-500"><Badge>{r.kind === "session_summary" ? "Live lesson" : r.kind.replace(/_/g, " ")}</Badge> {formatDateTime(r.created_at)}</p>
               </Link></li>
             ))}</ul>
           )}
         </Card>
-        {!selected ? <Empty title="Pick a report" /> : selected.kind === "session_summary" && full ? <SessionView id={selected.id} r={full.payload as SessionReport} /> : (
+        {!selected ? <Empty icon={<Icon name="chart" />} title={list.length ? "Pick a report" : "Your first report is one lesson away"}>{list.length ? "Choose a report on the left to see attendance, activity results and alerts." : "Run a live lesson and its summary (who joined, how they answered, who left the class) lands here when you end it."}</Empty> : selected.kind === "session_summary" && full ? <SessionView id={selected.id} r={full.payload as SessionReport} /> : (
           <Card title={selected.title} actions={<a className="btn btn-secondary btn-sm no-underline" href={`/api/reports/${selected.id}/export`}>Export CSV</a>}>
             <pre className="max-h-[60vh] overflow-auto rounded bg-ink-50 p-3 text-xs">{JSON.stringify(full?.payload, null, 2)}</pre>
           </Card>
@@ -57,7 +59,7 @@ function SessionView({ id, r }: { id: string; r: SessionReport }) {
         <Stat label="Teacher commands" value={r.commands} /><Stat label="Help requests" value={r.hands} />
       </div>
       <Card title="Activities">{r.activities.length ? <ul className="text-sm">{r.activities.map((a) => <li key={a.activity_id}>{a.title}: {a.attempts} attempts{a.avg_percent !== null && `, average ${a.avg_percent}%`}</li>)}</ul> : <p className="text-sm text-ink-500">No activities run.</p>}</Card>
-      <Card title="Alerts">{Object.keys(r.alerts).length ? <p className="text-sm">{Object.entries(r.alerts).map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join(" · ")}</p> : <p className="text-sm text-ink-500">None.</p>}</Card>
+      <Card title="Alerts">{Object.keys(r.alerts).length ? <p className="text-sm">{Object.entries(r.alerts).map(([k, v]) => `${ALERT_LABEL[k] ?? k.replace(/_/g, " ")}: ${v}`).join(" · ")}</p> : <p className="text-sm text-ink-500">None.</p>}</Card>
       <Card title="Students" pad={false}>
         <table className="table"><thead><tr><th>Student</th><th>Joined</th><th>Answers</th><th>Correct</th><th>Alerts</th></tr></thead>
           <tbody>{r.students.map((s) => <tr key={s.student_id}><td>{s.name}</td><td>{s.joined ? "Yes" : "No"}</td><td>{s.answers}</td><td>{s.correct}</td><td>{s.alerts}</td></tr>)}</tbody></table>

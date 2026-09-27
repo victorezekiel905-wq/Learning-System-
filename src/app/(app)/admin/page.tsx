@@ -1,12 +1,24 @@
 import Link from "next/link";
 import { requireRole, ADMINS } from "@/lib/session";
 import { Card, PageHeader, Stat } from "@/components/ui";
-import { Line } from "@/components/charts";
+import { Bars } from "@/components/charts";
 import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "School admin" };
 
 type Overview = { teachers: number; students: number; parents: number; classes: number; lessons: number; devices_active: number; devices_online: number; weekly: { week: string; sessions: number; participants: number; answers: number }[] };
+
+/** The database only returns weeks that had lessons; the chart shows all twelve, empty ones as 0.
+    Weeks start on Monday (UTC), as Postgres date_trunc('week') does. */
+function lastTwelveWeeks(rows: Overview["weekly"]) {
+  const byWeek = new Map(rows.map((r) => [r.week.slice(0, 10), r.sessions]));
+  const now = new Date();
+  const monday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7));
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(monday - (11 - i) * 7 * 86_400_000);
+    return { label: d.toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" }), value: byWeek.get(d.toISOString().slice(0, 10)) ?? 0 };
+  });
+}
 
 export default async function AdminHome() {
   const { me, sb } = await requireRole(ADMINS);
@@ -38,13 +50,17 @@ export default async function AdminHome() {
           <ol className="space-y-2">{steps.map((st, i) => (
             <li key={i} className="flex items-center gap-3 text-sm">
               <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${st.done ? "bg-emerald-700 text-white" : "bg-ink-200 text-ink-600"}`}>{st.done ? <Icon name="check" className="h-3.5 w-3.5" /> : i + 1}{st.done && <span className="sr-only">Done</span>}</span>
-              <Link href={st.href} className={st.done ? "text-ink-500 line-through" : ""}>{st.label}</Link>
+              <Link href={st.href} className={st.done ? "text-ink-500 line-through" : "font-medium no-underline hover:underline"}>{st.label}</Link>
             </li>
           ))}</ol>
         </Card>
-        <Card title="Engagement: live sessions per week (last 12 weeks)">
-          <Line data={o.weekly.map((w) => ({ label: w.week, value: w.sessions }))} />
-          <p className="mt-2 text-xs text-ink-500">{o.weekly.reduce((a, w) => a + w.participants, 0)} student joins · {o.weekly.reduce((a, w) => a + w.answers, 0)} answers</p>
+        <Card title="Live lessons per week (last 12 weeks)">
+          {o.weekly.every((w) => w.sessions === 0) ? (
+            <p className="text-sm text-ink-600">No live lessons yet. They appear here week by week once teachers start teaching live.</p>
+          ) : (
+            <Bars data={lastTwelveWeeks(o.weekly)} />
+          )}
+          <p className="mt-3 text-[13px] text-ink-500">{o.weekly.reduce((a, w) => a + w.participants, 0)} student joins · {o.weekly.reduce((a, w) => a + w.answers, 0)} answers</p>
         </Card>
       </div>
     </div>

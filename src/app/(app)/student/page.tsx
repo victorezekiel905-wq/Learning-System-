@@ -20,7 +20,9 @@ type Home = {
 
 export default async function StudentHome() {
   const { me, sb } = await requireRole(["student"]);
-  const { data } = await sb.rpc("student_home");
+  const { data, error } = await sb.rpc("student_home");
+  // A dropped connection shows the retry screen (error.tsx), not a crash inside the page.
+  if (error || !data) throw new Error(`Couldn't load the student home page: ${error?.message ?? "no data"}`);
   const h = data as Home;
   const todo = h.assignments.filter((a) => !a.submitted);
 
@@ -96,13 +98,13 @@ export default async function StudentHome() {
           )}
         </Card>
         <Card title="Recent scores">
-          {h.scores.length === 0 ? <p className="text-sm text-ink-500">No activities yet.</p> : (
+          {h.scores.length === 0 ? <p className="text-sm text-ink-500">Scores from activities and quizzes appear here.</p> : (
             <ul className="space-y-2 text-sm">{h.scores.map((s, i) => (
-              <li key={i} className="flex justify-between"><span className="truncate">{s.activity}</span>
-                <span className="tabular-nums text-ink-600">{s.max ? `${Number(s.score ?? 0)}/${Number(s.max)}` : "done"}{s.status === "submitted" && "*"}</span></li>
+              <li key={i} className="flex justify-between gap-3"><span className="truncate">{s.activity}</span>
+                <span className="whitespace-nowrap tabular-nums text-ink-600">{s.max ? `${Number(s.score ?? 0)}/${Number(s.max)}` : "done"}{s.status === "submitted" && "*"}</span></li>
             ))}</ul>
           )}
-          <p className="hint mt-2">* waiting for teacher review</p>
+          {h.scores.some((s) => s.status === "submitted") && <p className="hint mt-2">* waiting for teacher review</p>}
         </Card>
       </div>
     </div>

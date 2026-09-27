@@ -651,6 +651,14 @@ test("web classroom: screen sharing, lockdown, leave alerts with the screen", as
   await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: false, p_sharing: true });
   assert.equal((await db.rpc(S.teacherA, "teacher_session_state", { p_session: s.id })).alerts.length, 1);
 
+  // The teacher's own participant row going quiet is not a student leaving: no
+  // "Mrs X left the class" alert to the teacher about themselves (0840).
+  const teacherRow = [s.id, S.teacherA];
+  assert.equal((await db.admin("select count(*)::int n from public.session_participants where session_id = $1 and user_id = $2", teacherRow))[0].n, 1);
+  await db.admin("update public.session_participants set last_seen_at = now() - interval '10 minutes', joined_at = now() - interval '10 minutes' where session_id = $1 and user_id = $2", teacherRow);
+  assert.equal((await db.rpc(S.teacherA, "teacher_session_state", { p_session: s.id })).alerts.length, 1);
+  assert.equal((await db.admin("select count(*)::int n from public.environment_events where class_session_id = $1 and student_id = $2", teacherRow))[0].n, 0);
+
   // She comes back: alert resolves and the teacher is told.
   await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
   assert.equal((await db.admin("select count(*)::int n from public.environment_events where class_session_id = $1 and resolved_at is null", [s.id]))[0].n, 0);

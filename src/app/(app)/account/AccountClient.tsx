@@ -21,7 +21,7 @@ export function AccountClient({ profile, resetMode }: { profile: Profile; resetM
         <div className="space-y-3">
           <p className="text-sm text-ink-500">{profile.email} · {ROLE_LABEL[profile.role]}</p>
           <Field label="Full name"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-          <Field label="Preferred nickname" hint="Used in games when your teacher allows nicknames."><Input value={nick} maxLength={40} onChange={(e) => setNick(e.target.value)} /></Field>
+          {profile.role === "student" && <Field label="Preferred nickname" hint="Used in games when your teacher allows nicknames."><Input value={nick} maxLength={40} onChange={(e) => setNick(e.target.value)} /></Field>}
           <Button onClick={async () => {
             const { error } = await createClient().from("users").update({ full_name: name.trim(), nickname: nick.trim() || null }).eq("id", profile.id);
             if (error) toast(error.message, "error"); else { toast("Saved", "success"); router.refresh(); }

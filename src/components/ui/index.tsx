@@ -4,7 +4,7 @@ import {
   type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
   type TextareaHTMLAttributes
 } from "react";
-import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, MoreHorizontal, X, XCircle } from "lucide-react";
 import { cn, nameParts } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -427,3 +427,76 @@ export function Avatar({ name, className }: { name: string; className?: string }
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// "More actions" menu. Floats above the page (position: fixed), so a table that
+// scrolls sideways on phones can't clip it. Closes on Escape, outside click, scroll.
+// ---------------------------------------------------------------------------
+export type MenuItem = { label: string; onSelect: () => unknown; tone?: "danger"; icon?: ReactNode };
+
+export function Menu({ items, label = "More actions" }: { items: MenuItem[]; label?: string }) {
+  const toast = useContext(ToastCtx);
+  const btn = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+
+  useEffect(() => {
+    if (!pos) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
+      if (e.type === "mousedown" && (list.current?.contains(e.target as Node) || btn.current?.contains(e.target as Node))) return;
+      setPos(null);
+      if (e instanceof KeyboardEvent) btn.current?.focus();
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    list.current?.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus();
+    return () => {
+      document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close);
+      window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close);
+    };
+  }, [pos]);
+
+  function toggle() {
+    if (pos) { setPos(null); return; }
+    const r = btn.current!.getBoundingClientRect();
+    setPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+  }
+
+  return (
+    <>
+      <button ref={btn} type="button" onClick={toggle} aria-label={label} aria-haspopup="menu" aria-expanded={!!pos}
+        className="btn btn-ghost btn-sm h-8 w-8 px-0">
+        <MoreHorizontal className="h-4 w-4" aria-hidden />
+      </button>
+      {pos && (
+        <div ref={list} role="menu" aria-label={label} style={{ top: pos.top, right: pos.right }}
+          className="fixed z-50 min-w-[13rem] animate-fade-in overflow-hidden rounded-xl border border-ink-200 bg-white py-1 shadow-overlay"
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+            e.preventDefault();
+            const all = [...(list.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") ?? [])];
+            const i = all.indexOf(document.activeElement as HTMLButtonElement);
+            all[(i + (e.key === "ArrowDown" ? 1 : all.length - 1)) % all.length]?.focus();
+          }}>
+          {items.map((it) => (
+            <button key={it.label} type="button" role="menuitem"
+              className={cn("flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm font-medium outline-none transition-colors hover:bg-ink-50 focus-visible:bg-ink-100",
+                it.tone === "danger" ? "text-rose-700" : "text-ink-800")}
+              onClick={() => {
+                setPos(null);
+                const r = it.onSelect();
+                if (r && typeof (r as Promise<unknown>).then === "function") {
+                  (r as Promise<unknown>).catch((err: unknown) => toast(err instanceof Error ? err.message : "Something went wrong.", "error"));
+                }
+              }}>
+              {it.icon}{it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}

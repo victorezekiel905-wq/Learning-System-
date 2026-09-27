@@ -1,11 +1,15 @@
+import { headers } from "next/headers";
 import { requireRole, STAFF } from "@/lib/session";
 import { PageHeader } from "@/components/ui";
 import { DevicesClient } from "./DevicesClient";
+import { appOrigin } from "@/lib/app-url";
 
 export const metadata = { title: "Devices" };
 
 export default async function GuardPage() {
   const { me, sb } = await requireRole(STAFF);
+  const h = await headers();
+  const origin = appOrigin(h.get("host") ? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}` : null);
   const isIt = ["it_admin", "school_admin", "platform_admin"].includes(me.profile.role);
   const [{ data: devices }, { data: students }] = await Promise.all([
     sb.from("devices").select("id,label,os,browser,agent_version,status,last_seen_at,enrolled_at,student_id,users:student_id(full_name)").order("last_seen_at", { ascending: false, nullsFirst: false }).limit(2000),
@@ -14,7 +18,7 @@ export default async function GuardPage() {
   return (
     <div className="page">
       <PageHeader eyebrow="SwiftCipher Guard" title="Devices" subtitle="School-managed browsers enrolled with the SwiftCipher extension. Monitoring only happens during live class sessions." />
-      <DevicesClient devices={(devices ?? []) as never} students={students ?? []} isIt={isIt} appUrl={process.env.NEXT_PUBLIC_APP_URL ?? ""} />
+      <DevicesClient devices={(devices ?? []) as never} students={students ?? []} isIt={isIt} appUrl={origin} />
     </div>
   );
 }

@@ -58,10 +58,11 @@ export function NewGameForm({ classes, activities, defaults }: { classes: { id: 
                 onClick={() => { setStyle(st.id); patch(st.set); }}
                 className={cn("rounded-xl border p-4 text-left transition-colors",
                   style === st.id ? "border-ink-900 bg-ink-900 text-white" : "border-ink-200 bg-white hover:border-ink-400")}>
-                <span className="flex items-center gap-2 font-display font-bold">
-                  <span className={cn("grid h-8 w-8 place-items-center rounded-lg", style === st.id ? "bg-accent-500 text-accent-ink" : "bg-ink-100 text-ink-800")}><Icon name={st.icon} className="h-4 w-4" /></span>
-                  {st.name}{st.id === "think" && <span className={cn("ml-auto text-[11px] font-semibold", style === st.id ? "text-accent-400" : "text-ink-500")}>Recommended</span>}
+                <span className="flex items-start justify-between gap-2">
+                  <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg", style === st.id ? "bg-accent-500 text-accent-ink" : "bg-ink-100 text-ink-800")}><Icon name={st.icon} className="h-4 w-4" /></span>
+                  {st.id === "think" && <span className={cn("whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-bold", style === st.id ? "bg-accent-500 text-accent-ink" : "bg-ink-100 text-ink-700")}>Recommended</span>}
                 </span>
+                <span className="mt-3 block font-display font-bold">{st.name}</span>
                 <span className={cn("mt-2 block text-[13px] leading-snug", style === st.id ? "text-ink-300" : "text-ink-600")}>{st.text}</span>
               </button>
             ))}

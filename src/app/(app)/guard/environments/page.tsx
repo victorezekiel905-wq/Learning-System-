@@ -15,7 +15,7 @@ export default async function EnvironmentsPage(props: { searchParams: Promise<{ 
   return (
     <div className="page">
       <PageHeader eyebrow="SwiftCipher Guard" title="Environments & scenes"
-        subtitle="An environment is the set of sites and conditions allowed during a session. The server evaluates every change deterministically." />
+        subtitle="An environment is the set of sites students may use during a live lesson. Leaving it alerts the teacher; games and social media can be blocked outright." />
       <EnvironmentsClient policies={(policies ?? []) as EnvironmentPolicy[]} scenes={(scenes ?? []) as never}
         me={{ id: me.profile.id, tenantId: me.profile.tenant_id, isIt: ["it_admin", "school_admin", "platform_admin"].includes(me.profile.role) }}
         initialTab={searchParams.tab === "scenes" ? "scenes" : "policies"} />
