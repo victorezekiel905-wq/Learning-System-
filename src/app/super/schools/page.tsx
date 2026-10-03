@@ -18,7 +18,7 @@ export default async function SchoolsPage(props: { searchParams: Promise<{ q?: s
   const q = searchParams.q ? `q=${encodeURIComponent(searchParams.q)}&` : "";
   return (
     <div>
-      <PageHeader title="Schools (tenants)" subtitle="Create, rename, change plan, suspend, restore or delete any school. Newest first, 50 per page." />
+      <PageHeader title="Schools (tenants)" subtitle="Create, rename, change plan, suspend, restore or delete any school. Open a school to change its settings or appoint its admins. Newest first, 50 per page." />
       <SchoolsClient tenants={page.rows} plans={plans ?? []} q={searchParams.q ?? ""} openNew={searchParams.new === "1"} />
       <nav className="mt-4 flex items-center justify-between text-sm" aria-label="Pages">
         {searchParams.cursor ? <Link href={`/super/schools?${q}`}>← First page</Link> : <span />}

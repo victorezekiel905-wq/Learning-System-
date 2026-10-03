@@ -563,6 +563,25 @@ test("platform super admin: singleton, invisible, cross-tenant control", async (
   await db.rpc(S.superA, "sa_set_user_role", { p_user: S.itA, p_role: "teacher" });
   assert.equal((await db.admin("select role from public.users where id = $1", [S.itA]))[0].role, "teacher");
 
+  // Any school's settings, within the same limits a school admin has (0850).
+  const [before] = await db.admin("select s.parent_portal_enabled, s.default_grace_seconds, s.brand_name, t.timezone from public.tenant_settings s join public.tenants t on t.id = s.tenant_id where s.tenant_id = $1", [S.tenantA]);
+  const st = await db.rpc(S.superA, "sa_update_tenant_settings", { p_tenant: S.tenantA,
+    p_changes: { parent_portal_enabled: !before.parent_portal_enabled, default_grace_seconds: 30, brand_name: "Alpha Academy", timezone: "Africa/Lagos" } });
+  assert.equal(st.default_grace_seconds, 30);
+  assert.equal(st.timezone, "Africa/Lagos");
+  assert.equal((await db.as(S.adminA, "select parent_portal_enabled from public.tenant_settings"))[0].parent_portal_enabled, !before.parent_portal_enabled);
+  await rejects(db.rpc(S.superA, "sa_update_tenant_settings", { p_tenant: S.tenantA, p_changes: { support_access_until: "2030-01-01" } }), /can't be changed here/);
+  await rejects(db.rpc(S.superA, "sa_update_tenant_settings", { p_tenant: S.tenantA, p_changes: { default_grace_seconds: 9999 } }), /check constraint/);
+  await rejects(db.rpc(S.superA, "sa_update_tenant_settings", { p_tenant: S.tenantA, p_changes: { timezone: "Mars/Base" } }), /Unknown time zone/);
+  await rejects(db.rpc(S.adminA, "sa_update_tenant_settings", { p_tenant: S.tenantA, p_changes: { default_grace_seconds: 20 } }), /Not found/);
+  await rejects(db.rpc(S.adminA, "sa_update_tenant_settings", { p_tenant: S.tenantB, p_changes: { parent_portal_enabled: true } }), /Not found/);
+  // The school's log shows the change as a platform action, never who made it.
+  const named = await db.admin("select count(*)::int n from public.audit_logs where tenant_id = $1 and actor_id = $2", [S.tenantA, S.superA]);
+  assert.equal(named[0].n, 0);
+  assert.ok((await db.as(S.adminA, "select 1 from public.audit_logs where action = 'platform.settings.updated'")).length >= 1);
+  await db.rpc(S.superA, "sa_update_tenant_settings", { p_tenant: S.tenantA, p_changes: {
+    parent_portal_enabled: before.parent_portal_enabled, default_grace_seconds: before.default_grace_seconds, brand_name: before.brand_name ?? "", timezone: before.timezone } });
+
   // Tenant audit shows the platform action without revealing who.
   const tAudit = await db.as(S.adminA, "select actor_id, action from public.audit_logs where action like 'platform.%'");
   assert.ok(tAudit.length >= 2);

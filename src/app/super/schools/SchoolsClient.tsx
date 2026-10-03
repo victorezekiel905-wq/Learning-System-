@@ -92,15 +92,15 @@ function CreateSchool({ plans, onClose }: { plans: { code: string; name: string 
   );
 }
 
-function DeleteSchool({ t, onClose }: { t: TenantRow; onClose: () => void }) {
+export function DeleteSchool({ t, onClose }: { t: Pick<TenantRow, "id" | "name" | "users">; onClose: (deleted?: boolean) => void }) {
   const toast = useToast();
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <Modal open onClose={onClose} title={`Delete ${t.name}`} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button>
+    <Modal open onClose={() => onClose()} title={`Delete ${t.name}`} footer={<><Button variant="ghost" onClick={() => onClose()}>Cancel</Button>
       <Button variant="danger" loading={busy} disabled={confirm !== t.name} onClick={async () => {
         setBusy(true);
-        try { await api(`/api/super/tenants/${t.id}`, { method: "DELETE", json: { confirm_name: confirm } }); toast("School deleted", "success"); onClose(); }
+        try { await api(`/api/super/tenants/${t.id}`, { method: "DELETE", json: { confirm_name: confirm } }); toast("School deleted", "success"); onClose(true); }
         catch (e) { toast(errorText(e), "error"); setBusy(false); }
       }}>Delete permanently</Button></>}>
       <Alert tone="error" title="This cannot be undone">Deletes the school, its {t.users} user accounts (including their logins), classes, lessons, grades, devices and all other data.</Alert>

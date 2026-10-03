@@ -5,6 +5,7 @@ import { Badge, Card, PageHeader, Stat } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { UsersTable, type SaUser } from "../../users/UsersTable";
 import { InviteAdmin } from "./InviteAdmin";
+import { SchoolControls } from "./SchoolControls";
 
 type Detail = {
   tenant: { id: string; name: string; slug: string; plan_code: string; status: string; country: string | null; created_at: string; suspended_reason: string | null };
@@ -18,14 +19,19 @@ type Detail = {
 export default async function SchoolDetail(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const { sb } = await requireSuperAdmin();
-  const { data, error } = await sb.rpc("sa_tenant_detail", { p_tenant: params.id });
+  const [{ data, error }, { data: plans }] = await Promise.all([
+    sb.rpc("sa_tenant_detail", { p_tenant: params.id }),
+    sb.from("plans").select("code,name").order("sort")
+  ]);
   if (error || !data) notFound();
   const d = data as Detail;
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={<Link href="/super/schools">Schools</Link>} title={d.tenant.name}
         subtitle={<>{d.tenant.slug} · {d.tenant.plan_code} · created {formatDate(d.tenant.created_at)}</>}
-        actions={<><Badge tone={d.tenant.status === "active" ? "green" : "red"}>{d.tenant.status}</Badge><InviteAdmin tenantId={d.tenant.id} /></>} />
+        actions={<><Badge tone={d.tenant.status === "active" ? "green" : "red"}>{d.tenant.status === "active" ? "Active" : "Suspended"}</Badge><InviteAdmin tenantId={d.tenant.id} /></>} />
+      {d.tenant.suspended_reason && <p className="text-sm text-rose-700">Suspended: {d.tenant.suspended_reason}</p>}
+      <SchoolControls tenant={d.tenant} plans={plans ?? []} users={d.users.length} />
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Classes" value={d.usage.classes} /><Stat label="Lessons" value={d.usage.lessons} />
         <Stat label="Devices" value={d.usage.devices} /><Stat label="Sessions (30d)" value={d.usage.sessions_30d} />
