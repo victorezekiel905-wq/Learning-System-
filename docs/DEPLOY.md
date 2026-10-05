@@ -4,6 +4,8 @@ This is the production runbook: accounts, settings, the go-live checklist, and w
 
 Recommended stack: **Vercel** (app) + **Supabase Pro** (database, auth, storage) + an **SMTP provider** (email) + **GitHub Actions** (CI, database deploys, maintenance, uptime checks).
 
+**Hosting on Render instead of Vercel?** Follow [DEPLOY_RENDER.md](DEPLOY_RENDER.md); the repository includes a ready Render Blueprint (`render.yaml`). The Supabase and GitHub sections below apply either way.
+
 ---
 
 ## 1. Supabase (database)

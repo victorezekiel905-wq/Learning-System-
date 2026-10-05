@@ -25,7 +25,7 @@ npm run dev                       # http://localhost:3000
 node scripts/smoke.mjs            # end-to-end check against your project
 ```
 
-Then open `/signup` to create a school. Load `extension/` unpacked in Chrome (`chrome://extensions`, Developer mode) to try device monitoring. Full instructions are in [docs/SETUP.md](docs/SETUP.md). To deploy to production, follow [docs/DEPLOY.md](docs/DEPLOY.md). Capacity planning for 5,000,000 users and 50,000 schools is in [docs/SCALING.md](docs/SCALING.md). The compliance pack (DPIA, records of processing, incident response) is in [docs/compliance](docs/compliance/README.md).
+Then open `/signup` to create a school. Load `extension/` unpacked in Chrome (`chrome://extensions`, Developer mode) to try device monitoring. Full instructions are in [docs/SETUP.md](docs/SETUP.md). To deploy to production, follow [docs/DEPLOY.md](docs/DEPLOY.md), or [docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md) to host on Render. Capacity planning for 5,000,000 users and 50,000 schools is in [docs/SCALING.md](docs/SCALING.md). The compliance pack (DPIA, records of processing, incident response) is in [docs/compliance](docs/compliance/README.md).
 
 ## Scripts
 

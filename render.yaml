@@ -1,0 +1,68 @@
+# Render Blueprint for SwiftCipher.
+# In Render: New → Blueprint → pick this repository. Render reads this file,
+# creates the web app, and asks for every value marked `sync: false`.
+# Step-by-step guide: docs/DEPLOY_RENDER.md.
+#
+# No scheduled jobs are needed here: hourly maintenance runs inside the database
+# (pg_cron), and uptime checks run in GitHub Actions.
+
+services:
+  - type: web
+    name: swiftcipher
+    runtime: node
+    region: frankfurt          # closest Render region to the Supabase project in West EU (Ireland)
+    plan: starter              # free instances sleep after 15 minutes; live lessons need it always on
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    startCommand: npm start    # plain `next start`, so it listens on the port Render gives it
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # ---- Required ----
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL      # https://swiftcipher.onrender.com at first, then your own domain
+        sync: false
+      # ---- Company details shown in Terms, Privacy Notice and DPA (required before real schools) ----
+      - key: NEXT_PUBLIC_LEGAL_ENTITY
+        sync: false
+      - key: NEXT_PUBLIC_LEGAL_ADDRESS
+        sync: false
+      # ---- Optional: contacts (defaults are the synergyswift.com addresses) ----
+      - key: NEXT_PUBLIC_SUPPORT_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_INFO_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_PRIVACY_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_SUPPORT_PHONE
+        sync: false
+      # ---- Optional: sign in with Google or Microsoft (enable them in Supabase Auth first) ----
+      - key: NEXT_PUBLIC_SSO_PROVIDERS
+        sync: false
+      # ---- Optional: TURN server for strict school networks (teacher screen sharing) ----
+      - key: NEXT_PUBLIC_TURN_URL
+        sync: false
+      - key: NEXT_PUBLIC_TURN_USERNAME
+        sync: false
+      - key: NEXT_PUBLIC_TURN_CREDENTIAL
+        sync: false
+      # ---- Optional: card payments for plans (Stripe) ----
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_TEACHER_PRO
+        sync: false
+      - key: STRIPE_PRICE_SCHOOL
+        sync: false
+      - key: STRIPE_PRICE_SCHOOL_PLUS
+        sync: false
