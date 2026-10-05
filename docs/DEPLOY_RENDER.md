@@ -6,7 +6,7 @@ The repository contains a Render Blueprint ([`render.yaml`](../render.yaml)). It
 
 | Render service | What it is | Plan |
 |---|---|---|
-| `swiftcipher` | The web app | Starter ($7/month) or higher. The free plan sleeps after 15 minutes idle, so the first teacher each morning would wait about a minute, and its 512 MB can run out while building. |
+| `swiftcipher` | The web app | Starter ($7/month) or higher. The free plan sleeps after 15 minutes idle, so the first teacher each morning would wait about a minute. |
 
 No scheduled jobs are needed on Render: hourly maintenance runs inside the database (pg_cron), and uptime checks run in GitHub Actions. Check current prices on render.com/pricing before you start.
 
@@ -86,7 +86,9 @@ Turn on multi-factor authentication for this account in Supabase Auth.
 | Symptom | Likely cause |
 |---|---|
 | Build fails mentioning Supabase | `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` missing; they are needed during the build. |
-| Build stops with "out of memory" | The free plan. Use Starter or higher. |
+| Build stops with "JavaScript heap out of memory" | Free and Starter both have 512 MB. Move to the 2 GB plan (Standard). |
+| Deploy fails within seconds, right after "Checking out commit" | **Root Directory** is set (e.g. `supabase/`). Clear it: the app is at the top of the repository. |
+| "It looks like you're using Docker" | Choose **Node** as the language, or use **New → Blueprint**, which sets it for you. |
 | `/api/health` shows `db: "down"` | Wrong Supabase URL or key, or the Supabase project is paused (restore it in the dashboard). |
 | `schema` is lower than `0850` | Run the update file in step 1.1. |
 | Sign-in links go to localhost | `NEXT_PUBLIC_APP_URL` or the Supabase Site URL still points to localhost; redeploy after changing it. |
