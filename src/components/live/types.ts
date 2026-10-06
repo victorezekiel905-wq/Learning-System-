@@ -16,6 +16,8 @@ export type RosterEntry = {
   };
   open_alerts: number;
   hand_raised: boolean;
+  /** Joined with the code and a name, no account (0860). */
+  guest?: boolean;
 };
 
 export type AlertRow = {
@@ -40,6 +42,7 @@ export type SessionState = {
     current_slide: number; active_activity_id: string | null; environment_id: string | null; environment_active: boolean;
     group_chat_enabled: boolean; responses_visible: boolean; class_name: string; lesson_title: string | null; environment_name: string | null;
     tenant_id: string; started_at: string; lockdown: boolean;
+    guest_monitoring?: boolean; guests_closed?: boolean;
   };
   settings: {
     allow_spotlight: boolean; allow_group_chat: boolean; allow_screen_capture: boolean; thumbnail_interval_seconds: number;

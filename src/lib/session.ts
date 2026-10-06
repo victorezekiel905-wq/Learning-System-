@@ -36,6 +36,7 @@ export function homeFor(role: Role | undefined): string {
   switch (role) {
     case "student": return "/student";
     case "parent": return "/parent";
+    case "guest": return "/join";
     case "it_admin": return "/guard";
     case "teacher":
     case "school_admin":

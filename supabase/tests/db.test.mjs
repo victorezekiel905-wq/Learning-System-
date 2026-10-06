@@ -1335,3 +1335,74 @@ test("deleting a school with real data removes everything (no FK ordering errors
     assert.equal((await db.admin(`select count(*)::int n from public.${t} where tenant_id = $1`, [S.tenantA]))[0].n, 0, t);
   }
 });
+
+test("guests join a live lesson with the code and a name, and reach only that lesson (0860)", async () => {
+  // Its own school, so earlier tests can't affect it.
+  const T = await db.signUp("head@guests.test", "Guest Head");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Guest School", p_full_name: "Guest Head" })).tenant_id;
+  const cls = await db.rpc(T, "create_class", { p_name: "Guest Class" });
+  const pupil = await db.signUp("pupil@guests.test", "Pupil One");
+  await db.rpc(pupil, "redeem_code", { p_code: cls.join_code });
+  const s = await db.rpc(T, "start_session", { p_class: cls.id });
+  const g = await db.signInAnonymously();
+
+  // Wrong codes are counted (8 per 15 minutes) and answered plainly; names are checked.
+  assert.equal((await db.rpc(g, "join_session_as_guest", { p_code: "ZZZZZZ", p_name: "Kemi A" })).code, "P0002");
+  await rejects(db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "x" }), /2 to 40/);
+  const joined = await db.rpc(g, "join_session_as_guest", { p_code: s.join_code.toLowerCase(), p_name: "Kemi A" });
+  assert.equal(joined.session_id, s.id);
+  const g2 = await db.signInAnonymously();
+  await rejects(db.rpc(g2, "join_session_as_guest", { p_code: s.join_code, p_name: "kemi a" }), /already uses that name/);
+  // A real account can't use the guest door.
+  await rejects(db.rpc(pupil, "join_session_as_guest", { p_code: s.join_code, p_name: "Ada" }), /guest sign-in/);
+
+  // In the lesson: state, slides, hands up. No chat.
+  const st = await db.rpc(g, "session_student_state", { p_session: s.id });
+  assert.equal(st.guest, true);
+  assert.equal(st.session.group_chat_enabled, false);
+  await db.rpc(g, "session_lesson", { p_session: s.id });
+  await db.as(g, "insert into public.raise_hands (tenant_id, session_id, student_id, message) values ($1, $2, $3, 'help')", [tenant, s.id, g]);
+  await rejects(db.rpc(g, "open_group_thread", { p_session: s.id }), /./);
+
+  // Not monitored unless the teacher chooses: lockdown is off for the guest.
+  const free = await db.rpc(g, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: false, p_sharing: false });
+  assert.equal(free.lockdown, false);
+  assert.equal(free.away, false);
+  assert.equal(free.capture.enabled, false);
+
+  // The teacher sees the guest, marked as a guest.
+  const ts = await db.rpc(T, "teacher_session_state", { p_session: s.id });
+  assert.equal(ts.roster.find((r) => r.student_id === g).guest, true);
+  assert.equal(ts.roster.find((r) => r.student_id === pupil).guest, false);
+
+  // Nothing beyond this lesson: no class list, classes, assignments, other sessions.
+  assert.equal((await db.as(g, "select 1 from public.class_members")).length, 0);
+  assert.equal((await db.as(g, "select 1 from public.classes")).length, 0);
+  assert.equal((await db.as(g, "select 1 from public.assignments")).length, 0);
+  assert.deepEqual((await db.as(g, "select id from public.class_sessions")).map((r) => r.id), [s.id]);
+
+  // An anonymous sign-in can never become a student or create a school.
+  const g3 = await db.signInAnonymously();
+  await rejects(db.rpc(g3, "redeem_code", { p_code: cls.join_code }), /Create an account/);
+  await rejects(db.rpc(g3, "bootstrap_school", { p_school_name: "Fake School", p_full_name: "Fake" }), /Create an account/);
+
+  // The teacher turns on guest monitoring: lockdown now applies to the guest.
+  await rejects(db.rpc(pupil, "set_session_guests", { p_session: s.id, p_monitor: true }), /Not your session/);
+  await db.rpc(T, "set_session_guests", { p_session: s.id, p_monitor: true });
+  const watched = await db.rpc(g, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: false, p_sharing: false });
+  assert.equal(watched.lockdown, true);
+
+  // Closed to new guests; then the teacher removes the guest.
+  await db.rpc(T, "set_session_guests", { p_session: s.id, p_closed: true });
+  await rejects(db.rpc(g2, "join_session_as_guest", { p_code: s.join_code, p_name: "Tobi" }), /isn't taking new guests/);
+  await db.rpc(T, "remove_session_guest", { p_session: s.id, p_user: g });
+  await rejects(db.rpc(g, "session_student_state", { p_session: s.id }), /not found/i);
+  await rejects(db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Kemi A" }), /removed you/);
+  await db.rpc(T, "end_session", { p_session: s.id });
+
+  // Guests are deleted 30 days after their last lesson.
+  await db.admin("update public.class_sessions set ended_at = now() - interval '31 days' where id = $1", [s.id]);
+  const [{ n }] = await db.admin("select app.purge_guests() as n");
+  assert.ok(n >= 1);
+  assert.equal((await db.admin("select count(*)::int c from public.users where id = $1", [g]))[0].c, 0);
+});

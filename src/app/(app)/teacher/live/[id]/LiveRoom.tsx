@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Avatar, Badge, Button, CopyButton, Tabs, Textarea, useToast, useDialog } from "@/components/ui";
+import { Alert, Avatar, Badge, Button, CopyButton, Tabs, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL, type SessionState } from "@/components/live/types";
 import { createClient } from "@/lib/supabase/client";
@@ -227,6 +227,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
                     <span className={cn("h-2 w-2 shrink-0 rounded-full", PRESENCE_DOT[r.presence])} title={r.presence.replace("_", " ")} />
                     <Avatar name={r.name} className="h-6 w-6 text-[10px]" />
                     <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                    {r.guest && <Badge tone="gray">Guest</Badge>}
                     {r.hand_raised && <Icon name="hand" className="h-3.5 w-3.5 text-amber-600" />}
                     {r.open_alerts > 0 && <Badge tone="red">{r.open_alerts}</Badge>}
                     {r.device && !r.device.online && <span title="Device connection lost"><Icon name="wifiOff" className="h-3.5 w-3.5 text-ink-500" /></span>}
@@ -237,6 +238,8 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
             </ul>
             <p className="mt-2 text-[11px] text-ink-500">Select students to send commands from the Screens tab.</p>
           </div>
+
+          <GuestControls sessionId={sessionId} state={s} onChanged={() => void state.reload()} />
 
           <Announce sessionId={sessionId} classId={s.session.class_id} me={me} />
 
@@ -265,6 +268,41 @@ function Announce({ sessionId, classId, me }: { sessionId: string; classId: stri
         const { error } = await createClient().from("announcements").insert({ tenant_id: me.tenantId, class_id: classId, session_id: sessionId, author_id: me.id, body: text.trim() });
         if (error) toast(error.message, "error"); else { setText(""); toast("Announcement sent", "success"); }
       }}>Send to class</Button>
+    </div>
+  );
+}
+
+/** Guests: anyone with the code and a name. The teacher decides whether they're monitored and when to stop new ones. */
+function GuestControls({ sessionId, state, onChanged }: { sessionId: string; state: SessionState; onChanged: () => void }) {
+  const toast = useToast();
+  const guests = state.roster.filter((r) => r.guest);
+  const set = async (args: { p_monitor?: boolean; p_closed?: boolean }, msg: string) => {
+    try { await rpc("set_session_guests", { p_session: sessionId, ...args }); toast(msg, "success"); onChanged(); }
+    catch (e) { toast(errorText(e), "error"); }
+  };
+  return (
+    <div className="card space-y-3 p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold">Guests ({guests.length})</p>
+        <span className="text-[11px] text-ink-500">Code + name, no account</span>
+      </div>
+      <Toggle checked={!state.session.guests_closed} label="Let new guests join"
+        description="Anyone with the code can join at /join by typing a name."
+        onChange={(v) => void set({ p_closed: !v }, v ? "New guests can join" : "Closed to new guests")} />
+      <Toggle checked={!!state.session.guest_monitoring} label="Monitor guests"
+        description="Lockdown, screen sharing and leave alerts apply to guests too. Their screens are never captured where the school requires parental consent."
+        onChange={(v) => void set({ p_monitor: v }, v ? "Guests are monitored" : "Guests are not monitored")} />
+      {guests.length > 0 && (
+        <ul className="space-y-1 border-t border-ink-100 pt-2">{guests.map((g) => (
+          <li key={g.student_id} className="flex items-center justify-between gap-2 text-sm">
+            <span className="min-w-0 truncate">{g.name}</span>
+            <Button size="sm" variant="ghost" className="text-rose-700" onClick={async () => {
+              try { await rpc("remove_session_guest", { p_session: sessionId, p_user: g.student_id }); toast(`Removed ${g.name}`, "success"); onChanged(); }
+              catch (e) { toast(errorText(e), "error"); }
+            }}>Remove</Button>
+          </li>
+        ))}</ul>
+      )}
     </div>
   );
 }

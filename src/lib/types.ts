@@ -1,4 +1,4 @@
-export type Role = "student" | "teacher" | "school_admin" | "it_admin" | "parent" | "platform_admin";
+export type Role = "student" | "teacher" | "school_admin" | "it_admin" | "parent" | "platform_admin" | "guest";
 
 export type Profile = {
   id: string;
@@ -163,7 +163,8 @@ export const ROLE_LABEL: Record<Role, string> = {
   school_admin: "School admin",
   it_admin: "IT admin",
   parent: "Parent",
-  platform_admin: "Platform admin"
+  platform_admin: "Platform admin",
+  guest: "Guest"
 };
 
 export const CATEGORIES = [

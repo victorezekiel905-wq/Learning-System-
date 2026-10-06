@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, Select, Toggle } from "@/components/ui";
 import { errorText, rpc } from "@/lib/rpc";
 
 export function StartSessionForm({ classes, lessons, envs, defaultClass, defaultLesson }: {
@@ -17,6 +17,7 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
   // Game/social blocking on by default: the school's ready-made "Lesson focus" environment.
   const [env, setEnv] = useState(envs.find((e) => e.name.startsWith("Lesson focus"))?.id ?? "");
   const [title, setTitle] = useState("");
+  const [monitorGuests, setMonitorGuests] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -45,11 +46,18 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
           <Select value={env} onChange={(e) => setEnv(e.target.value)}><option value="">None (monitor only)</option>{envs.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</Select>
         </Field>
         <Field label="Session title (optional)"><Input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
+        <div className="rounded-xl border border-ink-200 bg-ink-50 p-4">
+          <p className="text-sm font-semibold text-ink-900">Guests</p>
+          <p className="mb-3 mt-0.5 text-[13px] text-ink-600">Anyone with the code can also join at <b>/join</b> by typing a name, with no account. You can stop new guests or remove one during the lesson.</p>
+          <Toggle checked={monitorGuests} onChange={setMonitorGuests} label="Monitor guests too"
+            description="Lockdown, screen sharing and leave alerts apply to guests. Off: guests just take part." />
+        </div>
         {err && <Alert tone="error">{err}</Alert>}
         <Button size="lg" loading={busy} onClick={async () => {
           setBusy(true); setErr(null);
           try {
             const s = await rpc<{ id: string }>("start_session", { p_class: cls, p_lesson: lesson || null, p_mode: mode, p_title: title || null, p_environment: env || null });
+            if (monitorGuests) await rpc("set_session_guests", { p_session: s.id, p_monitor: true });
             router.push(`/teacher/live/${s.id}`);
           } catch (e) { setErr(errorText(e)); setBusy(false); }
         }}>Go live</Button>

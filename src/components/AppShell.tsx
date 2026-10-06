@@ -69,7 +69,8 @@ const TABS: Record<Role, string[]> = {
   platform_admin: ["/teacher", "/teacher/classes", "/teacher/live", "/admin"],
   it_admin: ["/guard", "/guard/environments", "/teacher/classes", "/teacher/reports"],
   student: ["/student", "/student/join", "/student/work", "/messages"],
-  parent: ["/parent", "/messages", "/account"]
+  parent: ["/parent", "/messages", "/account"],
+  guest: []
 };
 
 // Full-attention screens (live lesson, editors, games) hide the tab bar; Menu stays in the header.

@@ -22,6 +22,7 @@ create table auth.users (
   id uuid primary key,
   email text,
   raw_user_meta_data jsonb not null default '{}'::jsonb,
+  is_anonymous boolean not null default false,
   created_at timestamptz not null default now()
 );
 create function auth.uid() returns uuid language sql stable as $$
@@ -134,6 +135,13 @@ class Db {
     const sql = `select public.${fn}(${names.map((n, i) => `${n} => $${i + 1}`).join(", ")}) as r`;
     const rows = await this.as(userId, sql, names.map((n) => args[n]));
     return rows[0]?.r;
+  }
+
+  /** An anonymous sign-in (Supabase Auth signInAnonymously): a guest with no email. */
+  async signInAnonymously() {
+    const id = randomUUID();
+    await this.admin("insert into auth.users (id, is_anonymous) values ($1, true)", [id]);
+    return id;
   }
 
   /** Create an auth.users row (what Supabase Auth does on sign-up). */

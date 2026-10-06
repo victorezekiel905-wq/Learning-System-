@@ -28,7 +28,11 @@ type StudentState = {
   announcements: { id: string; body: string; created_at: string }[];
 };
 
-export function StudentLive({ sessionId, me, notice, consented }: { sessionId: string; me: { id: string; tenantId: string; name: string }; notice: string; consented: boolean }) {
+export function StudentLive({ sessionId, me, notice, consented, guest = false }: {
+  sessionId: string; me: { id: string; tenantId: string; name: string }; notice: string; consented: boolean;
+  /** Joined with the code and a name: no chat, and "join another" when it ends. */
+  guest?: boolean;
+}) {
   const toast = useToast();
   const { quality } = useNetwork();
   const { pending } = useOfflineQueue((m) => toast(`An offline answer was rejected: ${m}`, "error"));
@@ -71,13 +75,13 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
     }
   }, [s?.announcements, lastAnnouncement, toast]);
 
-  if (st.error && !s) return <div className="page"><Alert tone="error">{st.error}</Alert></div>;
+  if (st.error && !s) return <div className="page"><Alert tone="error">{st.error}{guest && <> <Link href="/join">Back to joining</Link></>}</Alert></div>;
   if (!s) return <div className="page text-sm text-ink-500">Joining…</div>;
   if (s.session.status === "scheduled") {
     return <div className="page max-w-xl"><Alert title="This lesson hasn't started yet">Keep this page open. It starts as soon as {s.session.teacher} begins the lesson.</Alert></div>;
   }
   if (s.session.status !== "live") {
-    return <div className="page max-w-xl"><Alert title="This session has ended">Thanks for taking part. <Link href="/student">Back to home</Link></Alert></div>;
+    return <div className="page max-w-xl"><Alert title="This lesson has ended">Thanks for taking part. {guest ? <Link href="/join">Join another lesson</Link> : <Link href="/student">Back to home</Link>}</Alert></div>;
   }
 
   const slides = lesson.data?.slides ?? [];
@@ -106,8 +110,8 @@ export function StudentLive({ sessionId, me, notice, consented }: { sessionId: s
                 const { error } = await createClient().from("raise_hands").insert({ tenant_id: me.tenantId, session_id: sessionId, student_id: me.id, message: handMsg.trim().slice(0, 500) });
                 if (error) toast(error.message, "error"); else { setHandMsg(""); toast("Your teacher can see your hand is raised", "success"); void st.reload(); }
               }}><Icon name="hand" className="h-4 w-4" /> Raise hand</Button>}
-          <Button variant="secondary" onClick={() => openChat("teacher")}><Icon name="chat" className="h-4 w-4" /> Ask teacher</Button>
-          {s.session.group_chat_enabled && <Button variant="secondary" onClick={() => openChat("group")}><Icon name="users" className="h-4 w-4" /> Class chat</Button>}
+          {!guest && <Button variant="secondary" onClick={() => openChat("teacher")}><Icon name="chat" className="h-4 w-4" /> Ask teacher</Button>}
+          {!guest && s.session.group_chat_enabled && <Button variant="secondary" onClick={() => openChat("group")}><Icon name="users" className="h-4 w-4" /> Class chat</Button>}
         </div>
       </div>
 
