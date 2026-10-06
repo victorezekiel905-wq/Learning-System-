@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { errorText, rpc, must } from "@/lib/rpc";
-import { Alert, Button, Field, Input, Modal, Select, Tabs } from "@/components/ui";
+import { Alert, Button, Field, Input, Modal, Select, Tabs, Toggle } from "@/components/ui";
 
 export function NewLessonButton({ openInitially, templates }: { openInitially?: boolean; templates: { id: string; title: string }[] }) {
   const router = useRouter();
@@ -13,6 +13,8 @@ export function NewLessonButton({ openInitially, templates }: { openInitially?: 
   const [subject, setSubject] = useState("");
   const [template, setTemplate] = useState(templates[0]?.id ?? "");
   const [file, setFile] = useState<File | null>(null);
+  const [keepLook, setKeepLook] = useState(true);
+  const isPdf = !!file && /.pdf$/i.test(file.name);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -27,6 +29,7 @@ export function NewLessonButton({ openInitially, templates }: { openInitially?: 
         const form = new FormData();
         form.append("file", file);
         if (title) form.append("title", title);
+        form.append("mode", isPdf && keepLook ? "pictures" : "text");
         const res = await fetch("/api/lessons/import", { method: "POST", body: form });
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? "Import failed");
@@ -34,7 +37,8 @@ export function NewLessonButton({ openInitially, templates }: { openInitially?: 
       } else {
         const sb = createClient();
         const { data: { user } } = await sb.auth.getUser();
-        const { data: me } = await sb.from("users").select("tenant_id").eq("id", user!.id).single();
+        const { data: me } = await sb.from("users").select("tenant_id").eq("id", user!.id).maybeSingle();
+        if (!me?.tenant_id) throw new Error("Lessons belong to a school. Sign in with a teacher or school admin account.");
         const { data, error } = await sb.from("lessons").insert({ tenant_id: me!.tenant_id, owner_id: user!.id, title: title.trim(), subject: subject || null }).select("id").single();
         if (error) throw new Error(error.message);
         id = data.id;
@@ -61,9 +65,21 @@ export function NewLessonButton({ openInitially, templates }: { openInitially?: 
             <Field label="Template"><Select value={template} onChange={(e) => setTemplate(e.target.value)}>{templates.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}</Select></Field>
           ) : <Alert>No templates yet. Open any lesson and choose "Save as template".</Alert>)}
           {tab === "import" && (
-            <Field label="PowerPoint, PDF, Word, Markdown or text" hint="Text is turned into editable slides. Up to 20 MB, 80 slides.">
-              <input type="file" accept=".pptx,.pdf,.docx,.md,.markdown,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            </Field>
+            <div className="space-y-3">
+              <Field label="Your slides" hint="PDF, PowerPoint, Word, Markdown or text. Up to 20 MB and 80 slides.">
+                <input type="file" accept=".pdf,.pptx,.docx,.md,.markdown,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-ink-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
+              </Field>
+              {isPdf ? (
+                <Toggle checked={keepLook} onChange={setKeepLook} label="Keep the original look"
+                  description={keepLook ? "Every page becomes a slide that looks exactly like your PDF. Add quizzes, polls and other activities between them afterwards." : "Pages become plain text slides you can edit word by word."} />
+              ) : (
+                <Alert title="Want your slides to look exactly the same?">
+                  Save them as PDF first, then import the PDF. PowerPoint: <b>File → Save As → PDF</b>. Google Slides: <b>File → Download → PDF</b>. Canva: <b>Share → Download → PDF</b>. {file ? "Other files become editable text slides." : ""}
+                </Alert>
+              )}
+              {busy && <p className="text-sm text-ink-600">Importing… a long deck can take up to a minute.</p>}
+            </div>
           )}
           {err && <Alert tone="error">{err}</Alert>}
         </div>

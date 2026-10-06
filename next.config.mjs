@@ -42,7 +42,17 @@ const nextConfig = {
     // Tags error reports with the deployed commit (Vercel sets VERCEL_GIT_COMMIT_SHA).
     NEXT_PUBLIC_RELEASE: process.env.NEXT_PUBLIC_RELEASE || process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local"
   },
-  serverExternalPackages: ["pdf-parse", "mammoth"],
+  serverExternalPackages: ["pdf-parse", "mammoth", "@napi-rs/canvas"],
+  // The PDF reader loads its worker and font data from files the bundle tracer can't
+  // see; without them, lesson import fails in standalone (Docker) builds.
+  outputFileTracingIncludes: {
+    "/api/lessons/import": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/standard_fonts/**",
+      "./node_modules/pdfjs-dist/cmaps/**",
+      "./node_modules/@napi-rs/canvas*/**"
+    ]
+  },
   async headers() {
     return [
       {

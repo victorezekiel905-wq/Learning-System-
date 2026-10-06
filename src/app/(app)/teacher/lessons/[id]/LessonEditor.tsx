@@ -22,6 +22,34 @@ export const SLIDE_KINDS: { kind: SlideKind; label: string }[] = [
   { kind: "shapes", label: "Shapes / diagram" }, { kind: "whiteboard", label: "Whiteboard" }, { kind: "activity", label: "Activity" }
 ];
 
+/** What each slide type is for, in the "Add slide" picker. */
+const CONTENT_HELP: Partial<Record<SlideKind, [string, string]>> = {
+  title: ["Title", "A big heading to open the lesson or a section."],
+  text: ["Text", "A heading and paragraphs."],
+  image: ["Image", "A picture or diagram from your media library."],
+  video: ["Video with questions", "YouTube, Vimeo or your own video. It pauses to ask questions."],
+  audio: ["Audio", "A recording students can play."],
+  embed: ["Web page or simulation", "Any secure website, such as a PhET simulation or a 3D model."],
+  link: ["Link", "A button that opens a website."],
+  attachment: ["File", "A worksheet or document to download."],
+  shapes: ["Diagram", "Shapes, arrows and labels."],
+  whiteboard: ["Whiteboard", "A blank board to draw on during the lesson."]
+};
+const ACTIVITY_HELP: Record<ActivityKind, string> = {
+  multiple_choice: "Pick the right answer, with instant feedback.",
+  poll: "Quick opinions or checks, no right answer. Results live.",
+  open_ended: "Students write a response; share the best ones.",
+  quiz: "Several questions of any type, scored.",
+  draw: "Students draw or annotate on a picture.",
+  fill_blank: "Type the missing words.",
+  matching: "Match pairs, such as terms and definitions.",
+  drag_drop: "Put things in order or sort them into groups.",
+  collab_board: "Everyone posts notes to one shared board.",
+  file_upload: "Students hand in a photo or file.",
+  short_answer: "A short written answer, marked with a rubric.",
+  code: "Write and run code."
+};
+
 export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classes }: {
   lesson: Lesson; canEdit: boolean; userId: string; rubrics: { id: string; title: string }[]; classes: { id: string; name: string }[];
 }) {
@@ -168,10 +196,15 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
     } catch (e) { toast(errorText(e), "error"); }
   }
 
-  const slideData: SlideData | null = useMemo(() => current ? {
-    id: current.id, position: current.position, kind: current.kind, content: current.content,
-    activity: currentActivity ? { id: currentActivity.id, kind: currentActivity.kind, title: currentActivity.title, instructions: currentActivity.instructions } : null
-  } : null, [current, currentActivity]);
+  // Derived from state inside the memo, so the preview only changes when the slide does.
+  const activityMap = activities.data;
+  const slideData: SlideData | null = useMemo(() => {
+    const c = local.find((sl) => sl.id === selected);
+    if (!c) return null;
+    const a = c.activity_id ? activityMap?.[c.activity_id] : undefined;
+    return { id: c.id, position: c.position, kind: c.kind, content: c.content,
+             activity: a ? { id: a.id, kind: a.kind, title: a.title, instructions: a.instructions } : null };
+  }, [local, selected, activityMap]);
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] lg:min-h-[calc(100dvh-4rem)] flex-col">
@@ -213,17 +246,20 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
           </ol>
           {canEdit && (
             <div className="mt-3">
-              <Select aria-label="Add a slide" value="" onChange={(e) => { const k = e.target.value as SlideKind; if (!k) return; if (k === "activity") setAddKind(k); else void addSlide(k); }}>
-                <option value="">+ Add slide…</option>
-                {SLIDE_KINDS.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}
-              </Select>
+              <Button className="w-full" onClick={() => setAddKind("activity")}>+ Add slide</Button>
             </div>
           )}
         </aside>
 
         <section className="min-w-0 p-4 sm:p-6">
           {!current || !slideData ? (
-            <p className="text-sm text-ink-500">{slides.loading ? "Loading…" : "Add your first slide."}</p>
+            slides.loading ? <p className="text-sm text-ink-500">Loading…</p> : (
+              <div className="mx-auto mt-10 max-w-md text-center">
+                <p className="font-display text-lg font-bold text-ink-900">This lesson has no slides yet</p>
+                <p className="mt-1 text-sm text-ink-600">Add content and activities one by one, or go back and use <b>New lesson → Import file</b> to bring in a whole PDF deck.</p>
+                {canEdit && <Button className="mt-4" onClick={() => setAddKind("activity")}>+ Add slide</Button>}
+              </div>
+            )
           ) : (
             <div className="mx-auto max-w-5xl space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -258,13 +294,33 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
         </section>
       </div>
 
-      <Modal open={addKind === "activity"} onClose={() => setAddKind(null)} title="Add an activity" wide>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {(Object.keys(ACTIVITY_LABEL) as ActivityKind[]).map((k) => (
-            <button key={k} className="rounded-lg border border-ink-200 px-4 py-3 text-left hover:border-brand-400 hover:bg-brand-50" onClick={() => addSlide("activity", k)}>
-              <span className="font-medium">{ACTIVITY_LABEL[k]}</span>
-            </button>
-          ))}
+      <Modal open={addKind === "activity"} onClose={() => setAddKind(null)} title="Add a slide" wide>
+        <p className="-mt-1 mb-4 text-sm text-ink-600">It goes straight after the slide you have selected.</p>
+        <div className="grid gap-6 md:grid-cols-2">
+          <section aria-labelledby="add-content">
+            <h3 id="add-content" className="mb-2 text-sm font-bold text-ink-900">Content</h3>
+            <div className="grid gap-2">
+              {(Object.keys(CONTENT_HELP) as SlideKind[]).map((k) => (
+                <button key={k} type="button" onClick={() => { setAddKind(null); void addSlide(k); }}
+                  className="rounded-xl border border-ink-200 bg-white px-4 py-3 text-left transition-colors hover:border-ink-900">
+                  <span className="block text-sm font-semibold text-ink-900">{CONTENT_HELP[k]![0]}</span>
+                  <span className="block text-[13px] leading-snug text-ink-600">{CONTENT_HELP[k]![1]}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+          <section aria-labelledby="add-activity">
+            <h3 id="add-activity" className="mb-2 text-sm font-bold text-ink-900">Activities <span className="font-normal text-ink-500">(students answer on their devices)</span></h3>
+            <div className="grid gap-2">
+              {(Object.keys(ACTIVITY_LABEL) as ActivityKind[]).map((k) => (
+                <button key={k} type="button" onClick={() => { setAddKind(null); void addSlide("activity", k); }}
+                  className="rounded-xl border border-ink-200 bg-white px-4 py-3 text-left transition-colors hover:border-brand-600 hover:bg-brand-50">
+                  <span className="block text-sm font-semibold text-ink-900">{ACTIVITY_LABEL[k]}</span>
+                  <span className="block text-[13px] leading-snug text-ink-600">{ACTIVITY_HELP[k]}</span>
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
       </Modal>
       {share && <ShareModal lessonId={lesson.id} classes={classes} onClose={() => setShare(false)} />}

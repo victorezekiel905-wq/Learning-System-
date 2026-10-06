@@ -69,8 +69,8 @@ export function SlideView({ slide, activitySlot, overlay, onVideoTime, videoRef 
       break;
     case "image":
       inner = (
-        <figure className="flex h-full flex-col items-center justify-center bg-ink-900 p-4">
-          {src ? <img src={src} alt={c.alt ?? ""} className="max-h-full max-w-full object-contain" /> : <p className="text-ink-300">No image selected</p>}
+        <figure className={`flex h-full flex-col items-center justify-center bg-ink-900 ${c.full ? "" : "p-4"}`}>
+          {src ? <img src={src} alt={c.alt ?? ""} className={c.full ? "h-full w-full object-contain" : "max-h-full max-w-full object-contain"} /> : <p className="text-ink-300">No image selected</p>}
           {c.caption && <figcaption className="mt-2 text-sm text-ink-200">{c.caption}</figcaption>}
         </figure>
       );

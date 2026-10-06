@@ -66,6 +66,8 @@ export type SlideContent = {
   shapes?: Shape[];
   strokes?: Stroke[];
   label?: string;
+  /** Imported deck page: shown edge to edge, like the original slide. */
+  full?: boolean;
 };
 
 export type ActivityKind =

@@ -270,3 +270,41 @@ function normalizeImportedSlides(slides: ImportedSlide[], fallbackTitle: string)
   }
   return normalized.slice(0, 80);
 }
+
+export type PdfPage = { page: number; jpeg: Buffer; width: number; height: number; text: string };
+
+/**
+ * Each PDF page as a picture, so an imported deck looks exactly like the original
+ * (Nearpod-style), plus the page's text for teacher notes and alt text. Pages are
+ * rendered one at a time to keep memory low on small servers.
+ */
+export async function renderPdfPages(bytes: Uint8Array, opts: { maxPages?: number; width?: number } = {}): Promise<{ total: number; pages: PdfPage[] }> {
+  const { createCanvas, loadImage } = await import("@napi-rs/canvas");
+  const maxPages = opts.maxPages ?? 80;
+  const width = opts.width ?? 1600;
+  const parser = new PDFParse({ data: Buffer.from(bytes) });
+  try {
+    const text = await parser.getText();
+    const total = text.total ?? text.pages.length;
+    const count = Math.min(total, maxPages);
+    const pages: PdfPage[] = [];
+    for (let n = 1; n <= count; n++) {
+      const shot = await parser.getScreenshot({ partial: [n], desiredWidth: width, imageBuffer: true, imageDataUrl: false });
+      const png = shot.pages[0];
+      if (!png?.data) continue;
+      // JPEG on white: a fraction of the PNG's size, and transparent areas don't turn black.
+      const img = await loadImage(Buffer.from(png.data));
+      const canvas = createCanvas(img.width, img.height);
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, img.width, img.height);
+      ctx.drawImage(img, 0, 0);
+      const jpeg = await canvas.encode("jpeg", 82);
+      const pageText = normalizeText(text.pages.find((p) => p.num === n)?.text ?? "");
+      pages.push({ page: n, jpeg, width: img.width, height: img.height, text: pageText });
+    }
+    return { total, pages };
+  } finally {
+    await parser.destroy();
+  }
+}

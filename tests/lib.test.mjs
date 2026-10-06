@@ -107,3 +107,39 @@ test("links use the real address, never a leftover localhost setting", async () 
   assert.equal(appOrigin("https://school.example"), "https://school.example");
   if (was !== undefined) process.env.NEXT_PUBLIC_APP_URL = was;
 });
+
+/** A tiny two-page 16:9 PDF: a coloured title page and a text page. */
+function samplePdf() {
+  const pages = [
+    "0.14 0.25 0.83 rg 0 0 960 540 re f BT /F1 64 Tf 1 1 1 rg 60 280 Td (Equivalent fractions) Tj ET",
+    "1 1 1 rg 0 0 960 540 re f BT /F1 44 Tf 0 0 0 rg 60 400 Td (Why 2/4 = 1/2) Tj ET"
+  ];
+  const objs = ["<< /Type /Catalog /Pages 2 0 R >>",
+    `<< /Type /Pages /Kids [${pages.map((_, i) => `${4 + i * 2} 0 R`).join(" ")}] /Count ${pages.length} >>`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"];
+  pages.forEach((c, i) => {
+    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 960 540] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + i * 2} 0 R >>`);
+    objs.push(`<< /Length ${c.length} >>\nstream\n${c}\nendstream`);
+  });
+  let out = "%PDF-1.4\n"; const offs = [];
+  objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const x = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offs.map((o) => String(o).padStart(10, "0") + " 00000 n \n").join("");
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF\n`;
+  return new Uint8Array(Buffer.from(out, "latin1"));
+}
+
+test("PDF import keeps the original look: every page becomes a JPEG picture, with its text", async () => {
+  const r = await importer.renderPdfPages(samplePdf(), { width: 800 });
+  assert.equal(r.total, 2);
+  assert.equal(r.pages.length, 2);
+  for (const p of r.pages) {
+    assert.equal(p.width, 800);
+    assert.equal(p.height, 450, "16:9 kept");
+    assert.deepEqual([...p.jpeg.subarray(0, 2)], [0xff, 0xd8], "JPEG");
+  }
+  assert.match(r.pages[0].text, /Equivalent fractions/);
+  assert.match(r.pages[1].text, /Why 2\/4 = 1\/2/);
+  // The page limit is respected.
+  assert.equal((await importer.renderPdfPages(samplePdf(), { width: 400, maxPages: 1 })).pages.length, 1);
+});
