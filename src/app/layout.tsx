@@ -1,17 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Atkinson_Hyperlegible, Inter, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui";
 import { ErrorReporter } from "@/components/ErrorReporter";
 import { KeyboardScroll } from "@/components/KeyboardScroll";
 
-// Self-hosted at build time by next/font (no runtime requests to Google).
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", weight: ["500", "600", "700", "800"], display: "swap" });
-// Join codes and code blocks: unambiguous characters (0/O, 1/I) on every device.
+// Font files ship with the app (src/app/fonts, SIL Open Font License): builds never
+// download anything, and pages make no requests to Google.
+const inter = localFont({ src: "./fonts/inter-latin-wght-normal.woff2", weight: "100 900", variable: "--font-inter", display: "swap" });
+const jakarta = localFont({ src: "./fonts/plus-jakarta-sans-latin-wght-normal.woff2", weight: "200 800", variable: "--font-jakarta", display: "swap" });
 // "Easy-to-read font" learning support: designed for low vision and dyslexia-friendly letter shapes.
-const readable = Atkinson_Hyperlegible({ subsets: ["latin"], variable: "--font-readable", weight: ["400", "700"], display: "swap" });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", weight: ["500", "700", "800"], display: "swap" });
+const readable = localFont({
+  src: [{ path: "./fonts/atkinson-hyperlegible-latin-400-normal.woff2", weight: "400" }, { path: "./fonts/atkinson-hyperlegible-latin-700-normal.woff2", weight: "700" }],
+  variable: "--font-readable", display: "swap"
+});
+// Join codes and code blocks: unambiguous characters (0/O, 1/I) on every device.
+const mono = localFont({ src: "./fonts/jetbrains-mono-latin-wght-normal.woff2", weight: "100 800", variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "SwiftCipher", template: "%s · SwiftCipher" },
