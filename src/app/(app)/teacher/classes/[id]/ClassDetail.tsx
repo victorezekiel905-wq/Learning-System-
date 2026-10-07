@@ -8,6 +8,7 @@ import { api, errorText, rpc, must } from "@/lib/rpc";
 import { formatDate } from "@/lib/utils";
 import { LevelsPanel } from "./LevelsPanel";
 import { SupportsPanel } from "./SupportsPanel";
+import { FEATURES } from "@/lib/features";
 import { Icon } from "@/components/Icon";
 import {
   Alert, Avatar, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, PageHeader, Select, Tabs, Textarea, useToast, useDialog, Menu } from "@/components/ui";
@@ -18,7 +19,7 @@ type Member = { user_id: string; role: string; joined_at: string; users: { full_
 export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
   cls: Cls; canManage: boolean; isAdmin: boolean; policies: { id: string; name: string }[]; teachers: { id: string; full_name: string }[];
 }) {
-  const [tab, setTab] = useState<"roster" | "levels" | "supports" | "groups" | "attendance" | "settings">("roster");
+  const [tab, setTab] = useState<"roster" | "levels" | "supports" | "groups" | "settings">("roster");
   const members = useLoader(async () => {
     const { data, error } = await createClient().from("class_members")
       .select("user_id,role,joined_at,users(full_name,email)").eq("class_id", cls.id).order("role", { ascending: false });
@@ -33,7 +34,6 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
         subtitle={[cls.subject, cls.grade_level].filter(Boolean).join(" · ") || undefined}
         actions={canManage && <>
           <Link href={`/teacher/insights?class=${cls.id}`} className="btn btn-secondary no-underline">Analytics</Link>
-          <a href={`/api/classes/${cls.id}/gradebook`} className="btn btn-secondary no-underline" download>Export gradebook</a>
           <Link href={`/teacher/live/new?class=${cls.id}`} className="btn btn-primary no-underline">Go live</Link>
         </>} />
 
@@ -43,7 +43,6 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
         { id: "roster", label: `Roster (${students.length})` },
         ...(canManage ? [{ id: "levels" as const, label: "Levels & XP" }, { id: "supports" as const, label: "Supports" }] : []),
         { id: "groups", label: "Groups" },
-        { id: "attendance", label: "Attendance" },
         ...(canManage ? [{ id: "settings" as const, label: "Settings" }] : [])
       ]} />
 
@@ -51,7 +50,6 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
       {tab === "levels" && canManage && <LevelsPanel classId={cls.id} />}
       {tab === "supports" && canManage && <SupportsPanel classId={cls.id} />}
       {tab === "groups" && <Groups cls={cls} canManage={canManage} students={students} policies={policies} />}
-      {tab === "attendance" && <Attendance cls={cls} canManage={canManage} students={students} />}
       {tab === "settings" && canManage && <Settings cls={cls} isAdmin={isAdmin} teachers={teachers} />}
     </div>
   );
@@ -127,8 +125,8 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
                       {m.role === "student" && <div className="flex items-center justify-end gap-1">
                         <Link href={`/teacher/students/${m.user_id}`} className="btn btn-secondary btn-sm hidden no-underline sm:inline-flex">Report</Link>
                         <Menu label={`More for ${m.users?.full_name ?? "this student"}`} items={[
-                          { label: "Message parent", icon: <Icon name="chat" className="h-4 w-4" />, onSelect: () => messageParent(m.user_id, m.users?.full_name ?? "this student") },
-                          { label: "Parent invite code", icon: <Icon name="users" className="h-4 w-4" />, onSelect: () => parentInvite(m.user_id, m.users?.full_name ?? "student") },
+                          ...(FEATURES.messaging ? [{ label: "Message parent", icon: <Icon name="chat" className="h-4 w-4" />, onSelect: () => messageParent(m.user_id, m.users?.full_name ?? "this student") }] : []),
+                          ...(FEATURES.parentPortal ? [{ label: "Parent invite code", icon: <Icon name="users" className="h-4 w-4" />, onSelect: () => parentInvite(m.user_id, m.users?.full_name ?? "student") }] : []),
                           { label: "Pair a device", icon: <Icon name="laptop" className="h-4 w-4" />, onSelect: () => pairDevice(m.user_id, m.users?.full_name ?? "student") },
                           { label: "Remove from class", icon: <Icon name="trash" className="h-4 w-4" />, tone: "danger", onSelect: () => remove(m.user_id) }
                         ]} />
@@ -278,53 +276,6 @@ function Groups({ cls, canManage, students, policies }: { cls: Cls; canManage: b
   );
 }
 
-const STATUSES = ["present", "late", "absent", "excused"] as const;
-
-function Attendance({ cls, canManage, students }: { cls: Cls; canManage: boolean; students: Member[] }) {
-  const toast = useToast();
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const rows = useLoader(async () => {
-    const { data, error } = await createClient().from("attendance").select("student_id,status,source").eq("class_id", cls.id).eq("date", date);
-    if (error) throw error;
-    return Object.fromEntries((data ?? []).map((r) => [r.student_id, r as { status: string; source: string }]));
-  }, [cls.id, date]);
-
-  async function mark(studentId: string, status: string) {
-    const { error } = await createClient().from("attendance").upsert(
-      { tenant_id: cls.tenant_id, class_id: cls.id, student_id: studentId, date, status, source: "manual" },
-      { onConflict: "class_id,student_id,date" });
-    if (error) toast(error.message, "error"); else void rows.reload();
-  }
-  async function markAll(status: string) {
-    for (const s of students) await mark(s.user_id, status);
-  }
-
-  return (
-    <Card title="Attendance" actions={<div className="flex items-center gap-2">
-      <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
-      {canManage && <Button size="sm" variant="secondary" onClick={() => markAll("present")}>All present</Button>}
-    </div>} pad={false}>
-      {students.length === 0 ? <p className="p-5 text-sm text-ink-500">No students.</p> : (
-        <table className="table">
-          <thead><tr><th>Student</th><th>Status</th><th>Source</th></tr></thead>
-          <tbody>{students.map((s) => {
-            const r = rows.data?.[s.user_id];
-            return (
-              <tr key={s.user_id}>
-                <td className="font-medium">{s.users?.full_name}</td>
-                <td><div className="flex gap-1">{STATUSES.map((st) => (
-                  <button key={st} disabled={!canManage} onClick={() => mark(s.user_id, st)}
-                    className={`badge border capitalize ${r?.status === st ? "border-brand-400 bg-brand-600 text-white" : "border-ink-200 bg-white text-ink-600"}`}>{st}</button>
-                ))}</div></td>
-                <td className="text-xs text-ink-500">{r ? (r.source === "session" ? "from live session" : "manual") : "not recorded"}</td>
-              </tr>
-            );
-          })}</tbody>
-        </table>
-      )}
-    </Card>
-  );
-}
 
 function Settings({ cls, isAdmin, teachers }: { cls: Cls; isAdmin: boolean; teachers: { id: string; full_name: string }[] }) {
   const router = useRouter();

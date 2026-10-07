@@ -45,6 +45,7 @@ export type SessionState = {
     guest_monitoring?: boolean; guests_closed?: boolean;
   };
   settings: {
+    monitoring_enabled?: boolean;
     allow_spotlight: boolean; allow_group_chat: boolean; allow_screen_capture: boolean; thumbnail_interval_seconds: number;
     store_event_screenshots?: boolean;
   };

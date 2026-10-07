@@ -62,6 +62,8 @@ test.describe("responsive: signed-in pages", () => {
     const boot = await call<{ tenant_id: string }>(teacher.client, "bootstrap_school", { p_school_name: `E2E Layout ${tag}`, p_full_name: "E2E Teacher With A Fairly Long Name" });
     created.tenants.push(boot.tenant_id);
     await admin().from("tenants").update({ plan_code: "school" }).eq("id", boot.tenant_id);
+    // The live room is checked with its monitoring screens (an add-on since 0870).
+    await admin().from("tenant_settings").update({ monitoring_enabled: true }).eq("tenant_id", boot.tenant_id);
     const cls = await call<{ id: string; join_code: string }>(teacher.client, "create_class", { p_name: "Year 10 Computer Science and Digital Literacy", p_subject: "ICT" });
     classId = cls.id;
     await call(student.client, "redeem_code", { p_code: cls.join_code, p_full_name: "E2E Student" });
@@ -86,7 +88,7 @@ test.describe("responsive: signed-in pages", () => {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       for (const path of ["/teacher", "/teacher/classes", `/teacher/classes/${classId}`, "/teacher/lessons", "/teacher/live/new",
                           `/teacher/live/${sessionId}`, "/teacher/challenge", "/teacher/reports", "/admin", "/admin/users", "/admin/settings",
-                          "/messages", "/notifications", "/account"]) {
+                          "/notifications", "/account"]) {
         await page.goto(path);
         // Live pages hold a realtime socket open, so they never go "network idle".
         await page.waitForLoadState("load");
@@ -107,7 +109,7 @@ test.describe("responsive: signed-in pages", () => {
     await signIn(page, student);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      for (const path of ["/student", "/student/work", `/student/live/${sessionId}`, "/account"]) {
+      for (const path of ["/student", `/student/live/${sessionId}`, "/account"]) {
         await page.goto(path);
         // Live pages hold a realtime socket open, so they never go "network idle".
         await page.waitForLoadState("load");

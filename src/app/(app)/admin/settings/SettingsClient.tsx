@@ -180,8 +180,11 @@ export function SettingsClient({ tenant, settings, schools, flags, plan }: {
             <Button size="sm" variant="secondary" onClick={async () => { const name = await dialog.ask({ title: "Add a campus", label: "Campus name", placeholder: "e.g. Lekki campus", confirmLabel: "Add campus" }); if (!name) return; const { error } = await createClient().from("schools").insert({ tenant_id: t.id, name }); if (error) toast(error.message, "error"); else router.refresh(); }}>Add campus</Button></div></div>
       </Card>
 
-      <Card title="Classroom monitoring (Guard)">
-        <div className="grid gap-4 md:grid-cols-2">
+      <Card title="Classroom monitoring (add-on)">
+        <Toggle checked={!!s.monitoring_enabled} onChange={(v) => set({ monitoring_enabled: v })} label="Turn on classroom monitoring"
+          description="Lockdown, students' screens in the live room, leave alerts and blocked sites on school devices. Off: live lessons work without any monitoring. Save to apply." />
+        {s.monitoring_enabled && <>
+        <div className="mt-5 grid gap-4 border-t border-ink-100 pt-5 md:grid-cols-2">
           <Toggle checked={s.allow_screen_capture} onChange={(v) => set({ allow_screen_capture: v })} label="Screen thumbnails" description="Low-resolution frames during live sessions only." />
           <Toggle checked={s.allow_spotlight} onChange={(v) => set({ allow_spotlight: v })} label="Student screen spotlight" description="Teachers can show a student's screen to the class; the student is always told." />
           <Toggle checked={s.store_event_screenshots} onChange={(v) => set({ store_event_screenshots: v })} label="Keep a screenshot with leave alerts" description="Shows the teacher what the student switched to (for example a game). Kept only for the telemetry retention period." />
@@ -195,9 +198,10 @@ export function SettingsClient({ tenant, settings, schools, flags, plan }: {
         <Field className="mt-4" label="Student-facing monitoring notice" hint="Shown in the extension and at the start of managed sessions. Changing it asks every student to acknowledge it again.">
           <Textarea rows={3} value={s.monitoring_notice} onChange={(e) => set({ monitoring_notice: e.target.value })} />
         </Field>
+        </>}
       </Card>
 
-      <ConsentCard />
+      {s.monitoring_enabled && <ConsentCard />}
 
       <Card title="Communication & content moderation">
         <div className="grid gap-4 md:grid-cols-2">

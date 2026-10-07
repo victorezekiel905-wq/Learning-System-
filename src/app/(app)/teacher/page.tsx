@@ -11,13 +11,14 @@ export default async function TeacherHome() {
   const { me, sb } = await requireRole(TEACHERS);
   const uid = me.profile.id;
 
-  const [classes, live, lessons, pending, alerts, assignments] = await Promise.all([
+  const monthStart = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const [classes, live, lessons, monthSessions, alerts, recent] = await Promise.all([
     sb.from("classes").select("id,name,subject,join_code").is("archived_at", null).order("created_at"),
     sb.from("class_sessions").select("id,title,join_code,started_at,class_id").eq("status", "live").eq("teacher_id", uid),
     sb.from("lessons").select("id,title,status,updated_at").eq("owner_id", uid).order("updated_at", { ascending: false }).limit(5),
-    sb.from("quiz_answers").select("id", { count: "exact", head: true }).eq("status", "pending_review"),
+    sb.from("class_sessions").select("id", { count: "exact", head: true }).eq("teacher_id", uid).gte("created_at", monthStart),
     sb.from("environment_events").select("id,kind,rule,created_at,class_session_id,student_id").eq("status", "open").order("created_at", { ascending: false }).limit(5),
-    sb.from("assignments").select("id,title,due_at,class_id").gte("due_at", new Date().toISOString()).order("due_at").limit(5)
+    sb.from("class_sessions").select("id,title,ended_at").eq("teacher_id", uid).eq("status", "ended").order("ended_at", { ascending: false }).limit(5)
   ]);
 
   const myClasses = (classes.data ?? []) as { id: string; name: string; subject: string | null; join_code: string }[];
@@ -27,7 +28,7 @@ export default async function TeacherHome() {
 
   const stats = [
     { label: "Classes", value: myClasses.length, href: "/teacher/classes" },
-    { label: "Awaiting review", value: pending.count ?? 0, href: "/teacher/review" },
+    { label: "Sessions (30 days)", value: monthSessions.count ?? 0, href: "/teacher/reports" },
     { label: "Open alerts", value: openAlerts, href: liveNow[0] ? `/teacher/live/${liveNow[0].id}` : "/teacher/reports", red: openAlerts > 0 },
     { label: "Recent lessons", value: (lessons.data ?? []).length, href: "/teacher/lessons" }
   ];
@@ -114,11 +115,11 @@ export default async function TeacherHome() {
               </ul>
             )}
           </Card>
-          <Card title="Coming up">
-            {(assignments.data ?? []).length === 0 ? <p className="text-sm text-ink-500">Nothing due soon.</p> : (
+          <Card title="Recent sessions" actions={<Link href="/teacher/reports" className="text-[13px] font-semibold">All reports</Link>}>
+            {(recent.data ?? []).length === 0 ? <p className="text-sm text-ink-500">Sessions you run appear here, with their reports.</p> : (
               <ul className="space-y-3 text-sm">
-                {(assignments.data ?? []).map((a) => (
-                  <li key={a.id}><Link href={`/teacher/assignments/${a.id}`} className="font-medium text-ink-900">{a.title}</Link><span className="block text-[13px] text-ink-500">Due {formatDateTime(a.due_at)}</span></li>
+                {(recent.data ?? []).map((r) => (
+                  <li key={r.id}><Link href={`/teacher/reports?session=${r.id}`} className="font-medium text-ink-900">{r.title}</Link><span className="block text-[13px] text-ink-500">Ended {formatDateTime(r.ended_at)}</span></li>
                 ))}
               </ul>
             )}

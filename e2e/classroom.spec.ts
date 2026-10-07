@@ -21,6 +21,8 @@ test.describe("live classroom", () => {
     const boot = await call<{ tenant_id: string }>(teacher.client, "bootstrap_school", { p_school_name: `E2E School ${tag}`, p_full_name: "E2E Teacher" });
     created.tenants.push(boot.tenant_id);
     await admin().from("tenants").update({ plan_code: "school" }).eq("id", boot.tenant_id);
+    // Monitoring is a per-school add-on (0870); this test is about monitoring.
+    await admin().from("tenant_settings").update({ monitoring_enabled: true }).eq("tenant_id", boot.tenant_id);
     // Short grace period keeps the test fast; the default is 15 s.
     await admin().from("tenant_settings").update({ default_grace_seconds: 5, store_event_screenshots: true }).eq("tenant_id", boot.tenant_id);
     const cls = await call<{ id: string; join_code: string }>(teacher.client, "create_class", { p_name: "E2E Year 8", p_subject: "ICT" });

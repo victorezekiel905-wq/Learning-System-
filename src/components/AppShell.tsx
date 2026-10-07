@@ -15,6 +15,7 @@ import { Logo } from "./Logo";
 import { Avatar } from "./ui";
 import { Icon, type IconName } from "./Icon";
 import { useSupports } from "@/lib/supports";
+import { FEATURES } from "@/lib/features";
 
 /** The school's own logo and name when set (tenant branding), otherwise SwiftCipher's. */
 function SchoolBrand({ logoPath, name, compact, onDark }: { logoPath?: string | null; name?: string | null; compact?: boolean; onDark?: boolean }) {
@@ -30,7 +31,7 @@ function SchoolBrand({ logoPath, name, compact, onDark }: { logoPath?: string | 
 }
 
 type Group = "Teach" | "Run" | "Assess" | "Safety" | "Learn" | "Family" | "School";
-type NavItem = { href: string; label: string; short?: string; icon: IconName; roles: Role[]; exact?: boolean; group: Group };
+type NavItem = { href: string; label: string; short?: string; icon: IconName; roles: Role[]; exact?: boolean; group: Group; monitoring?: boolean };
 
 const T: Role[] = ["teacher", "school_admin", "platform_admin"];
 const A: Role[] = ["school_admin", "platform_admin"];
@@ -46,18 +47,15 @@ const NAV: NavItem[] = [
   { href: "/teacher/media", label: "Media library", icon: "image", roles: T, group: "Teach" },
   { href: "/teacher/live", label: "Live classroom", short: "Live", icon: "broadcast", roles: T, group: "Run" },
   { href: "/teacher/challenge", label: "Challenge", icon: "trophy", roles: T, group: "Run" },
-  { href: "/teacher/assignments", label: "Assignments", icon: "clipboard", roles: T, group: "Assess" },
-  { href: "/teacher/review", label: "Review queue", icon: "check", roles: T, group: "Assess" },
   { href: "/teacher/insights", label: "Analytics", icon: "chart", roles: T, group: "Assess" },
   { href: "/teacher/reports", label: "Reports", icon: "file", roles: [...T, "it_admin"], group: "Assess" },
-  { href: "/guard", label: "Devices", icon: "laptop", roles: IT, exact: true, group: "Safety" },
-  { href: "/guard/environments", label: "Environments", icon: "shield", roles: IT, group: "Safety" },
+  { href: "/guard", label: "Devices", icon: "laptop", roles: IT, exact: true, group: "Safety", monitoring: true },
+  { href: "/guard/environments", label: "Environments", icon: "shield", roles: IT, group: "Safety", monitoring: true },
   { href: "/student", label: "Home", icon: "home", roles: ["student"], exact: true, group: "Learn" },
   { href: "/student/join", label: "Join with code", short: "Join", icon: "key", roles: ["student"], group: "Learn" },
-  { href: "/student/work", label: "My work", icon: "clipboard", roles: ["student"], group: "Learn" },
-  { href: "/student/device", label: "This device", icon: "laptop", roles: ["student"], group: "Learn" },
-  { href: "/parent", label: "My children", short: "Children", icon: "users", roles: ["parent"], group: "Family" },
-  { href: "/messages", label: "Messages", icon: "chat", roles: ["student", "teacher", "school_admin", "platform_admin", "parent"], group: "School" },
+  { href: "/student/device", label: "This device", icon: "laptop", roles: ["student"], group: "Learn", monitoring: true },
+  ...(FEATURES.parentPortal ? [{ href: "/parent", label: "My children", short: "Children", icon: "users", roles: ["parent"], group: "Family" } as NavItem] : []),
+  ...(FEATURES.messaging ? [{ href: "/messages", label: "Messages", icon: "chat", roles: ["student", "teacher", "school_admin", "platform_admin", "parent"], group: "School" } as NavItem] : []),
   { href: "/admin", label: "School admin", short: "Admin", icon: "building", roles: A, group: "School" },
   { href: "/account", label: "Settings", icon: "settings", roles: EVERYONE, group: "School" }
 ];
@@ -68,8 +66,8 @@ const TABS: Record<Role, string[]> = {
   school_admin: ["/teacher", "/teacher/classes", "/teacher/live", "/admin"],
   platform_admin: ["/teacher", "/teacher/classes", "/teacher/live", "/admin"],
   it_admin: ["/guard", "/guard/environments", "/teacher/classes", "/teacher/reports"],
-  student: ["/student", "/student/join", "/student/work", "/messages"],
-  parent: ["/parent", "/messages", "/account"],
+  student: ["/student", "/student/join", "/student/device"],
+  parent: ["/parent", "/account"],
   guest: []
 };
 
@@ -83,7 +81,8 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const role = me.profile.role;
-  const items = NAV.filter((n) => n.roles.includes(role));
+  const monitoring = !!me.settings?.monitoring_enabled;
+  const items = NAV.filter((n) => n.roles.includes(role) && (!n.monitoring || monitoring));
   const tabs = TABS[role].map((h) => items.find((n) => n.href === h)).filter((n): n is NavItem => !!n);
   const focus = FOCUS.some((r) => r.test(pathname));
   const { quality } = useNetwork();

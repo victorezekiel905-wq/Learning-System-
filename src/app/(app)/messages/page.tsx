@@ -1,10 +1,13 @@
+import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/session";
+import { FEATURES } from "@/lib/features";
 import { PageHeader } from "@/components/ui";
 import { MessagesClient } from "./MessagesClient";
 
 export const metadata = { title: "Messages" };
 
 export default async function MessagesPage(props: { searchParams: Promise<{ thread?: string; class?: string }> }) {
+  if (!FEATURES.messaging) notFound();
   const searchParams = await props.searchParams;
   const { me, sb } = await requireRole(["student", "teacher", "school_admin", "platform_admin", "parent"]);
   const base = "id,kind,class_id,student_id,teacher_id,created_at,classes(name),student:users!chat_threads_student_id_tenant_id_fkey(full_name),teacher:users!chat_threads_teacher_id_tenant_id_fkey(full_name)";

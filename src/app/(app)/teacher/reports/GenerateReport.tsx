@@ -24,7 +24,7 @@ export function GenerateReport({ classes }: { classes: { id: string; name: strin
         }}>Generate</Button></>}>
         <div className="space-y-3">
           <Field label="Report"><Select value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="class_analytics">Class analytics</option><option value="attendance">Attendance register</option><option value="tenant_overview">School overview (admins)</option>
+            <option value="class_analytics">Class analytics</option><option value="tenant_overview">School overview (admins)</option>
           </Select></Field>
           {kind !== "tenant_overview" && <Field label="Class"><Select value={cls} onChange={(e) => setCls(e.target.value)}>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>}
           <Field label="Period"><Select value={days} onChange={(e) => setDays(Number(e.target.value))}><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option><option value={365}>1 year</option></Select></Field>

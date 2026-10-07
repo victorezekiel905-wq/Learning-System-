@@ -6,7 +6,7 @@ export const metadata = { title: "Start a live class" };
 
 export default async function NewLive(props: { searchParams: Promise<{ class?: string; lesson?: string }> }) {
   const searchParams = await props.searchParams;
-  const { sb } = await requireRole(TEACHERS);
+  const { me, sb } = await requireRole(TEACHERS);
   const [{ data: classes }, { data: lessons }, { data: envs }] = await Promise.all([
     sb.rpc("my_teaching_classes"),
     sb.from("lessons").select("id,title,status").neq("status", "archived").order("updated_at", { ascending: false }).limit(100),
@@ -16,7 +16,8 @@ export default async function NewLive(props: { searchParams: Promise<{ class?: s
     <div className="page max-w-2xl">
       <PageHeader title="Start a live class" subtitle="Students join with the code you'll get on the next screen." />
       <StartSessionForm classes={(classes as { id: string; name: string; students: number }[]) ?? []} lessons={lessons ?? []} envs={envs ?? []}
-        defaultClass={searchParams.class} defaultLesson={searchParams.lesson} />
+        defaultClass={searchParams.class} defaultLesson={searchParams.lesson}
+        monitoring={!!me.settings?.monitoring_enabled} />
     </div>
   );
 }

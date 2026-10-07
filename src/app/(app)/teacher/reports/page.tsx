@@ -55,7 +55,7 @@ function SessionView({ id, r }: { id: string; r: SessionReport }) {
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold">{r.session.title} · {r.class.name}</h2>
         <a className="btn btn-secondary btn-sm no-underline" href={`/api/reports/${id}/export`}>Export CSV</a></div>
       <div className="grid gap-4 sm:grid-cols-4">
-        <Stat label="Attendance" value={`${r.joined}/${r.enrolled}`} /><Stat label="Duration" value={`${r.session.minutes} min`} />
+        <Stat label="Joined" value={`${r.joined}/${r.enrolled}`} /><Stat label="Duration" value={`${r.session.minutes} min`} />
         <Stat label="Teacher commands" value={r.commands} /><Stat label="Help requests" value={r.hands} />
       </div>
       <Card title="Activities">{r.activities.length ? <ul className="text-sm">{r.activities.map((a) => <li key={a.activity_id}>{a.title}: {a.attempts} attempts{a.avg_percent !== null && `, average ${a.avg_percent}%`}</li>)}</ul> : <p className="text-sm text-ink-500">No activities run.</p>}</Card>

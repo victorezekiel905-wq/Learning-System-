@@ -4,6 +4,7 @@ import { Alert, Empty, PageHeader } from "@/components/ui";
 import { ChildReport } from "@/components/parent/ChildReport";
 import { ParentAlerts } from "@/components/parent/ParentAlerts";
 import { firstName } from "@/lib/utils";
+import { FEATURES } from "@/lib/features";
 import { ParentConsent, type ConsentRow } from "./ParentConsent";
 
 export const metadata = { title: "My children" };
@@ -11,6 +12,9 @@ export const metadata = { title: "My children" };
 export default async function ParentPage(props: { searchParams: Promise<{ child?: string; period?: string; thread?: string }> }) {
   const searchParams = await props.searchParams;
   const { me, sb } = await requireRole(["parent"]);
+  if (!FEATURES.parentPortal) {
+    return <div className="page max-w-xl"><Alert title="Parent reports are coming soon">Your account is ready. Your child's lesson results will appear here once your school turns parent reports on.</Alert></div>;
+  }
   if (!me.settings?.parent_portal_enabled) {
     return <div className="page max-w-xl"><Alert title="The parent portal is not switched on">Your school hasn't enabled parent reports yet. Please contact the school office.</Alert></div>;
   }

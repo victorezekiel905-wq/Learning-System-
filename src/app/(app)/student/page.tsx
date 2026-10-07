@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/session";
-import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
-import { firstName, formatDateTime } from "@/lib/utils";
+import { Alert, Card, Empty, PageHeader } from "@/components/ui";
+import { firstName } from "@/lib/utils";
 import { ProgressPanel } from "./ProgressPanel";
-import { WriteQuestion } from "./WriteQuestion";
 import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "Home" };
@@ -24,11 +23,10 @@ export default async function StudentHome() {
   // A dropped connection shows the retry screen (error.tsx), not a crash inside the page.
   if (error || !data) throw new Error(`Couldn't load the student home page: ${error?.message ?? "no data"}`);
   const h = data as Home;
-  const todo = h.assignments.filter((a) => !a.submitted);
 
   return (
     <div className="page">
-      <PageHeader title={`Hi${firstName(me.profile.full_name) ? `, ${firstName(me.profile.full_name)}` : ""}.`} subtitle="Your lessons, your level and your work, in one place."
+      <PageHeader title={`Hi${firstName(me.profile.full_name) ? `, ${firstName(me.profile.full_name)}` : ""}.`} subtitle="Your live lessons, challenges and progress."
         actions={<Link href="/student/join" className="btn btn-primary no-underline"><Icon name="key" className="h-4 w-4" />Join with code</Link>} />
 
       {me.settings?.welcome_message && <div className="mb-6 rounded-2xl border border-ink-200 bg-white px-5 py-4 text-[15px] text-ink-800"><span className="mr-2 font-semibold">From your school:</span>{me.settings.welcome_message}</div>}
@@ -61,39 +59,12 @@ export default async function StudentHome() {
       )}
 
       <ProgressPanel />
-      <WriteQuestion />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2" title={`To do (${todo.length})`}>
-          {todo.length === 0 ? <p className="text-sm text-ink-500">You're all caught up.</p> : (
-            <ul className="divide-y divide-ink-100">
-              {todo.map((a) => {
-                const overdue = a.due_at && new Date(a.due_at) < new Date();
-                return (
-                  <li key={a.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <div><Link href={`/student/assignments/${a.id}`} className="font-medium">{a.title}</Link><p className="text-xs text-ink-500">{a.class}{a.due_at && ` · due ${formatDateTime(a.due_at)}`}</p></div>
-                    {overdue ? <Badge tone={a.late_allowed ? "amber" : "red"}>{a.late_allowed ? "Late" : "Closed"}</Badge> : <Badge tone="brand">Open</Badge>}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-        <Card title="My classes">
-          {h.classes.length === 0 ? <Empty title="No classes yet" action={<Link href="/student/join" className="btn btn-primary no-underline">Enter a class code</Link>} /> : (
+        <Card className="lg:col-span-2" title="My classes">
+          {h.classes.length === 0 ? <Empty title="No classes yet" action={<Link href="/student/join" className="btn btn-primary no-underline">Enter a code</Link>}>You can also join any live lesson with its code, no class needed.</Empty> : (
             <ul className="space-y-2 text-sm">{h.classes.map((c) => (
-              <li key={c.id} className="flex items-center justify-between"><span><span className="font-medium">{c.name}</span><span className="block text-xs text-ink-500">{c.teacher}</span></span>
-                <Link href={`/messages?class=${c.id}`} className="text-xs">Message teacher</Link></li>
-            ))}</ul>
-          )}
-        </Card>
-        <Card className="lg:col-span-2" title="Feedback">
-          {h.feedback.length === 0 ? <p className="text-sm text-ink-500">Feedback from your teachers appears here.</p> : (
-            <ul className="space-y-3">{h.feedback.map((f, i) => (
-              <li key={i} className="rounded-lg bg-ink-50 p-3 text-sm">
-                <p className="flex justify-between font-medium"><span>{f.title}</span>{f.score !== null && <span className="tabular-nums">{Number(f.score)}/{Number(f.out_of)}</span>}</p>
-                {f.feedback && <p className="mt-1 text-ink-700">{f.feedback}</p>}
-              </li>
+              <li key={c.id}><span className="font-medium">{c.name}</span><span className="block text-xs text-ink-500">{c.teacher}</span></li>
             ))}</ul>
           )}
         </Card>
@@ -101,10 +72,9 @@ export default async function StudentHome() {
           {h.scores.length === 0 ? <p className="text-sm text-ink-500">Scores from activities and quizzes appear here.</p> : (
             <ul className="space-y-2 text-sm">{h.scores.map((s, i) => (
               <li key={i} className="flex justify-between gap-3"><span className="truncate">{s.activity}</span>
-                <span className="whitespace-nowrap tabular-nums text-ink-600">{s.max ? `${Number(s.score ?? 0)}/${Number(s.max)}` : "done"}{s.status === "submitted" && "*"}</span></li>
+                <span className="whitespace-nowrap tabular-nums text-ink-600">{s.max ? `${Number(s.score ?? 0)}/${Number(s.max)}` : "done"}</span></li>
             ))}</ul>
           )}
-          {h.scores.some((s) => s.status === "submitted") && <p className="hint mt-2">* waiting for teacher review</p>}
         </Card>
       </div>
     </div>

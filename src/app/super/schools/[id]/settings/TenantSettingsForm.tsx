@@ -5,6 +5,7 @@ import { Button, Card, Field, Input, Select, Textarea, Toggle, useToast } from "
 import { rpc } from "@/lib/rpc";
 
 export type SaSettings = {
+  monitoring_enabled: boolean;
   allow_spotlight: boolean; allow_group_chat: boolean; allow_screen_capture: boolean; store_event_screenshots: boolean;
   parent_portal_enabled: boolean; email_alerts_enabled: boolean; parent_focus_details: boolean; require_monitoring_consent: boolean;
   nickname_mode: "first_name_initial" | "approved_nickname" | "anonymous";
@@ -47,6 +48,7 @@ export function TenantSettingsForm({ tenantId, initial }: { tenantId: string; in
     <div className="space-y-6">
       <Card title="Live lessons">
         <div className="space-y-4">
+          {flag("monitoring_enabled", "Classroom monitoring (add-on)", "Lockdown, students' screens, leave alerts and blocked sites. Off: live lessons without monitoring.")}
           {flag("allow_screen_capture", "Students share their screen in lessons", "Teachers see each student's screen during live lessons.")}
           {flag("store_event_screenshots", "Keep the screen picture with a leave alert", "Otherwise every screen picture is deleted when the class ends.")}
           {flag("allow_spotlight", "Spotlight", "Teachers can show one student's screen to the class.")}

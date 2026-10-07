@@ -29,6 +29,9 @@ before(async () => {
 
   S.adminB = await db.signUp("admin@b.test", "Bob Admin");
   S.tenantB = (await db.rpc(S.adminB, "bootstrap_school", { p_school_name: "Beta School", p_full_name: "Bob Admin" })).tenant_id;
+  // Monitoring is an add-on (0870), off for new schools; these schools use it.
+  await db.admin("update public.tenant_settings set monitoring_enabled = true where tenant_id = any($1)", [[S.tenantA, S.tenantB]]);
+  await db.admin("delete from public.audit_logs where action = 'settings.updated'"); // fixture, not part of any scenario
 });
 
 // ---------------------------------------------------------------------------
@@ -1341,6 +1344,7 @@ test("guests join a live lesson with the code and a name, and reach only that le
   const T = await db.signUp("head@guests.test", "Guest Head");
   const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Guest School", p_full_name: "Guest Head" })).tenant_id;
   const cls = await db.rpc(T, "create_class", { p_name: "Guest Class" });
+  await db.admin("update public.tenant_settings set monitoring_enabled = true where tenant_id = $1", [tenant]);
   const pupil = await db.signUp("pupil@guests.test", "Pupil One");
   await db.rpc(pupil, "redeem_code", { p_code: cls.join_code });
   const s = await db.rpc(T, "start_session", { p_class: cls.id });
@@ -1405,4 +1409,35 @@ test("guests join a live lesson with the code and a name, and reach only that le
   const [{ n }] = await db.admin("select app.purge_guests() as n");
   assert.ok(n >= 1);
   assert.equal((await db.admin("select count(*)::int c from public.users where id = $1", [g]))[0].c, 0);
+});
+
+test("monitoring is an add-on: off for new schools, enforced by the database (0870)", async () => {
+  const head = await db.signUp("head@nomon.test", "No Monitor Head");
+  const tenant = (await db.rpc(head, "bootstrap_school", { p_school_name: "Calm School", p_full_name: "No Monitor Head" })).tenant_id;
+  assert.equal((await db.as(head, "select monitoring_enabled from public.tenant_settings"))[0].monitoring_enabled, false);
+  const cls = await db.rpc(head, "create_class", { p_name: "Calm 1" });
+  const kid = await db.signUp("kid@nomon.test", "Kid One");
+  await db.rpc(kid, "redeem_code", { p_code: cls.join_code });
+
+  // Off: sessions start without lockdown, can't be locked, and nothing is captured.
+  const s = await db.rpc(head, "start_session", { p_class: cls.id });
+  assert.equal(s.lockdown, false);
+  await rejects(db.rpc(head, "set_session_lockdown", { p_session: s.id, p_on: true }), /monitoring is switched off/);
+  const r = await db.rpc(kid, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: false, p_sharing: false });
+  assert.equal(r.lockdown, false);
+  assert.equal(r.away, false);
+  assert.equal(r.capture.enabled, false);
+  assert.equal((await db.rpc(kid, "student_screen_frame", { p_session: s.id, p_image: "data:image/jpeg;base64,AAAA" })).stored, false);
+  assert.equal((await db.rpc(head, "teacher_session_state", { p_session: s.id })).settings.monitoring_enabled, false);
+  await db.rpc(head, "end_session", { p_session: s.id });
+
+  // The school admin turns it on: new sessions lock down again.
+  await db.as(head, "update public.tenant_settings set monitoring_enabled = true");
+  const s2 = await db.rpc(head, "start_session", { p_class: cls.id });
+  assert.equal(s2.lockdown, true);
+  await db.rpc(head, "end_session", { p_session: s2.id });
+  // Only the school's admins can switch it: a student's update changes nothing.
+  await db.as(head, "update public.tenant_settings set monitoring_enabled = false");
+  assert.equal((await db.as(kid, "update public.tenant_settings set monitoring_enabled = true returning 1")).length, 0);
+  assert.equal((await db.admin("select monitoring_enabled from public.tenant_settings where tenant_id = $1", [tenant]))[0].monitoring_enabled, false);
 });

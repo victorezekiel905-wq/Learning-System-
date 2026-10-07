@@ -11,6 +11,7 @@ import { useSignal } from "@/lib/realtime";
 import { useScreenFeed } from "@/lib/screen-feed";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, timeAgo } from "@/lib/utils";
+import { FEATURES } from "@/lib/features";
 import { LessonPanel } from "./LessonPanel";
 import { ResponsesPanel } from "./ResponsesPanel";
 import { ScreensPanel } from "./ScreensPanel";
@@ -122,6 +123,8 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
   if (state.error && !s) return <div className="page"><Alert tone="error">{state.error}</Alert></div>;
   if (!s) return <div className="page text-sm text-ink-500">Connecting to the session…</div>;
 
+  // Classroom monitoring is a per-school add-on (0870); databases before it count as on.
+  const mon = s.settings.monitoring_enabled !== false;
   const joined = s.roster.filter((r) => r.presence === "online" || r.presence === "idle").length;
   const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
@@ -153,12 +156,12 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 [&_.btn-secondary:hover]:bg-white/15 [&_.btn-secondary]:border-white/20 [&_.btn-secondary]:bg-white/5 [&_.btn-secondary]:text-white">
-          <Button size="sm" variant={s.session.lockdown ? "accent" : "secondary"} aria-pressed={s.session.lockdown}
+          {mon && <Button size="sm" variant={s.session.lockdown ? "accent" : "secondary"} aria-pressed={s.session.lockdown}
             title={s.session.lockdown ? "Students must share their screen and stay in the full-screen lesson; leaving alerts you." : "Students can leave the lesson without an alert."}
             onClick={async () => {
               try { await rpc("set_session_lockdown", { p_session: sessionId, p_on: !s.session.lockdown }); void state.reload(); toast(s.session.lockdown ? "Lockdown off" : "Lockdown on", "info"); }
               catch (e) { toast(errorText(e), "error"); }
-            }}><Icon name="lock" className="h-4 w-4" /> Lockdown {s.session.lockdown ? "on" : "off"}</Button>
+            }}><Icon name="lock" className="h-4 w-4" /> Lockdown {s.session.lockdown ? "on" : "off"}</Button>}
           <CopyButton value={s.session.join_code} label="Copy code" />
           <Link href={`/present/${sessionId}`} target="_blank" className="btn btn-secondary btn-sm no-underline"><Icon name="monitor" className="h-4 w-4" /> Present</Link>
           <Link href={`/teacher/challenge/new?class=${s.session.class_id}&session=${sessionId}${s.session.active_activity_id ? `&activity=${s.session.active_activity_id}` : ""}`}
@@ -180,18 +183,18 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
         </div>
       )}
 
-      <div className="grid flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_300px]">
-        <aside className="min-w-0 border-b border-ink-200 bg-white p-3 lg:sticky lg:top-16 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r" aria-label="Student screens">
+      <div className={cn("grid flex-1 grid-cols-[minmax(0,1fr)]", mon ? "lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_300px]" : "xl:grid-cols-[minmax(0,1fr)_300px]")}>
+        {mon && <aside className="min-w-0 border-b border-ink-200 bg-white p-3 lg:sticky lg:top-16 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r" aria-label="Student screens">
           <ScreenRail state={s} screens={screens} focus={focus} onFocus={setFocus} />
-        </aside>
+        </aside>}
         <section className="min-w-0 p-4">
           {focus ? <FocusView state={s} studentId={focus} sessionId={sessionId} onMinimize={() => setFocus(null)} live={screens[focus]?.source === "web" ? screens[focus] : undefined} /> : <>
           <Tabs className="mb-4" value={tab} onChange={setTab} tabs={[
             { id: "lesson", label: "Lesson" },
             { id: "responses", label: "Responses" },
-            { id: "screens", label: "Screens" },
-            { id: "environment", label: "Environment", count: openAlerts.filter((a) => a.kind !== "connection_lost").length },
-            { id: "chat", label: "Chat" }
+            ...(mon ? [{ id: "screens" as Tab, label: "Screens" },
+              { id: "environment" as Tab, label: "Environment", count: openAlerts.filter((a) => a.kind !== "connection_lost").length }] : []),
+            ...(FEATURES.messaging ? [{ id: "chat" as Tab, label: "Chat" }] : [])
           ]} />
           {tab === "lesson" && <LessonPanel state={s} me={me} reload={state.reload} />}
           {tab === "responses" && <ResponsesPanel state={s} me={me} reload={state.reload} />}
@@ -201,7 +204,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
           </>}
         </section>
 
-        <aside className="space-y-4 border-l border-ink-200 bg-ink-50 p-4 lg:col-span-2 xl:col-span-1">
+        <aside className={cn("space-y-4 border-l border-ink-200 bg-ink-50 p-4 xl:col-span-1", mon && "lg:col-span-2")}>
           {s.hands.length > 0 && (
             <div className="card p-3">
               <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Icon name="hand" className="h-4 w-4 text-amber-600" /> Help queue ({s.hands.length})</p>
@@ -236,10 +239,10 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[11px] text-ink-500">Select students to send commands from the Screens tab.</p>
+            {mon && <p className="mt-2 text-[11px] text-ink-500">Select students to send commands from the Screens tab.</p>}
           </div>
 
-          <GuestControls sessionId={sessionId} state={s} onChanged={() => void state.reload()} />
+          <GuestControls sessionId={sessionId} state={s} monitoring={mon} onChanged={() => void state.reload()} />
 
           <Announce sessionId={sessionId} classId={s.session.class_id} me={me} />
 
@@ -273,7 +276,7 @@ function Announce({ sessionId, classId, me }: { sessionId: string; classId: stri
 }
 
 /** Guests: anyone with the code and a name. The teacher decides whether they're monitored and when to stop new ones. */
-function GuestControls({ sessionId, state, onChanged }: { sessionId: string; state: SessionState; onChanged: () => void }) {
+function GuestControls({ sessionId, state, monitoring, onChanged }: { sessionId: string; state: SessionState; monitoring: boolean; onChanged: () => void }) {
   const toast = useToast();
   const guests = state.roster.filter((r) => r.guest);
   const set = async (args: { p_monitor?: boolean; p_closed?: boolean }, msg: string) => {
@@ -289,9 +292,9 @@ function GuestControls({ sessionId, state, onChanged }: { sessionId: string; sta
       <Toggle checked={!state.session.guests_closed} label="Let new guests join"
         description="Anyone with the code can join at /join by typing a name."
         onChange={(v) => void set({ p_closed: !v }, v ? "New guests can join" : "Closed to new guests")} />
-      <Toggle checked={!!state.session.guest_monitoring} label="Monitor guests"
+      {monitoring && <Toggle checked={!!state.session.guest_monitoring} label="Monitor guests"
         description="Lockdown, screen sharing and leave alerts apply to guests too. Their screens are never captured where the school requires parental consent."
-        onChange={(v) => void set({ p_monitor: v }, v ? "Guests are monitored" : "Guests are not monitored")} />
+        onChange={(v) => void set({ p_monitor: v }, v ? "Guests are monitored" : "Guests are not monitored")} />}
       {guests.length > 0 && (
         <ul className="space-y-1 border-t border-ink-100 pt-2">{guests.map((g) => (
           <li key={g.student_id} className="flex items-center justify-between gap-2 text-sm">

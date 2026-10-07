@@ -11,6 +11,8 @@ export type Profile = {
 };
 
 export type TenantSettings = {
+  /** Classroom monitoring add-on (0870). */
+  monitoring_enabled?: boolean;
   allow_spotlight: boolean;
   allow_group_chat: boolean;
   allow_screen_capture: boolean;

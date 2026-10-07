@@ -16,6 +16,7 @@ import { useLoader, useNetwork, useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
 import { useOfflineQueue } from "@/lib/offline-queue";
 import { errorText, rpc } from "@/lib/rpc";
+import { FEATURES } from "@/lib/features";
 
 type StudentState = {
   session: { id: string; title: string; status: string; mode: string; current_slide: number; group_chat_enabled: boolean; responses_visible: boolean; class_id: string; teacher: string; environment_active: boolean };
@@ -110,8 +111,8 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
                 const { error } = await createClient().from("raise_hands").insert({ tenant_id: me.tenantId, session_id: sessionId, student_id: me.id, message: handMsg.trim().slice(0, 500) });
                 if (error) toast(error.message, "error"); else { setHandMsg(""); toast("Your teacher can see your hand is raised", "success"); void st.reload(); }
               }}><Icon name="hand" className="h-4 w-4" /> Raise hand</Button>}
-          {!guest && <Button variant="secondary" onClick={() => openChat("teacher")}><Icon name="chat" className="h-4 w-4" /> Ask teacher</Button>}
-          {!guest && s.session.group_chat_enabled && <Button variant="secondary" onClick={() => openChat("group")}><Icon name="users" className="h-4 w-4" /> Class chat</Button>}
+          {!guest && FEATURES.messaging && <Button variant="secondary" onClick={() => openChat("teacher")}><Icon name="chat" className="h-4 w-4" /> Ask teacher</Button>}
+          {!guest && FEATURES.messaging && s.session.group_chat_enabled && <Button variant="secondary" onClick={() => openChat("group")}><Icon name="users" className="h-4 w-4" /> Class chat</Button>}
         </div>
       </div>
 
