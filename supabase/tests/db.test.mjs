@@ -1534,3 +1534,86 @@ test("live engine core: lobby, start, pause, end; no class needed; join by code 
   assert.equal(st.session.phase, "ended");
   assert.equal(st.summary.answered, 0);
 });
+
+test("points and leaderboard: server scoring, speed, streaks, private ranks (0890)", async () => {
+  const T = await db.signUp("t@score.test", "Score Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Score School", p_full_name: "Score Teacher" })).tenant_id;
+  const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title, status) values ($1, $2, 'Quiz deck', 'published') returning id", [tenant, T]);
+  const [{ id: act }] = await db.admin(`insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+    values ($1, $2, $3, 'quiz', 'Quick quiz', '{"show_feedback": "immediately", "attempts_allowed": 1}') returning id`, [tenant, lesson, T]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 0, 'activity', $3, '{}')", [tenant, lesson, act]);
+  const q = {};
+  for (const [i, k] of ["q1", "q2", "q3", "poll"].entries()) {
+    const kind = k === "poll" ? "poll" : "mcq";
+    const [{ id }] = await db.admin("insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, position) values ($1, $2, $3, $4, $5, 1, $6) returning id", [tenant, act, T, kind, k, i]);
+    const [{ id: right }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'right', $3, 0) returning id", [tenant, id, kind === "mcq"]);
+    const [{ id: wrong }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'wrong', false, 1) returning id", [tenant, id]);
+    q[k] = { id, right, wrong };
+  }
+  const s = await db.rpc(T, "start_session", { p_class: null, p_lesson: lesson });
+  const players = {};
+  for (const n of ["Ada", "Ben", "Cy"]) {
+    players[n] = await db.signInAnonymously();
+    await db.rpc(players[n], "join_session_as_guest", { p_code: s.join_code, p_name: n });
+  }
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "start" });
+  const attempt = async (who) => (await db.rpc(players[who], "start_attempt", { p_activity: act, p_session: s.id })).attempt.id;
+  const answer = (who, a, k, pick) => db.rpc(players[who], "submit_answer", { p_attempt: a, p_question: q[k].id, p_response: JSON.stringify({ option_id: q[k][pick] }) });
+
+  // Ada: right, right (streak), wrong (streak resets), poll (taking part).
+  const aA = await attempt("Ada");
+  const r1 = await answer("Ada", aA, "q1", "right");
+  assert.equal(r1.points.base, 1000);
+  assert.ok(r1.points.speed >= 450, `fast answer earns most of the speed bonus (${r1.points.speed})`);
+  assert.equal(r1.points.streak_bonus, 0);
+  const r2 = await answer("Ada", aA, "q2", "right");
+  assert.equal(r2.points.streak_bonus, 100);
+  assert.equal(r2.points.streak, 2);
+  const r3 = await answer("Ada", aA, "q3", "wrong");
+  assert.equal(r3.points.points, 0, "wrong: no points");
+  assert.equal(r3.points.streak, 0, "wrong: the streak resets");
+  const r4 = await answer("Ada", aA, "poll", "right");
+  assert.equal(r4.points.points, 100);
+  const [ada] = await db.admin("select total_score, streak, correct_count from public.session_participants where session_id = $1 and user_id = $2", [s.id, players.Ada]);
+  const [{ sum }] = await db.admin("select sum(points)::int as sum from public.quiz_answers where attempt_id = $1", [aA]);
+  assert.equal(ada.total_score, sum, "the total is exactly the sum of the answers' points");
+  assert.equal(ada.streak, 0);
+  assert.equal(ada.correct_count, 2);
+
+  // Ben: wrong. Cy: right with the speed bonus switched off for the lesson.
+  const aB = await attempt("Ben");
+  await answer("Ben", aB, "q1", "wrong");
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "settings", p_args: { speed_bonus: false } });
+  const aC = await attempt("Cy");
+  assert.equal((await answer("Cy", aC, "q1", "right")).points.points, 1000);
+
+  // Before the board is shown, students only know their own rank.
+  let ben = await db.rpc(players.Ben, "session_student_state", { p_session: s.id });
+  assert.equal(ben.leaderboard, null);
+  assert.deepEqual([ben.my.rank, ben.my.of], [3, 3]);
+  await rejects(db.rpc(players.Ben, "session_control", { p_session: s.id, p_action: "leaderboard" }), /Not your session/);
+
+  // The teacher shows the board: one frozen snapshot for everyone.
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "leaderboard", p_args: { show: true } });
+  ben = await db.rpc(players.Ben, "session_student_state", { p_session: s.id });
+  assert.deepEqual(ben.leaderboard.map((e) => e.name), ["Ada", "Cy", "Ben"]);
+  assert.ok(ben.leaderboard.length <= 5);
+  // Ben overtakes Cy (speed bonus back on); the next board shows the movement.
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "settings", p_args: { speed_bonus: true } });
+  await answer("Ben", aB, "q2", "right");
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "leaderboard", p_args: { show: true } });
+  const board = (await db.rpc(T, "teacher_session_state", { p_session: s.id })).session.leaderboard.top;
+  assert.equal(board.find((e) => e.name === "Ben").delta, 1);
+  assert.equal(board.find((e) => e.name === "Cy").delta, -1);
+
+  // Anonymous names; a lesson without a public board; hiding it.
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "settings", p_args: { anonymous_names: true } });
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "leaderboard", p_args: { show: true } });
+  assert.ok((await db.rpc(players.Cy, "session_student_state", { p_session: s.id })).leaderboard.every((e) => /^Player \d+$/.test(e.name)));
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "settings", p_args: { leaderboard: false } });
+  assert.equal((await db.rpc(players.Cy, "session_student_state", { p_session: s.id })).leaderboard, null);
+  assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).ranking.length, 3, "the teacher always sees the ranking");
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "leaderboard", p_args: { show: false } });
+  assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).session.show_leaderboard, false);
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "end" });
+});

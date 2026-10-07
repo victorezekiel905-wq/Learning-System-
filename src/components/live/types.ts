@@ -19,6 +19,8 @@ export type RosterEntry = {
   /** Joined with the code and a name, no account (0860). */
   guest?: boolean;
   avatar?: string | null;
+  score?: number;
+  streak?: number;
 };
 
 export type AlertRow = {
@@ -47,7 +49,11 @@ export type SessionState = {
     /** Live engine (0880). Missing on older databases (treated as active). */
     phase?: "lobby" | "active" | "paused" | "ended";
     settings?: { leaderboard?: boolean; anonymous_names?: boolean; late_join?: boolean; speed_bonus?: boolean };
+    show_leaderboard?: boolean;
+    leaderboard?: { at: string; top: { name: string; avatar: string | null; score: number; rank: number; delta: number }[] } | null;
   };
+  /** Points (0890): the live top 10, for the teacher only. */
+  ranking?: { user_id: string; name: string; avatar: string | null; score: number; rank: number; streak: number }[];
   settings: {
     monitoring_enabled?: boolean;
     allow_spotlight: boolean; allow_group_chat: boolean; allow_screen_capture: boolean; thumbnail_interval_seconds: number;

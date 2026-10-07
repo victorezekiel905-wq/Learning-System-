@@ -8,6 +8,7 @@ import { useSignal } from "@/lib/realtime";
 import { rpc } from "@/lib/rpc";
 import { Icon } from "@/components/Icon";
 import { avatarFor } from "@/components/live/avatars";
+import { Leaderboard } from "@/components/live/Leaderboard";
 import { formatJoinCode } from "@/lib/utils";
 
 export function Presenter({ sessionId }: { sessionId: string }) {
@@ -37,6 +38,11 @@ export function Presenter({ sessionId }: { sessionId: string }) {
             <ul className="mx-auto mt-4 flex max-w-5xl flex-wrap justify-center gap-3">
               {here.map((r) => <li key={r.student_id} className="rounded-full bg-white/10 px-4 py-2 text-xl"><span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span> {r.name}</li>)}
             </ul>
+          </div>
+        ) : s?.show_leaderboard && s.leaderboard && s.settings?.leaderboard !== false ? (
+          <div className="w-full max-w-4xl">
+            <h2 className="mb-8 text-center font-display text-6xl font-extrabold">Leaderboard</h2>
+            <Leaderboard entries={s.leaderboard.top.slice(0, 5)} size="lg" />
           </div>
         ) : s?.phase === "paused" ? (
           <p className="text-center font-display text-6xl font-extrabold">👀 Eyes on me</p>

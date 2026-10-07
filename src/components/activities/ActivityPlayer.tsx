@@ -28,9 +28,12 @@ type Feedback = {
   second_chance?: boolean; tries?: number;
   /** Revealed earlier (e.g. before a reload): the answer can't change. */
   final?: boolean;
+  /** Live lessons (0890): points decided by the server. */
+  points?: LivePoints;
 };
+type LivePoints = { points: number; base: number; speed: number; streak_bonus: number; streak: number; total: number };
 type Finished = {
-  attempt: { status: string; score: number | null; max_score: number | null };
+  attempt: { status: string; score: number | null; max_score: number | null; points?: number | null };
   results: { question_id: string; is_correct: boolean | null; score: number | null; status: string; feedback: string | null; explanation: string | null; correct_option_ids: string[] }[] | null;
 };
 
@@ -145,6 +148,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
       <div className="card card-pad space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">Submitted: {data.activity.title}</h3>
+          {finished.attempt.points != null && <Badge tone="green" className="text-sm">{finished.attempt.points.toLocaleString()} points</Badge>}
           {finished.attempt.max_score ? (
             <Badge tone="brand" className="text-sm">{Number(finished.attempt.score ?? 0)} / {Number(finished.attempt.max_score)}{pendingReview && " so far"}</Badge>
           ) : null}
@@ -224,6 +228,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
           {fb.is_correct ? (fb.tries === 2 ? "Correct on your second try!" : "Correct!") : "Not quite."}{fb.explanation ? ` ${fb.explanation}` : ""}
         </Alert>
       )}
+      {fb?.points && !fb.second_chance && <PointsLine p={fb.points} />}
       {fb && (fb.status === "pending_review" || fb.status === "ungraded" || (fb.status === "auto_graded" && fb.is_correct === undefined)) && <Alert tone="success">Answer saved.</Alert>}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -239,6 +244,18 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** "+1,450 points · fast +450 · streak +100" after an answer in a live lesson. */
+function PointsLine({ p }: { p: LivePoints }) {
+  const extras = [p.speed > 0 && `fast +${p.speed}`, p.streak_bonus > 0 && `streak +${p.streak_bonus}`].filter(Boolean).join(" · ");
+  return (
+    <div role="status" className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl bg-ink-950 px-4 py-3 text-white">
+      <span className="font-display text-2xl font-extrabold text-accent-400">+{p.points.toLocaleString()}</span>
+      <span className="text-sm text-ink-200">{p.points === 100 && p.base === 100 ? "for taking part" : extras || "points"}</span>
+      <span className="ml-auto text-sm text-ink-300">Total {p.total.toLocaleString()}{p.streak >= 2 ? ` · 🔥 ${p.streak} in a row` : ""}</span>
     </div>
   );
 }

@@ -12,7 +12,7 @@ No scheduled jobs are needed on Render: hourly maintenance runs inside the datab
 
 ## 1. Prepare the database (Supabase)
 
-1. **Update the database.** SQL Editor → New query → paste all of [`supabase/updates/2026-09-27_RUN_THIS_update.sql`](../supabase/updates/2026-09-27_RUN_THIS_update.sql) → Run. The last row should show `schema = 0880` and every other column `true`. It is safe to run again. (A brand-new project runs [`supabase/setup.sql`](../supabase/setup.sql) instead.)
+1. **Update the database.** SQL Editor → New query → paste all of [`supabase/updates/2026-09-27_RUN_THIS_update.sql`](../supabase/updates/2026-09-27_RUN_THIS_update.sql) → Run. The last row should show `schema = 0890` and every other column `true`. It is safe to run again. (A brand-new project runs [`supabase/setup.sql`](../supabase/setup.sql) instead.)
 2. **Upgrade to Pro** before real schools use it (Settings → Billing). The free tier pauses idle projects, keeps no backups, and allows about 200 live connections. Then turn on **Point-in-time recovery** (Database → Backups).
 3. **Realtime:** Project Settings → Realtime → turn **off** "Allow public access", so only the private, permission-checked channels work.
 4. **Hourly maintenance:** Database → Extensions → enable **pg_cron**, then run the update file from step 1 once more. Check with `select * from cron.job;`.
@@ -37,7 +37,7 @@ No scheduled jobs are needed on Render: hourly maintenance runs inside the datab
 
    Leave the rest empty for now; features without keys stay off. They are explained in [`.env.example`](../.env.example).
 4. Click **Apply**. The first build takes 3 to 6 minutes. When the service shows **Live**, open its URL: you should see the SwiftCipher home page.
-5. Open `https://YOUR-APP/api/health`. It should show `"ok":true`, `"db":"up"`, `"schema":"0880"` and `"missing_legal_details":[]`.
+5. Open `https://YOUR-APP/api/health`. It should show `"ok":true`, `"db":"up"`, `"schema":"0890"` and `"missing_legal_details":[]`.
 
 Every push to `main` on GitHub now redeploys automatically.
 
@@ -69,7 +69,7 @@ Turn on multi-factor authentication for this account in Supabase Auth.
 
 ## 6. Before inviting schools
 
-- [ ] `/api/health` shows `ok: true`, `schema: 0880`, no missing legal details
+- [ ] `/api/health` shows `ok: true`, `schema: 0890`, no missing legal details
 - [ ] A test sign-up receives its confirmation email
 - [ ] `/terms`, `/privacy` and `/dpa` show your company name and address
 - [ ] A live lesson with two browsers (teacher and student): join with the code, lockdown, the screen strip, a leave alert
@@ -91,7 +91,7 @@ Turn on multi-factor authentication for this account in Supabase Auth.
 | Deploy fails within seconds, right after "Checking out commit" | **Root Directory** is set (e.g. `supabase/`). Clear it: the app is at the top of the repository. |
 | "It looks like you're using Docker" | Choose **Node** as the language, or use **New → Blueprint**, which sets it for you. |
 | `/api/health` shows `db: "down"` | Wrong Supabase URL or key, or the Supabase project is paused (restore it in the dashboard). |
-| `schema` is lower than `0880` | Run the update file in step 1.1. |
+| `schema` is lower than `0890` | Run the update file in step 1.1. |
 | Sign-in links go to localhost | `NEXT_PUBLIC_APP_URL` or the Supabase Site URL still points to localhost; redeploy after changing it. |
 | `/super` says "page not found" | The account isn't the super admin yet (step 4). |
 | Live screens never appear | Realtime public access is on, or the database update wasn't run. |

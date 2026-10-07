@@ -128,8 +128,8 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
   const mon = s.settings.monitoring_enabled !== false;
   const joined = s.roster.filter((r) => r.presence === "online" || r.presence === "idle").length;
   const phase = s.session.phase ?? "active";
-  async function control(action: "start" | "pause" | "resume") {
-    try { await rpc("session_control", { p_session: sessionId, p_action: action }); void state.reload(); }
+  async function control(action: "start" | "pause" | "resume" | "leaderboard", args?: Record<string, unknown>) {
+    try { await rpc("session_control", { p_session: sessionId, p_action: action, p_args: args ?? {} }); void state.reload(); }
     catch (e) { toast(errorText(e), "error"); }
   }
   const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -167,6 +167,10 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
           {phase === "lobby" && <Button size="sm" variant="accent" onClick={() => control("start")}>Start lesson</Button>}
           {phase === "active" && <Button size="sm" variant="secondary" onClick={() => control("pause")} title="Students see 'Eyes on your teacher' until you resume">Pause</Button>}
           {phase === "paused" && <Button size="sm" variant="accent" onClick={() => control("resume")}>Resume</Button>}
+          {phase !== "lobby" && s.ranking && <Button size="sm" variant={s.session.show_leaderboard ? "accent" : "secondary"} aria-pressed={!!s.session.show_leaderboard}
+            title={s.session.settings?.leaderboard === false ? "The class leaderboard is off for this lesson; only you see the scores" : "Show the top 5 on every screen"}
+            onClick={() => control("leaderboard", { show: !s.session.show_leaderboard })}>
+            <Icon name="trophy" className="h-4 w-4" /> {s.session.show_leaderboard ? "Hide leaderboard" : "Leaderboard"}</Button>}
           {mon && <Button size="sm" variant={s.session.lockdown ? "accent" : "secondary"} aria-pressed={s.session.lockdown}
             title={s.session.lockdown ? "Students must share their screen and stay in the full-screen lesson; leaving alerts you." : "Students can leave the lesson without an alert."}
             onClick={async () => {
@@ -253,6 +257,21 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
             </ul>
             {mon && <p className="mt-2 text-[11px] text-ink-500">Select students to send commands from the Screens tab.</p>}
           </div>
+
+          {s.ranking && s.ranking.length > 0 && (
+            <div className="card p-3">
+              <p className="mb-2 text-sm font-semibold">Scores</p>
+              <ol className="space-y-1 text-sm">{s.ranking.map((r) => (
+                <li key={r.user_id} className="flex items-center gap-2">
+                  <span className="w-5 text-right text-xs font-bold text-ink-500">{r.rank}</span>
+                  <span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span>
+                  <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                  {r.streak >= 2 && <span className="text-xs" title={`${r.streak} in a row`}>🔥{r.streak}</span>}
+                  <span className="font-semibold tabular-nums">{r.score.toLocaleString()}</span>
+                </li>
+              ))}</ol>
+            </div>
+          )}
 
           <GuestControls sessionId={sessionId} state={s} monitoring={mon} onChanged={() => void state.reload()} />
 

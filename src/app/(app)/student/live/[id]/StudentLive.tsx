@@ -17,7 +17,8 @@ import { useSignal } from "@/lib/realtime";
 import { useOfflineQueue } from "@/lib/offline-queue";
 import { errorText, rpc } from "@/lib/rpc";
 import { FEATURES } from "@/lib/features";
-import { EndScreen, Lobby, PausedOverlay } from "@/components/live/StudentPhases";
+import { BoardOverlay, EndScreen, Lobby, PausedOverlay } from "@/components/live/StudentPhases";
+import type { BoardEntry } from "@/components/live/Leaderboard";
 
 type StudentState = {
   session: { id: string; title: string; status: string; mode: string; current_slide: number; group_chat_enabled: boolean; responses_visible: boolean; class_id: string | null; teacher: string; environment_active: boolean;
@@ -26,6 +27,9 @@ type StudentState = {
   me?: { name: string; avatar: string | null };
   participants?: number;
   summary?: { answered: number; correct: number } | null;
+  /** Points (0890): own score and rank only; the top 5 while the teacher shows the board. */
+  my?: { score: number; rank: number; of: number; streak: number } | null;
+  leaderboard?: BoardEntry[] | null;
   my_slide: number;
   active_activity: { id: string; kind: string; title: string } | null;
   spotlight: { me: boolean; show_to_class: boolean; anonymized: boolean } | null;
@@ -89,7 +93,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   }
   const myName = s.me?.name ?? me.name;
   if (s.session.status !== "live" || s.session.phase === "ended") {
-    return <EndScreen name={myName} avatar={s.me?.avatar ?? null} summary={s.summary ?? null} guest={guest} />;
+    return <EndScreen name={myName} avatar={s.me?.avatar ?? null} summary={s.summary ?? null} guest={guest} score={s.my ?? null} />;
   }
   if (s.session.phase === "lobby") {
     return <Lobby sessionId={sessionId} title={s.session.title} teacher={s.session.teacher} name={myName} avatar={s.me?.avatar ?? null}
@@ -110,10 +114,15 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   return (
     <div className="page max-w-5xl space-y-4 bg-ink-50">
       {s.session.phase === "paused" && <PausedOverlay teacher={s.session.teacher} />}
+      {s.leaderboard && s.session.phase !== "paused" && <BoardOverlay entries={s.leaderboard} me={myName} my={s.my ?? null} />}
       <LockdownGate guard={guard} teacher={s.session.teacher} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs text-ink-500">Live with {s.session.teacher}</p><h1 className="text-xl font-bold">{s.session.title}</h1></div>
         <div className="flex flex-wrap items-center gap-2">
+          {s.my && <span className="inline-flex items-center gap-2 rounded-lg bg-ink-950 px-3 py-1.5 text-sm font-semibold text-white" title="Your score and rank">
+            <span className="font-display text-base font-extrabold tabular-nums text-accent-400">{s.my.score.toLocaleString()}</span>
+            <span className="text-ink-300">#{s.my.rank} of {s.my.of}</span>{s.my.streak >= 2 && <span aria-label={`${s.my.streak} in a row`}>🔥{s.my.streak}</span>}
+          </span>}
           {guard.sharing && <Badge tone="red"><span className="mr-1 inline-block h-2 w-2 animate-pulse2 rounded-full bg-rose-600" />Sharing screen with your teacher</Badge>}
           {guard.locked && <Badge tone="gray"><Icon name="lock" className="mr-1 inline h-3 w-3" />Lockdown</Badge>}
           {pending > 0 && <Badge tone="amber">{pending} answer(s) waiting to sync</Badge>}
