@@ -17,9 +17,15 @@ import { useSignal } from "@/lib/realtime";
 import { useOfflineQueue } from "@/lib/offline-queue";
 import { errorText, rpc } from "@/lib/rpc";
 import { FEATURES } from "@/lib/features";
+import { EndScreen, Lobby, PausedOverlay } from "@/components/live/StudentPhases";
 
 type StudentState = {
-  session: { id: string; title: string; status: string; mode: string; current_slide: number; group_chat_enabled: boolean; responses_visible: boolean; class_id: string; teacher: string; environment_active: boolean };
+  session: { id: string; title: string; status: string; mode: string; current_slide: number; group_chat_enabled: boolean; responses_visible: boolean; class_id: string | null; teacher: string; environment_active: boolean;
+    /** Live engine (0880): lobby, active, paused, ended. Missing before that update. */
+    phase?: "lobby" | "active" | "paused" | "ended"; join_code?: string };
+  me?: { name: string; avatar: string | null };
+  participants?: number;
+  summary?: { answered: number; correct: number } | null;
   my_slide: number;
   active_activity: { id: string; kind: string; title: string } | null;
   spotlight: { me: boolean; show_to_class: boolean; anonymized: boolean } | null;
@@ -81,8 +87,13 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   if (s.session.status === "scheduled") {
     return <div className="page max-w-xl"><Alert title="This lesson hasn't started yet">Keep this page open. It starts as soon as {s.session.teacher} begins the lesson.</Alert></div>;
   }
-  if (s.session.status !== "live") {
-    return <div className="page max-w-xl"><Alert title="This lesson has ended">Thanks for taking part. {guest ? <Link href="/join">Join another lesson</Link> : <Link href="/student">Back to home</Link>}</Alert></div>;
+  const myName = s.me?.name ?? me.name;
+  if (s.session.status !== "live" || s.session.phase === "ended") {
+    return <EndScreen name={myName} avatar={s.me?.avatar ?? null} summary={s.summary ?? null} guest={guest} />;
+  }
+  if (s.session.phase === "lobby") {
+    return <Lobby sessionId={sessionId} title={s.session.title} teacher={s.session.teacher} name={myName} avatar={s.me?.avatar ?? null}
+      participants={s.participants ?? 0} code={s.session.join_code ?? ""} onAvatar={() => void st.reload()} />;
   }
 
   const slides = lesson.data?.slides ?? [];
@@ -91,13 +102,14 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
 
   async function openChat(kind: "teacher" | "group") {
     try {
-      const id = kind === "teacher" ? await rpc<string>("open_direct_thread", { p_class: s!.session.class_id }) : await rpc<string>("open_group_thread", { p_session: sessionId });
+      const id = kind === "teacher" ? await rpc<string>("open_direct_thread", { p_class: s!.session.class_id ?? "" }) : await rpc<string>("open_group_thread", { p_session: sessionId });
       setThreadId(id); setChat(kind);
     } catch (e) { toast(errorText(e), "error"); }
   }
 
   return (
     <div className="page max-w-5xl space-y-4 bg-ink-50">
+      {s.session.phase === "paused" && <PausedOverlay teacher={s.session.teacher} />}
       <LockdownGate guard={guard} teacher={s.session.teacher} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs text-ink-500">Live with {s.session.teacher}</p><h1 className="text-xl font-bold">{s.session.title}</h1></div>

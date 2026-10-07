@@ -69,6 +69,7 @@ test.describe("responsive: signed-in pages", () => {
     await call(student.client, "redeem_code", { p_code: cls.join_code, p_full_name: "E2E Student" });
     for (const u of [teacher, student]) await call(u.client, "accept_notice", { p_kind: "terms_of_service" });
     sessionId = (await call<{ id: string }>(teacher.client, "start_session", { p_class: cls.id })).id;
+    await call(teacher.client, "session_control", { p_session: sessionId, p_action: "start" }); // sessions open in the lobby (0880)
   });
   test.afterAll(async () => { await cleanup(created); });
 

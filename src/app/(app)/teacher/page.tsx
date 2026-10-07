@@ -3,7 +3,7 @@ import { ArrowRight, Plus, Radio } from "lucide-react";
 import { requireRole, TEACHERS } from "@/lib/session";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
-import { cn, dayPart, firstName, formatDateTime, timeAgo } from "@/lib/utils";
+import { cn, dayPart, firstName, formatDateTime, formatJoinCode, timeAgo } from "@/lib/utils";
 
 export const metadata = { title: "Dashboard" };
 
@@ -58,7 +58,7 @@ export default async function TeacherHome() {
               </div>
               <div className="rounded-xl bg-accent-500 px-4 py-2 text-accent-ink">
                 <p className="text-[11px] font-semibold">Join code</p>
-                <p className="font-mono text-2xl font-extrabold tracking-[0.18em]">{s.join_code}</p>
+                <p className="font-mono text-2xl font-extrabold tracking-[0.18em]">{formatJoinCode(s.join_code)}</p>
               </div>
               <span className="btn btn-lg bg-white text-ink-900 group-hover:bg-ink-100">Open the room <ArrowRight className="h-4 w-4" aria-hidden /></span>
             </Link>

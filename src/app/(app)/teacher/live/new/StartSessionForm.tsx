@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, Button, Card, Field, Input, Select, Toggle } from "@/components/ui";
@@ -23,17 +22,16 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  if (!classes.length) return (
-    <Alert title="Create a class first">
-      A live session runs for a class, so students can join with its code.{" "}
-      <Link href="/teacher/classes" className="font-semibold">Create a class →</Link>
-    </Alert>
-  );
 
   return (
     <Card>
       <div className="space-y-4">
-        <Field label="Class"><Select value={cls} onChange={(e) => setCls(e.target.value)}>{classes.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.students} students)</option>)}</Select></Field>
+        <Field label="Class" hint="Optional. Without a class, anyone with the code joins: students of your school and guests.">
+          <Select value={cls} onChange={(e) => setCls(e.target.value)}>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.students} students)</option>)}
+            <option value="">No class: anyone with the code</option>
+          </Select>
+        </Field>
         <Field label="Lesson" hint="Your most recent lesson is picked. Choose &quot;No lesson&quot; to watch screens and run quick activities only.">
           <Select value={lesson} onChange={(e) => setLesson(e.target.value)}>{lessons.map((l) => <option key={l.id} value={l.id}>{l.title}{l.status !== "published" ? " (draft)" : ""}</option>)}<option value="">No lesson: screens, chat and quick activities only</option></Select>
         </Field>
@@ -58,7 +56,7 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
         <Button size="lg" loading={busy} onClick={async () => {
           setBusy(true); setErr(null);
           try {
-            const s = await rpc<{ id: string }>("start_session", { p_class: cls, p_lesson: lesson || null, p_mode: mode, p_title: title || null, p_environment: monitoring ? env || null : null });
+            const s = await rpc<{ id: string }>("start_session", { p_class: cls || null, p_lesson: lesson || null, p_mode: mode, p_title: title || null, p_environment: monitoring ? env || null : null });
             if (monitoring && monitorGuests) await rpc("set_session_guests", { p_session: s.id, p_monitor: true });
             router.push(`/teacher/live/${s.id}`);
           } catch (e) { setErr(errorText(e)); setBusy(false); }

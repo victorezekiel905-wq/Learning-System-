@@ -140,7 +140,7 @@ Phase 2: `video` (synced), `embed`, `resource`, `short_answer`, `word_cloud`, `d
 
 0. ✅ **Retire and hide** (done 2026-10-07): the assignment pipeline; menus for messaging and the parent
    portal; monitoring behind a per-school switch (off by default for new schools, migration 0870).
-1. **Engine core:** phases, `session_control`, `state` broadcasts, lobby and end screens.
+1. ✅ **Engine core** (done 2026-10-07, migration 0880): phases, `session_control`, `state` broadcasts with the compact state, lobby with avatars, pause, end screens, classless sessions, join by code for students.
 2. **Scoring:** points, streaks, the leaderboard, the student feedback screen.
 3. **Teacher control panel** with keyboard shortcuts (→ ← L R P), the projector view
    (slide, code, QR, results, leaderboard).

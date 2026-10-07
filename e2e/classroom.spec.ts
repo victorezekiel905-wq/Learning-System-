@@ -32,6 +32,7 @@ test.describe("live classroom", () => {
       await call(u.client, "accept_notice", { p_kind: "privacy_notice" });
     }
     const s = await call<{ id: string; join_code: string }>(teacher.client, "start_session", { p_class: cls.id });
+    await call(teacher.client, "session_control", { p_session: s.id, p_action: "start" }); // sessions open in the lobby (0880)
     sessionId = s.id; joinCode = s.join_code;
     await call(student.client, "join_session", { p_code: joinCode });
   });

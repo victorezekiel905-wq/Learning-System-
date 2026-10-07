@@ -35,6 +35,7 @@ try {
   ]);
   await call(teacher.client, "publish_lesson", { p_lesson: lesson!.id });
   const s = await call<{ id: string; join_code: string }>(teacher.client, "start_session", { p_class: cls.id, p_lesson: lesson!.id });
+    await call(teacher.client, "session_control", { p_session: s.id, p_action: "start" }); // sessions open in the lobby (0880)
   for (const st of students) await call(st.client, "join_session", { p_code: s.join_code });
 
   const shot = async (page: Page, name: string) => {

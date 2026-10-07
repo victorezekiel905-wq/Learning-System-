@@ -10,7 +10,8 @@ import { useNetwork, useNow, useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
 import { useScreenFeed } from "@/lib/screen-feed";
 import { errorText, rpc } from "@/lib/rpc";
-import { cn, timeAgo } from "@/lib/utils";
+import { cn, formatJoinCode, timeAgo } from "@/lib/utils";
+import { avatarFor } from "@/components/live/avatars";
 import { FEATURES } from "@/lib/features";
 import { LessonPanel } from "./LessonPanel";
 import { ResponsesPanel } from "./ResponsesPanel";
@@ -126,10 +127,15 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
   // Classroom monitoring is a per-school add-on (0870); databases before it count as on.
   const mon = s.settings.monitoring_enabled !== false;
   const joined = s.roster.filter((r) => r.presence === "online" || r.presence === "idle").length;
+  const phase = s.session.phase ?? "active";
+  async function control(action: "start" | "pause" | "resume") {
+    try { await rpc("session_control", { p_session: sessionId, p_action: action }); void state.reload(); }
+    catch (e) { toast(errorText(e), "error"); }
+  }
   const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   async function end() {
-    if (!(await dialog.confirm({ title: "End the session for everyone?", body: "Attendance and a report are saved.", tone: "danger", confirmLabel: "End session" }))) return;
+    if (!(await dialog.confirm({ title: "End the session for everyone?", body: "Everyone sees their results, and the session report is saved.", tone: "danger", confirmLabel: "End session" }))) return;
     try { await rpc("end_session", { p_session: sessionId }); router.push(`/teacher/reports?session=${sessionId}`); }
     catch (e) { toast(errorText(e), "error"); }
   }
@@ -140,22 +146,27 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
         <div className="min-w-0 flex-1 basis-60">
           <p className="truncate text-[13px] text-ink-400">{s.session.class_name}{s.session.lesson_title && ` · ${s.session.lesson_title}`}</p>
           <h1 className="flex items-center gap-2.5 text-lg font-bold text-white sm:text-xl">
-            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-rose-600 px-1.5 py-1 text-[11px] font-bold leading-none text-white">
-              <span className="h-1.5 w-1.5 animate-pulse2 rounded-full bg-white" aria-hidden />LIVE</span>
+            {phase === "lobby" ? <span className="inline-flex shrink-0 items-center rounded-md bg-accent-500 px-1.5 py-1 text-[11px] font-bold leading-none text-accent-ink">LOBBY</span>
+              : phase === "paused" ? <span className="inline-flex shrink-0 items-center rounded-md bg-amber-400 px-1.5 py-1 text-[11px] font-bold leading-none text-ink-950">PAUSED</span>
+              : <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-rose-600 px-1.5 py-1 text-[11px] font-bold leading-none text-white">
+              <span className="h-1.5 w-1.5 animate-pulse2 rounded-full bg-white" aria-hidden />LIVE</span>}
             <span className="truncate">{s.session.title}</span>
           </h1>
         </div>
         <div className="flex items-stretch gap-2.5">
           <div className="rounded-xl bg-accent-500 px-3.5 py-1.5 text-accent-ink">
             <p className="text-[11px] font-semibold leading-tight">Join code</p>
-            <p className="font-mono text-xl font-extrabold leading-tight tracking-[0.18em] sm:text-2xl">{s.session.join_code}</p>
+            <p className="font-mono text-xl font-extrabold leading-tight tracking-[0.18em] sm:text-2xl">{formatJoinCode(s.session.join_code)}</p>
           </div>
           <div className="rounded-xl border border-white/15 px-3.5 py-1.5">
-            <p className="text-[11px] font-semibold leading-tight text-ink-400">Students</p>
-            <p className="font-display text-xl font-extrabold leading-tight tabular-nums sm:text-2xl">{joined}<span className="text-ink-400">/{s.roster.length}</span></p>
+            <p className="text-[11px] font-semibold leading-tight text-ink-400">Joined</p>
+            <p className="font-display text-xl font-extrabold leading-tight tabular-nums sm:text-2xl">{joined}{s.session.class_id && <span className="text-ink-400">/{s.roster.length}</span>}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 [&_.btn-secondary:hover]:bg-white/15 [&_.btn-secondary]:border-white/20 [&_.btn-secondary]:bg-white/5 [&_.btn-secondary]:text-white">
+          {phase === "lobby" && <Button size="sm" variant="accent" onClick={() => control("start")}>Start lesson</Button>}
+          {phase === "active" && <Button size="sm" variant="secondary" onClick={() => control("pause")} title="Students see 'Eyes on your teacher' until you resume">Pause</Button>}
+          {phase === "paused" && <Button size="sm" variant="accent" onClick={() => control("resume")}>Resume</Button>}
           {mon && <Button size="sm" variant={s.session.lockdown ? "accent" : "secondary"} aria-pressed={s.session.lockdown}
             title={s.session.lockdown ? "Students must share their screen and stay in the full-screen lesson; leaving alerts you." : "Students can leave the lesson without an alert."}
             onClick={async () => {
@@ -188,7 +199,8 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
           <ScreenRail state={s} screens={screens} focus={focus} onFocus={setFocus} />
         </aside>}
         <section className="min-w-0 p-4">
-          {focus ? <FocusView state={s} studentId={focus} sessionId={sessionId} onMinimize={() => setFocus(null)} live={screens[focus]?.source === "web" ? screens[focus] : undefined} /> : <>
+          {phase === "lobby" && !focus && <WaitingRoom state={s} onStart={() => control("start")} />}
+          {phase === "lobby" && !focus ? null : focus ? <FocusView state={s} studentId={focus} sessionId={sessionId} onMinimize={() => setFocus(null)} live={screens[focus]?.source === "web" ? screens[focus] : undefined} /> : <>
           <Tabs className="mb-4" value={tab} onChange={setTab} tabs={[
             { id: "lesson", label: "Lesson" },
             { id: "responses", label: "Responses" },
@@ -306,6 +318,29 @@ function GuestControls({ sessionId, state, monitoring, onChanged }: { sessionId:
           </li>
         ))}</ul>
       )}
+    </div>
+  );
+}
+
+/** The lobby, as the teacher sees it: how to join, who has joined, and Start. */
+function WaitingRoom({ state, onStart }: { state: SessionState; onStart: () => void }) {
+  const here = state.roster.filter((r) => r.presence === "online" || r.presence === "idle");
+  const host = typeof window !== "undefined" ? window.location.host : "";
+  return (
+    <div className="mx-auto max-w-3xl rounded-3xl bg-ink-950 p-6 text-white sm:p-10">
+      <p className="text-sm font-semibold text-accent-400">Waiting room</p>
+      <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight">Students join at <span className="text-accent-400">{host}/join</span></h2>
+      <p className="mt-4 font-mono text-6xl font-extrabold tracking-[0.2em] sm:text-7xl">{formatJoinCode(state.session.join_code)}</p>
+      <p className="mt-6 text-ink-300">{here.length === 0 ? "Nobody has joined yet." : `${here.length} joined`}</p>
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {here.map((r) => (
+          <li key={r.student_id} className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-sm">
+            <span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span>{r.name}
+          </li>
+        ))}
+      </ul>
+      <Button size="lg" variant="accent" className="mt-8" onClick={onStart}>Start lesson</Button>
+      <p className="mt-2 text-sm text-ink-400">Students see the first slide as soon as you start. You can also use Present for the projector.</p>
     </div>
   );
 }

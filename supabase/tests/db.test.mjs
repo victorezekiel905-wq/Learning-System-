@@ -7,6 +7,13 @@ import { createDb } from "./harness.mjs";
 let db;
 const S = {}; // shared fixture ids
 
+/** Start a live lesson and press Start: sessions open in the lobby (0880). */
+async function goLive(teacher, args) {
+  const s = await db.rpc(teacher, "start_session", args);
+  await db.rpc(teacher, "session_control", { p_session: s.id, p_action: "start" });
+  return s;
+}
+
 async function rejects(promise, pattern) {
   await assert.rejects(promise, (err) => {
     if (pattern && !pattern.test(err.message)) {
@@ -166,12 +173,12 @@ test("studio: lessons, questions, publish, duplicate", async () => {
 
 // ---------------------------------------------------------------------------
 test("live session + auto-marking + review queue (§3.2, §3.4)", async () => {
-  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA, p_lesson: S.lesson });
+  const s = await goLive(S.teacherA, { p_class: S.classA, p_lesson: S.lesson });
   S.session = s.id;
-  await rejects(db.rpc(S.teacherA, "start_session", { p_class: S.classA }), /already has a live session/);
+  await rejects(goLive(S.teacherA, { p_class: S.classA }), /already has a live session/);
   const joined = await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
   assert.equal(joined.session_id, S.session);
-  await rejects(db.rpc(S.adminB, "join_session", { p_code: s.join_code }), /another class|profile|No live/);
+  await rejects(db.rpc(S.adminB, "join_session", { p_code: s.join_code }), /another class|another school|profile|No live/);
 
   // Activity is not open until the teacher reaches it.
   await rejects(db.rpc(S.stu1, "start_attempt", { p_activity: S.quiz, p_session: S.session }), /not open/);
@@ -461,10 +468,8 @@ test("chat, hands, announcements, end of session, reports (§3.4, §17)", async 
 
   const ended = await db.rpc(S.teacherA, "end_session", { p_session: S.session });
   assert.ok(ended.report_id);
-  const att = await db.as(S.teacherA, "select student_id, status from public.attendance where session_id = $1", [S.session]);
-  assert.equal(att.length, 3);
-  assert.equal(att.find((a) => a.student_id === S.stu1).status, "present");
-  assert.equal(att.find((a) => a.student_id === S.stu3).status, "absent");
+  // Attendance registers are retired (live engine, increment 1): ending writes none.
+  assert.equal((await db.admin("select count(*)::int n from public.attendance where session_id = $1", [S.session]))[0].n, 0);
   const [rep] = await db.as(S.teacherA, "select payload from public.reports where id = $1", [ended.report_id]);
   assert.equal(rep.payload.enrolled, 3);
   // After the session, the device goes quiet (privacy boundary).
@@ -502,7 +507,6 @@ test("insights, parent portal, privacy, retention (§18, §20)", async () => {
   const kids = await db.rpc(S.parentA, "parent_children", {});
   assert.equal(kids.length, 1);
   const summary = await db.rpc(S.parentA, "student_summary", { p_student: S.stu1 });
-  assert.equal(summary.attendance.present, 1);
   await rejects(db.rpc(S.parentA, "student_summary", { p_student: S.stu2 }), /Not available/);
 
   const exp = await db.rpc(S.adminA, "export_user_data", { p_user: S.stu1 });
@@ -615,7 +619,7 @@ test("school branding: admins only, logo must stay in the school's folder", asyn
 });
 
 test("web classroom: screen sharing, lockdown, leave alerts with the screen", async () => {
-  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  const s = await goLive(S.teacherA, { p_class: S.classA });
   await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
   await db.rpc(S.stu2, "join_session", { p_code: s.join_code });
   const frame = "data:image/jpeg;base64,AAAA";
@@ -703,7 +707,7 @@ test("web classroom: screen sharing, lockdown, leave alerts with the screen", as
 
 test("operations: thumbnails deleted at session end, error log, health, maintenance, terms consent", async () => {
   // Live thumbnails go the moment a session ends.
-  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  const s = await goLive(S.teacherA, { p_class: S.classA });
   await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
   await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
   await db.rpc(S.stu1, "student_screen_frame", { p_session: s.id, p_image: "data:image/jpeg;base64,BBBB" });
@@ -728,7 +732,7 @@ test("operations: thumbnails deleted at session end, error log, health, maintena
   assert.equal((await db.rpc(null, "health", {})).ok, true);
   await rejects(db.rpc(S.adminA, "run_maintenance", {}), /permission denied/);
   await db.admin("update public.class_sessions set started_at = now() - interval '13 hours' where id = $1", [s.id]);
-  const stale = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  const stale = await goLive(S.teacherA, { p_class: S.classA });
   await db.admin("update public.class_sessions set started_at = now() - interval '13 hours' where id = $1", [stale.id]);
   await db.admin("update public.session_participants set last_seen_at = now() - interval '3 hours' where session_id = $1", [stale.id]);
   const m = (await db.admin("select app.run_maintenance() r"))[0].r;
@@ -751,7 +755,7 @@ test("scale: indexes, push signals, write throttling, private channels, batched 
   // postgres_changes is not used any more.
   assert.equal((await db.admin("select count(*)::int n from pg_publication_tables where pubname = 'supabase_realtime'"))[0].n, 0);
 
-  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  const s = await goLive(S.teacherA, { p_class: S.classA });
   await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
   await db.admin("delete from realtime.sent");
   const sent = async () => db.admin("select topic, event, payload from realtime.sent order by id");
@@ -776,8 +780,14 @@ test("scale: indexes, push signals, write throttling, private channels, batched 
   for (const [topic, event] of [[`staff:${s.id}`, "hand"], [`staff:${s.id}`, "roster"], [`staff:${s.id}`, "alert"], [`user:${S.teacherA}`, "notification"]]) {
     assert.ok(msgs.some((m) => m.topic === topic && m.event === event), `${topic} ${event}`);
   }
-  // Signals carry no personal data, only "something changed".
-  assert.ok(msgs.every((m) => JSON.stringify(m.payload).length < 40));
+  // Signals carry no personal data: "something changed", or (session state, 0880) only the
+  // lesson position (version, phase, status, slide, activity, mode). Never a name.
+  const STATE_KEYS = new Set(["v", "phase", "status", "slide", "activity", "mode"]);
+  for (const m of msgs) {
+    assert.ok(Object.keys(m.payload ?? {}).every((k) => STATE_KEYS.has(k)), `${m.topic} ${m.event}: ${JSON.stringify(m.payload)}`);
+    assert.ok(JSON.stringify(m.payload).length < 220);
+    assert.ok(!/Ada|Lovelace|Grace|Alan/.test(JSON.stringify(m.payload)));
+  }
   await db.rpc(S.stu1, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: true });
 
   // Presence ticks don't write when nothing changed (at most every 15 s).
@@ -826,7 +836,7 @@ test("scale: indexes, push signals, write throttling, private channels, batched 
 });
 
 test("realtime authorization: joining and sending on private channels, as Supabase checks it", async () => {
-  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  const s = await goLive(S.teacherA, { p_class: S.classA });
   await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
   // Realtime seeds a row per topic and checks a SELECT (join) / INSERT (send) under RLS.
   const join = async (user, topic) => {
@@ -914,7 +924,7 @@ test("parental monitoring consent: signed undertakings, parent portal, optional 
 
   // When the school requires consent, screens are only requested from students with consent.
   await db.as(S.adminA, "update public.tenant_settings set require_monitoring_consent = true");
-  const s = await db.rpc(S.teacherA, "start_session", { p_class: S.classA });
+  const s = await goLive(S.teacherA, { p_class: S.classA });
   for (const u of [S.stu1, S.stu2]) await db.rpc(u, "join_session", { p_code: s.join_code });
   const tick = (u) => db.rpc(u, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: true, p_sharing: false });
   assert.equal((await tick(S.stu1)).capture.enabled, true, "consent on file: screen requested");
@@ -964,7 +974,7 @@ test("engaging learning: differentiated levels, reasoning, XP, badges, leaderboa
 
   const adaBefore = (await db.rpc(S.stu1, "my_progress", {})).xp;
   const alanBefore = (await db.rpc(S.stu2, "my_progress", {})).xp;
-  const s = await db.rpc(t, "start_session", { p_class: S.classA });
+  const s = await goLive(t, { p_class: S.classA });
   for (const u of [S.stu1, S.stu2]) await db.rpc(u, "join_session", { p_code: s.join_code });
   await db.rpc(t, "set_session_state", { p_session: s.id, p_activity: act.id });
   const ada = await db.rpc(S.stu1, "start_attempt", { p_activity: act.id, p_session: s.id });
@@ -1031,7 +1041,7 @@ test("fair play: answers lock once revealed, second chance, untimed games, class
       values ($1,$2,'12',true,0), ($1,$2,'7',false,1) returning id, is_correct`, [S.tenantA, q.id]);
     return { act: act.id, q: q.id, right: opts.find((o) => o.is_correct).id, wrong: opts.find((o) => !o.is_correct).id };
   };
-  const s = await db.rpc(t, "start_session", { p_class: S.classA });
+  const s = await goLive(t, { p_class: S.classA });
   for (const u of [S.stu1, S.stu2]) await db.rpc(u, "join_session", { p_code: s.join_code });
 
   // Instant feedback without a second chance: the revealed answer is final (no copying the answer back in).
@@ -1106,7 +1116,7 @@ test("learning supports, student-written questions, gradebook export", async () 
   const [act] = await db.as(t, `insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
     values ($1, $2, $3, 'quiz', 'Timed check', '{"time_limit_seconds":600}') returning id`, [S.tenantA, S.lesson, t]);
   await db.as(t, `insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points) values ($1,$2,$3,'short','Name a prime',1)`, [S.tenantA, act.id, t]);
-  const s = await db.rpc(t, "start_session", { p_class: S.classA });
+  const s = await goLive(t, { p_class: S.classA });
   for (const u of [S.stu1, S.stu2]) await db.rpc(u, "join_session", { p_code: s.join_code });
   await db.rpc(t, "set_session_state", { p_session: s.id, p_activity: act.id });
   const secs = (x) => Math.round((new Date(x.attempt.deadline_at) - new Date(x.attempt.server_now)) / 1000);
@@ -1153,7 +1163,7 @@ test("learning supports, student-written questions, gradebook export", async () 
 
 test("audit fixes: no right/wrong leak before submit, second try never lowers a score, atomic slide order", async () => {
   const t = S.teacherA;
-  const s = await db.rpc(t, "start_session", { p_class: S.classA });
+  const s = await goLive(t, { p_class: S.classA });
   await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
 
   // "After submit" feedback: a wrong answer must not come back flagged on reload (that would reveal it's wrong).
@@ -1226,7 +1236,7 @@ test("parent reports: daily/weekly by subject, participation, focus with context
   const before = await mathsNow();
   // A lesson with a titled slide; Ada joins, answers with reasoning, raises a hand, then leaves.
   await db.admin("update public.lesson_slides set content = jsonb_set(coalesce(content, '{}'), '{heading}', '\"Adding fractions\"') where lesson_id = $1 and position = 0", [S.lesson]);
-  const s = await db.rpc(t, "start_session", { p_class: S.classA, p_lesson: S.lesson });
+  const s = await goLive(t, { p_class: S.classA, p_lesson: S.lesson });
   await db.rpc(S.stu1, "join_session", { p_code: s.join_code });
   const [act] = await db.as(t, `insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
     values ($1,$2,$3,'quiz','Warm-up','{}') returning id`, [S.tenantA, S.lesson, t]);
@@ -1347,7 +1357,7 @@ test("guests join a live lesson with the code and a name, and reach only that le
   await db.admin("update public.tenant_settings set monitoring_enabled = true where tenant_id = $1", [tenant]);
   const pupil = await db.signUp("pupil@guests.test", "Pupil One");
   await db.rpc(pupil, "redeem_code", { p_code: cls.join_code });
-  const s = await db.rpc(T, "start_session", { p_class: cls.id });
+  const s = await goLive(T, { p_class: cls.id });
   const g = await db.signInAnonymously();
 
   // Wrong codes are counted (8 per 15 minutes) and answered plainly; names are checked.
@@ -1420,7 +1430,7 @@ test("monitoring is an add-on: off for new schools, enforced by the database (08
   await db.rpc(kid, "redeem_code", { p_code: cls.join_code });
 
   // Off: sessions start without lockdown, can't be locked, and nothing is captured.
-  const s = await db.rpc(head, "start_session", { p_class: cls.id });
+  const s = await goLive(head, { p_class: cls.id });
   assert.equal(s.lockdown, false);
   await rejects(db.rpc(head, "set_session_lockdown", { p_session: s.id, p_on: true }), /monitoring is switched off/);
   const r = await db.rpc(kid, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: false, p_sharing: false });
@@ -1433,11 +1443,94 @@ test("monitoring is an add-on: off for new schools, enforced by the database (08
 
   // The school admin turns it on: new sessions lock down again.
   await db.as(head, "update public.tenant_settings set monitoring_enabled = true");
-  const s2 = await db.rpc(head, "start_session", { p_class: cls.id });
+  const s2 = await goLive(head, { p_class: cls.id });
   assert.equal(s2.lockdown, true);
   await db.rpc(head, "end_session", { p_session: s2.id });
   // Only the school's admins can switch it: a student's update changes nothing.
   await db.as(head, "update public.tenant_settings set monitoring_enabled = false");
   assert.equal((await db.as(kid, "update public.tenant_settings set monitoring_enabled = true returning 1")).length, 0);
   assert.equal((await db.admin("select monitoring_enabled from public.tenant_settings where tenant_id = $1", [tenant]))[0].monitoring_enabled, false);
+});
+
+test("live engine core: lobby, start, pause, end; no class needed; join by code (0880)", async () => {
+  const T = await db.signUp("t@engine.test", "Engine Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Engine School", p_full_name: "Engine Teacher" })).tenant_id;
+  const other = await db.signUp("o@engine.test", "Other Head");
+  await db.rpc(other, "bootstrap_school", { p_school_name: "Other School", p_full_name: "Other Head" });
+  // A student of the school with no class at all, and a deck with two slides and a quiz.
+  const cls = await db.rpc(T, "create_class", { p_name: "Unused class" });
+  const pupil = await db.signUp("p@engine.test", "Pupil Two");
+  await db.rpc(pupil, "redeem_code", { p_code: cls.join_code });
+  await db.admin("delete from public.class_members where user_id = $1", [pupil]);
+  const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title, status) values ($1, $2, 'Deck', 'published') returning id", [tenant, T]);
+  const [{ id: act }] = await db.admin("insert into public.activities (tenant_id, lesson_id, owner_id, kind, title) values ($1, $2, $3, 'quiz', 'Q') returning id", [tenant, lesson, T]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, content) values ($1, $2, 0, 'title', '{}'), ($1, $2, 1, 'text', '{}')", [tenant, lesson]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 2, 'activity', $3, '{}')", [tenant, lesson, act]);
+
+  // No class: the session opens in the lobby.
+  const s = await db.rpc(T, "start_session", { p_class: null, p_lesson: lesson });
+  assert.equal(s.phase, "lobby");
+  assert.equal(s.class_id, null);
+
+  // A guest and a classless student of the school join by code (dashes allowed for students).
+  const g = await db.signInAnonymously();
+  assert.equal((await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Tobi" })).session_id, s.id);
+  const code = s.join_code.slice(0, 3) + "-" + s.join_code.slice(3);
+  assert.equal((await db.rpc(pupil, "join_session", { p_code: code })).session_id, s.id);
+  await rejects(db.rpc(other, "join_session", { p_code: s.join_code }), /another school/);
+  let st = await db.rpc(pupil, "session_student_state", { p_session: s.id });
+  assert.equal(st.session.phase, "lobby");
+  assert.equal(st.me.name, "Pupil Two");
+  assert.equal(st.guest, false);
+
+  // Avatars; nothing to answer in the lobby.
+  await db.rpc(g, "set_avatar", { p_session: s.id, p_avatar: "fox" });
+  await rejects(db.rpc(g, "set_avatar", { p_session: s.id, p_avatar: "<b>" }), /Unknown avatar/);
+  assert.equal((await db.rpc(g, "session_student_state", { p_session: s.id })).me.avatar, "fox");
+  await rejects(db.rpc(pupil, "start_attempt", { p_activity: act, p_session: s.id }), /not open/);
+
+  // Only the session's teacher drives it; transitions are checked.
+  await rejects(db.rpc(pupil, "session_control", { p_session: s.id, p_action: "start" }), /Not your session/);
+  await rejects(db.rpc(T, "session_control", { p_session: s.id, p_action: "next" }), /Start the lesson first/);
+  await rejects(db.rpc(T, "session_control", { p_session: s.id, p_action: "fly" }), /Unknown action/);
+  await db.admin("delete from realtime.sent");
+  assert.equal((await db.rpc(T, "session_control", { p_session: s.id, p_action: "start" })).phase, "active");
+  await rejects(db.rpc(T, "session_control", { p_session: s.id, p_action: "start" }), /already started/);
+  // The state travels with the signal.
+  const [sig] = await db.admin("select payload from realtime.sent where topic = $1 and event = 'state' order by id desc limit 1", [`session:${s.id}`]);
+  assert.equal(sig.payload.phase, "active");
+  assert.equal(sig.payload.slide, 0);
+
+  // Navigation is bounded by the deck; answering works once active and on the slide.
+  assert.equal((await db.rpc(T, "session_control", { p_session: s.id, p_action: "next" })).slide, 1);
+  assert.equal((await db.rpc(T, "session_control", { p_session: s.id, p_action: "goto", p_args: { slide: 99 } })).slide, 2);
+  assert.equal((await db.rpc(T, "session_control", { p_session: s.id, p_action: "prev" })).slide, 1);
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "goto", p_args: { slide: 2 } });
+  assert.ok((await db.rpc(pupil, "start_attempt", { p_activity: act, p_session: s.id })).attempt.id);
+
+  // Pause ("eyes on teacher") blocks answering; resume.
+  assert.equal((await db.rpc(T, "session_control", { p_session: s.id, p_action: "pause" })).phase, "paused");
+  await rejects(db.rpc(g, "start_attempt", { p_activity: act, p_session: s.id }), /not open/);
+  await rejects(db.rpc(T, "session_control", { p_session: s.id, p_action: "pause" }), /Only a running lesson/);
+  assert.equal((await db.rpc(T, "session_control", { p_session: s.id, p_action: "resume" })).phase, "active");
+
+  // Settings: no late joiners now; invalid settings refused.
+  await rejects(db.rpc(T, "session_control", { p_session: s.id, p_action: "settings", p_args: { colour: true } }), /Unknown or invalid setting/);
+  assert.equal((await db.rpc(T, "session_control", { p_session: s.id, p_action: "settings", p_args: { late_join: false } })).settings.late_join, false);
+  const late = await db.signInAnonymously();
+  await rejects(db.rpc(late, "join_session_as_guest", { p_code: s.join_code, p_name: "Latecomer" }), /late joiners/);
+
+  // The teacher removes the classless student; they can't come back.
+  const ts = await db.rpc(T, "teacher_session_state", { p_session: s.id });
+  assert.equal(ts.roster.find((r) => r.student_id === pupil).guest, false);
+  assert.equal(ts.roster.find((r) => r.student_id === g).avatar, "fox");
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "kick", p_args: { user_id: pupil } });
+  await rejects(db.rpc(pupil, "session_student_state", { p_session: s.id }), /removed you/);
+  await rejects(db.rpc(pupil, "join_session", { p_code: s.join_code }), /removed you/);
+
+  // End: the guest sees their summary.
+  assert.equal((await db.rpc(T, "session_control", { p_session: s.id, p_action: "end" })).ended, true);
+  st = await db.rpc(g, "session_student_state", { p_session: s.id });
+  assert.equal(st.session.phase, "ended");
+  assert.equal(st.summary.answered, 0);
 });

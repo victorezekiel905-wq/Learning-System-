@@ -105,6 +105,7 @@ test("retention probes each school through the (tenant_id, time) index", async (
 
 test("classroom hot paths stay fast with a large database", async () => {
   const s = await db.rpc(S.teacher, "start_session", { p_class: S.class });
+  await db.rpc(S.teacher, "session_control", { p_session: s.id, p_action: "start" });
   await db.rpc(S.student, "join_session", { p_code: s.join_code });
   const t0 = performance.now();
   for (let i = 0; i < 50; i++) {

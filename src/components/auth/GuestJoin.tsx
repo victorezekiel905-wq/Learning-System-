@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { errorText, rpc } from "@/lib/rpc";
+import { formatJoinCode } from "@/lib/utils";
 
 type GuestJoinResult = { session_id?: string; title?: string; error?: string; code?: string };
 
@@ -21,7 +22,8 @@ export function GuestJoin({ initialCode = "" }: { initialCode?: string }) {
   const [err, setErr] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  const cleanCode = code.replace(/\s/g, "").toUpperCase();
+  // Codes are shown as "DV6-44Y"; dashes and spaces are ignored.
+  const cleanCode = code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
   async function join() {
     setBusy(true); setErr(null);
@@ -68,15 +70,15 @@ export function GuestJoin({ initialCode = "" }: { initialCode?: string }) {
           <form onSubmit={(e) => { e.preventDefault(); if (cleanCode.length >= 6) { setErr(null); setStep("name"); setTimeout(() => nameRef.current?.focus(), 0); } }}>
             <label htmlFor="join-code" className="block text-center font-display text-2xl font-extrabold tracking-tight">Enter the code</label>
             <p className="mt-1 text-center text-sm text-ink-300">It&apos;s on your teacher&apos;s screen.</p>
-            <input id="join-code" autoFocus autoComplete="off" autoCapitalize="characters" spellCheck={false} inputMode="text" maxLength={8}
-              value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ABC123" aria-describedby={err ? "join-err" : undefined}
+            <input id="join-code" autoFocus autoComplete="off" autoCapitalize="characters" spellCheck={false} inputMode="text" maxLength={9}
+              value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ABC-123" aria-describedby={err ? "join-err" : undefined}
               className="mt-5 block w-full rounded-2xl border-0 bg-white px-4 py-4 text-center font-mono text-4xl font-extrabold tracking-[0.3em] text-ink-950 placeholder:text-ink-300 focus:outline-none focus:ring-4 focus:ring-accent-400" />
             <Button type="submit" size="lg" className="btn-accent mt-4 w-full disabled:bg-white/10 disabled:text-ink-400 disabled:opacity-100" disabled={cleanCode.length < 6}>Next</Button>
           </form>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); void join(); }}>
             <button type="button" onClick={() => { setStep("code"); setErr(null); }} className="text-sm text-ink-300 hover:text-white">
-              ← Code <span className="font-mono font-bold tracking-widest text-white">{cleanCode}</span>
+              ← Code <span className="font-mono font-bold tracking-widest text-white">{formatJoinCode(cleanCode)}</span>
             </button>
             <label htmlFor="join-name" className="mt-3 block text-center font-display text-2xl font-extrabold tracking-tight">What&apos;s your name?</label>
             <p className="mt-1 text-center text-sm text-ink-300">Your teacher sees this name.</p>

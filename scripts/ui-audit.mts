@@ -50,6 +50,7 @@ try {
   await a.from("assignments").insert({ tenant_id: boot.tenant_id, class_id: cls.id, activity_id: act!.id, title: "Fractions homework", created_by: teacher.id,
     due_at: new Date(Date.now() + 3 * 86400_000).toISOString(), points_possible: 10 });
   const s = await call<{ id: string; join_code: string }>(teacher.client, "start_session", { p_class: cls.id, p_lesson: lesson!.id });
+    await call(teacher.client, "session_control", { p_session: s.id, p_action: "start" }); // sessions open in the lobby (0880)
   for (const st of students.slice(0, 3)) await call(st.client, "join_session", { p_code: s.join_code });
 
   const shot = async (page: Page, name: string) => {

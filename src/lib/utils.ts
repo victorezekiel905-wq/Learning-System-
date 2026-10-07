@@ -99,3 +99,9 @@ export function safeHref(url: string | null | undefined): string | null {
 export function plural(n: number, word: string, many = `${word}s`): string {
   return `${n} ${n === 1 ? word : many}`;
 }
+
+/** "DV644Y" → "DV6-44Y": easier to read off a projector. Typing works with or without the dash. */
+export function formatJoinCode(code: string | null | undefined): string {
+  const c = (code ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return c.length === 6 ? `${c.slice(0, 3)}-${c.slice(3)}` : c;
+}

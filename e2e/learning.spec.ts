@@ -37,6 +37,7 @@ test.describe("engaging learning", () => {
     await mk("Easy: which is 0.75?", 1, {}, 0);
     await mk("Challenge: which fraction is closest to 0.76?", 5, { require_reasoning: true }, 1);
     const s = await call<{ id: string; join_code: string }>(teacher.client, "start_session", { p_class: cls.id });
+    await call(teacher.client, "session_control", { p_session: s.id, p_action: "start" }); // sessions open in the lobby (0880)
     sessionId = s.id;
     await a.from("class_sessions").update({ lockdown: false }).eq("id", s.id);
     await call(student.client, "join_session", { p_code: s.join_code });

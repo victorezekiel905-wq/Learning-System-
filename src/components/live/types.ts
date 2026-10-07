@@ -18,6 +18,7 @@ export type RosterEntry = {
   hand_raised: boolean;
   /** Joined with the code and a name, no account (0860). */
   guest?: boolean;
+  avatar?: string | null;
 };
 
 export type AlertRow = {
@@ -43,6 +44,9 @@ export type SessionState = {
     group_chat_enabled: boolean; responses_visible: boolean; class_name: string; lesson_title: string | null; environment_name: string | null;
     tenant_id: string; started_at: string; lockdown: boolean;
     guest_monitoring?: boolean; guests_closed?: boolean;
+    /** Live engine (0880). Missing on older databases (treated as active). */
+    phase?: "lobby" | "active" | "paused" | "ended";
+    settings?: { leaderboard?: boolean; anonymous_names?: boolean; late_join?: boolean; speed_bonus?: boolean };
   };
   settings: {
     monitoring_enabled?: boolean;

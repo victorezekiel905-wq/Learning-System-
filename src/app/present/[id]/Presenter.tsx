@@ -7,6 +7,8 @@ import { useLoader, useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
 import { rpc } from "@/lib/rpc";
 import { Icon } from "@/components/Icon";
+import { avatarFor } from "@/components/live/avatars";
+import { formatJoinCode } from "@/lib/utils";
 
 export function Presenter({ sessionId }: { sessionId: string }) {
   const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: 15000 });
@@ -17,15 +19,28 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   const ann = useAnnotations(sessionId, s?.current_slide ?? 0);
   const slide = (lesson.data?.slides ?? []).find((x) => x.position === s?.current_slide);
   const results = state.data?.activity;
+  const host = typeof window !== "undefined" ? window.location.host : "";
+  const here = (state.data?.roster ?? []).filter((r) => r.presence === "online" || r.presence === "idle");
 
   return (
     <div className="flex min-h-screen flex-col bg-ink-900 text-white">
       <header className="flex items-center justify-between px-8 py-4">
         <p className="text-lg font-semibold">{s?.title ?? "SwiftCipher"}</p>
-        {s && <p className="text-right text-sm text-ink-300">Join at <strong className="text-white">{typeof window !== "undefined" ? window.location.host : ""}/student/join</strong> · code <span className="font-mono text-3xl font-extrabold tracking-[0.2em] text-accent-300">{s.join_code}</span></p>}
+        {s && s.phase !== "lobby" && <p className="text-right text-sm text-ink-300">Join at <strong className="text-white">{host}/join</strong> · code <span className="font-mono text-3xl font-extrabold tracking-[0.2em] text-accent-300">{formatJoinCode(s.join_code)}</span></p>}
       </header>
       <main className="flex flex-1 items-center justify-center p-6">
-        {spot.data ? (
+        {s?.phase === "lobby" ? (
+          <div className="text-center">
+            <p className="text-2xl text-ink-300">Join at <strong className="text-white">{host}/join</strong></p>
+            <p className="mt-4 font-mono text-[9rem] font-extrabold leading-none tracking-[0.15em] text-accent-400">{formatJoinCode(s.join_code)}</p>
+            <p className="mt-8 text-2xl text-ink-300">{here.length === 0 ? "Waiting for players…" : `${here.length} joined`}</p>
+            <ul className="mx-auto mt-4 flex max-w-5xl flex-wrap justify-center gap-3">
+              {here.map((r) => <li key={r.student_id} className="rounded-full bg-white/10 px-4 py-2 text-xl"><span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span> {r.name}</li>)}
+            </ul>
+          </div>
+        ) : s?.phase === "paused" ? (
+          <p className="text-center font-display text-6xl font-extrabold">👀 Eyes on me</p>
+        ) : spot.data ? (
           <figure className="w-full max-w-6xl">
             {spot.data.image && !spot.data.stale ? <img src={spot.data.image} alt={`Spotlight: ${spot.data.student}`} className="w-full rounded-xl" />
               : <div className="grid aspect-video place-items-center rounded-xl bg-ink-800 text-ink-400">Screen unavailable</div>}
