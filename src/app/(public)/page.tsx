@@ -1,239 +1,219 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, BellRing, Check, Gamepad2, Layers, MonitorSmartphone, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { getMe, homeFor } from "@/lib/session";
+import { LEGAL } from "@/lib/legal";
+import { LiveDemo } from "@/components/marketing/LiveDemo";
+import { AnswerMini, DesignMini, Frame, ParentMini, ReviewMini, RevealMini, SchoolMini, TeachMini } from "@/components/marketing/Showcase";
 
-const PILLARS = [
-  {
-    n: "01", title: "Teach", icon: Layers,
-    text: "Build a lesson from slides, video with checkpoint questions, whiteboards, or the PowerPoint, PDF or Word file you already have. Present it to every screen at once."
-  },
-  {
-    n: "02", title: "Engage", icon: Sparkles,
-    text: "Students pick their challenge level, explain their reasoning, earn XP and badges, and race each other in quiz games. You see how they think, not just what they tapped."
-  },
-  {
-    n: "03", title: "Protect", icon: ShieldCheck,
-    text: "Every student's screen as a thumbnail on your left. Tap one to see it full size, privately. Anyone who opens a game, switches app or closes the tab is flagged at once."
-  }
+export const metadata = {
+  title: { absolute: "SwiftCipher · Lessons your whole class plays together" },
+  description: "Teach from your own slides, ask a question and every student answers on their phone. Results arrive as you reveal them, and parents follow progress in every subject."
+};
+
+const STEPS = [
+  { title: "Design", text: "Lay out slides with text, pictures and shapes, or bring in your PDF and PowerPoint files.", art: <DesignMini />, dark: false },
+  { title: "Teach", text: "Your screen leads. Every student sees the slide you are on and the question you ask.", art: <TeachMini />, dark: true },
+  { title: "Answer", text: "Students tap a colour on any phone or laptop. They join with a code; there is nothing to install.", art: <AnswerMini />, dark: false },
+  { title: "Review", text: "After the lesson: who took part, how each question went, and the most common wrong answer.", art: <ReviewMini />, dark: false }
 ];
 
-const FACTS = [
-  { big: "< 2 s", text: "from a student leaving the lesson to the alert on your screen" },
-  { big: "3", text: "challenge levels in every activity, chosen by the student or by you" },
-  { big: "12", text: "activity types, from multiple choice to drawing, code and rubrics" },
-  { big: "0", text: "screen recordings stored. Live frames are never saved." }
-];
+const CLASSROOM = [
+  ["Any device with a browser", "Phones, tablets, laptops and classroom panels. Nothing to install, nothing to update."],
+  ["Slow Wi-Fi", "If the connection drops, answers wait on the device and send themselves when it comes back."],
+  ["The slides you already have", "Import PDF and PowerPoint files and add questions between them, or design new slides here."],
+  ["Private by design", "Students see their own results, parents their own children, and teachers their own subjects."],
+  ["Data you control", `Stored in ${LEGAL.hostingRegion.replace(/^European Union: /, "the EU, ")}. Export or delete it whenever you choose.`],
+  ["Monitoring only if you want it", "An optional add-on: live screens during class only, and only with parents' agreement."]
+] as const;
 
-const MODULES = [
-  ["Studio", "Slides, interactive video, whiteboards and imported files, with a library of media and questions you reuse."],
-  ["Assess", "Server-marked quizzes, short answers with rubrics, and a review queue for the work that needs a human."],
-  ["Challenge", "Fast quiz games with streaks, teams and podiums. Leaderboards can be hidden for younger classes."],
-  ["Live", "Responses as they arrive, a raise-hand queue, announcements and private chat, all in one room."],
-  ["Guard", "Screen wall, lockdown, allow and block lists, and a built-in list of game and social sites blocked during lessons."],
-  ["Insights", "Misconceptions by question, thinking level by Bloom's taxonomy, and reports for heads of department."]
-];
+const FAQ = [
+  ["Do students need an account?", "Not for a live lesson. They type the code on your screen and their name. With an account, their progress is kept from lesson to lesson and their parents can follow it."],
+  ["Can I use the slides I already have?", "Yes. Import a PDF or PowerPoint file, then add questions, polls and quizzes between the slides. You can also design slides from scratch in SwiftCipher."],
+  ["What does it cost?", "One teacher with up to three classes is free. Whole-school plans add school leaders, parent accounts and more storage. Talk to us and we will price it for your school."],
+  ["What happens when the internet is slow?", "SwiftCipher is built for school Wi-Fi. Pages stay light, and if a student loses the connection mid-question, the answer is kept on the device and sent when it returns."],
+  ["Who can see a child's results?", "The student, their parents, the teachers of their subjects (for those subjects only) and the school's leaders. No other family, and no other school."],
+  ["How do parents join?", "The school gives each family a private code for each child. Parents sign up with it, and add a second child to the same account with that child's code."]
+] as const;
 
 export default async function Landing() {
   const me = await getMe();
   if (me?.profile) redirect(homeFor(me.profile.role));
 
   return (
-    <main>
-      {/* Hero */}
-      <section className="mx-auto max-w-7xl px-4 pb-14 pt-12 sm:px-8 sm:pb-20 sm:pt-20">
-        <p className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white py-1 pl-1 pr-3 text-[13px] font-semibold text-ink-700">
-          <span className="rounded-full bg-ink-900 px-2 py-0.5 text-[11px] font-bold text-white">New</span>
-          Challenge levels, reasoning and XP for every activity
-        </p>
-        <h1 className="mt-6 max-w-5xl font-display text-[44px] font-extrabold leading-[0.98] tracking-tightest text-ink-900 sm:text-[68px] lg:text-[88px]">
-          Every screen in the room. <span className="mark">One lesson</span> on all of them.
-        </h1>
-        <div className="mt-8 grid gap-8 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <p className="max-w-2xl text-lg leading-relaxed text-ink-600 sm:text-xl">
-            SwiftCipher is the classroom platform for international primary and secondary schools. Lessons and games your students drive,
-            and live screen monitoring that tells you the moment anyone wanders off.
+    <main className="overflow-x-clip">
+      {/* Opening */}
+      <section className="mx-auto grid max-w-6xl items-center gap-x-14 gap-y-12 px-5 pb-28 pt-14 sm:px-8 sm:pt-20 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:pb-32 lg:pt-24">
+        <div>
+          <h1 className="font-display text-[40px] font-bold leading-[1.04] tracking-[-0.03em] text-ink-900 sm:text-[52px] lg:text-[58px]">
+            Lessons your whole class plays together.
+          </h1>
+          <p className="mt-6 max-w-[32rem] text-[17px] leading-[1.65] text-ink-600 sm:text-lg">
+            Teach from your own slides. Ask a question and every student answers on their phone, with a countdown and points.
+            Results arrive the moment you reveal them, and parents can follow progress in every subject.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/signup" className="btn btn-ink btn-lg no-underline">Create your school <ArrowRight className="h-4 w-4" aria-hidden /></Link>
-            <Link href="/join" className="btn btn-secondary btn-lg no-underline">I have a class code</Link>
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Link href="/signup" className="btn btn-ink btn-lg no-underline">Create your school</Link>
+            <Link href="#lesson" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-ink-900 no-underline hover:text-brand-700">
+              See how a lesson runs <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
           </div>
+          <p className="mt-5 text-[13px] text-ink-500">Free for one teacher and up to three classes.</p>
         </div>
-        <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-[13px] font-medium text-ink-600">
-          {["Hosted in the EU (Ireland)", "Built for GDPR and NDPA", "Works on slow school Wi-Fi", "Phones, tablets, laptops and panels"].map((t) => (
-            <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-ink-900" strokeWidth={2.6} aria-hidden />{t}</li>
-          ))}
-        </ul>
-
-        {/* Sign in or sign up, by who you are */}
-        <div className="mt-12 grid gap-4 sm:grid-cols-3" aria-label="Sign in">
-          {([
-            ["student", "Students", "Join your lessons, play the quizzes, and see your progress in every subject.", "Join with your class code"],
-            ["parent", "Parents", "Follow each of your children: lessons, results, strengths, and where they need help.", "Sign up with your child's code"],
-            ["staff", "Staff", "Design slides, teach live, and see how your students are doing in your subjects.", "Use your invite from the school"]
-          ] as const).map(([who, title, text, signup]) => (
-            <div key={who} className="flex flex-col rounded-2xl border border-ink-200 bg-white p-5">
-              <h2 className="font-display text-xl font-extrabold text-ink-900">{title}</h2>
-              <p className="mt-1 flex-1 text-[15px] leading-relaxed text-ink-600">{text}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Link href={`/login?as=${who}`} className="btn btn-ink no-underline">Sign in</Link>
-                <Link href={`/signup?as=${who}`} className="text-sm font-semibold">{signup}</Link>
-              </div>
-            </div>
-          ))}
-        </div>
+        <LiveDemo />
       </section>
 
-      {/* The product, as the teacher sees it */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-8" aria-label="The live classroom">
-        <ClassroomPicture />
-      </section>
-
-      {/* Three pillars */}
-      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-8 sm:py-28">
-        <h2 className="max-w-3xl font-display text-[34px] font-extrabold leading-[1.05] tracking-tightest sm:text-5xl">
-          Three jobs. Done properly, in one place.
-        </h2>
-        <div className="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
-          {PILLARS.map((p) => (
-            <article key={p.n} className="border-t-2 border-ink-900 pt-6">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-sm font-bold text-ink-500">{p.n}</span>
-                <p.icon className="h-6 w-6 text-ink-900" strokeWidth={1.8} aria-hidden />
-              </div>
-              <h3 className="mt-6 text-2xl font-extrabold tracking-tight">{p.title}</h3>
-              <p className="mt-3 text-[15px] leading-relaxed text-ink-600">{p.text}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {/* Facts band */}
-      <section className="bg-ink-950 text-white">
-        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-px bg-white/10 lg:grid-cols-4">
-          {FACTS.map((f) => (
-            <div key={f.big} className="bg-ink-950 px-4 py-8 sm:px-8 sm:py-14">
-              <p className="font-display text-5xl font-extrabold leading-none tracking-tightest text-accent-400 sm:text-7xl">{f.big}</p>
-              <p className="mt-3 max-w-[16rem] text-[13px] leading-snug text-ink-300 sm:mt-4 sm:text-[15px]">{f.text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Modules */}
-      <section className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-8 sm:py-28 lg:grid-cols-[1fr_1.6fr]">
-        <div className="lg:sticky lg:top-28 lg:self-start">
-          <h2 className="font-display text-[34px] font-extrabold leading-[1.05] tracking-tightest sm:text-5xl">Everything a lesson needs.</h2>
-          <p className="mt-4 max-w-md text-lg text-ink-600">Six tools that share one roster, one gradebook and one set of permissions for every branch of your school.</p>
-        </div>
-        <dl className="divide-y divide-ink-200 border-y border-ink-200">
-          {MODULES.map(([name, text]) => (
-            <div key={name} className="grid gap-2 py-6 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-8">
-              <dt className="font-display text-xl font-bold tracking-tight">{name}</dt>
-              <dd className="text-[15px] leading-relaxed text-ink-600">{text}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      {/* Consent and privacy */}
-      <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-8 sm:pb-28">
-        <div className="grid gap-10 rounded-3xl border border-ink-200 bg-white p-6 sm:p-12 lg:grid-cols-[1fr_1.3fr]">
-          <div>
-            <MonitorSmartphone className="h-8 w-8 text-ink-900" strokeWidth={1.8} aria-hidden />
-            <h2 className="mt-6 font-display text-3xl font-extrabold leading-tight tracking-tightest sm:text-4xl">Monitoring families have agreed to.</h2>
-            <p className="mt-4 text-[15px] leading-relaxed text-ink-600">
-              Parents give consent in the parent portal before any monitoring starts, and students always see when their screen is being shared.
-            </p>
+      {/* A lesson, step by step */}
+      <section id="lesson" className="scroll-mt-20 border-t border-ink-200/80">
+        <div className="mx-auto max-w-6xl px-5 py-24 sm:px-8 lg:py-28">
+          <div className="max-w-2xl">
+            <h2 className="font-display text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-ink-900 sm:text-[38px]">How a lesson runs.</h2>
+            <p className="mt-4 text-[17px] leading-relaxed text-ink-600">The same lesson works at the front of the room, on every student&apos;s device, and in the report you read afterwards.</p>
           </div>
-          <ul className="grid gap-5 sm:grid-cols-2">
-            {[
-              ["Only during class", "Monitoring starts when the lesson starts and stops when it ends."],
-              ["Nothing recorded", "Live frames go straight to the teacher and are never stored."],
-              ["Fair on connections", "A dropped connection shows as connection lost, never as a violation."],
-              ["Teachers decide", "Alerts are a prompt for the teacher. SwiftCipher never disciplines anyone."]
-            ].map(([t, d]) => (
-              <li key={t} className="rounded-2xl bg-ink-50 p-5">
-                <p className="flex items-center gap-2 font-display font-bold"><Check className="h-4 w-4" strokeWidth={3} aria-hidden />{t}</p>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-600">{d}</p>
+          <ol className="mt-14 grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map((s) => (
+              <li key={s.title}>
+                <Frame dark={s.dark} fixed>{s.art}</Frame>
+                <h3 className="mt-5 text-[15px] font-semibold text-ink-900">{s.title}</h3>
+                <p className="mt-1.5 text-[14px] leading-relaxed text-ink-600">{s.text}</p>
               </li>
             ))}
-          </ul>
+          </ol>
         </div>
       </section>
 
-      {/* Closing call */}
-      <section className="bg-accent-500 text-accent-ink">
-        <div className="mx-auto flex max-w-7xl flex-col items-start gap-8 px-4 py-16 sm:px-8 sm:py-24 lg:flex-row lg:items-end lg:justify-between">
-          <h2 className="max-w-3xl font-display text-[40px] font-extrabold leading-[1] tracking-tightest text-inherit sm:text-6xl">Bring the whole class back to the lesson.</h2>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/signup" className="btn btn-ink btn-lg no-underline">Create your school <ArrowRight className="h-4 w-4" aria-hidden /></Link>
-            <Link href="/login" className="btn btn-lg border border-ink-900/20 text-ink-900 no-underline hover:bg-ink-900/5 hover:text-ink-900">Sign in</Link>
+      {/* The game */}
+      <section className="bg-ink-950 text-white">
+        <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:py-28">
+          <div>
+            <h2 className="font-display text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-white sm:text-[38px]">Quiz like a game, without leaving the lesson.</h2>
+            <p className="mt-5 max-w-[34rem] text-[17px] leading-relaxed text-ink-300">
+              Questions sit between your slides. The class shares one countdown, earns points for right answers and for speed, and builds streaks.
+              When time is up the answers close, and the right one appears on the big screen with how many chose each option.
+            </p>
+            <p className="mt-4 max-w-[34rem] text-[17px] leading-relaxed text-ink-300">
+              Show the leaderboard when it helps, and keep it hidden for younger classes or quiet checks. Music for the room is built in.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-[1.2fr_1fr]">
+            <div className="rounded-2xl bg-white/[0.04] ring-1 ring-white/10"><RevealMini /></div>
+            <div className="rounded-2xl bg-white/[0.04] p-5 ring-1 ring-white/10" aria-hidden>
+              <p className="text-[12px] font-semibold text-white/60">Leaderboard</p>
+              <ol className="mt-3 space-y-2.5 text-[14px]">
+                {[["Ada", "4,860", "+1"], ["Tobi", "4,410", "−1"], ["Kemi", "3,990", ""], ["Femi", "3,720", "+2"]].map(([n, p, d], i) => (
+                  <li key={n} className="flex items-center gap-3">
+                    <span className="w-4 text-right font-semibold tabular-nums text-white/50">{i + 1}</span>
+                    <span className="flex-1 font-semibold">{n}</span>
+                    <span className="text-[11px] text-white/45">{d}</span>
+                    <span className="font-display font-bold tabular-nums">{p}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Parents */}
+      <section id="parents" className="scroll-mt-20">
+        <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 py-24 sm:px-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:py-28">
+          <div>
+            <h2 className="font-display text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-ink-900 sm:text-[38px]">Parents see each subject, not just a score.</h2>
+            <p className="mt-5 text-[17px] leading-relaxed text-ink-600">
+              Every family sees their own child&apos;s progress: lessons attended, right answers, and the topics where help is needed, by week, month, term or year.
+            </p>
+            <p className="mt-4 text-[17px] leading-relaxed text-ink-600">
+              Parents write to each subject teacher from the same page, and teachers reply. A parent with three children at the school signs up once and sees all three.
+            </p>
+          </div>
+          <Frame caption="Example report" className="lg:pl-4"><div className="bg-ink-50/70"><ParentMini /></div></Frame>
+        </div>
+      </section>
+
+      {/* School leaders */}
+      <section id="schools" className="scroll-mt-20 border-t border-ink-200/80">
+        <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 py-24 sm:px-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:py-28">
+          <Frame caption="Example: the whole school over one term" className="order-last lg:order-first lg:pr-4"><SchoolMini /></Frame>
+          <div>
+            <h2 className="font-display text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-ink-900 sm:text-[38px]">Know where pupils struggle, long before exams.</h2>
+            <p className="mt-5 text-[17px] leading-relaxed text-ink-600">
+              School leaders see every subject broken down by topic, the pupils who need help, and what parents are asking teachers.
+            </p>
+            <p className="mt-4 text-[17px] leading-relaxed text-ink-600">
+              Teachers see the same for the subjects they teach, and a report after every lesson.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Practicalities */}
+      <section className="border-t border-ink-200/80 bg-white">
+        <div className="mx-auto max-w-6xl px-5 py-24 sm:px-8 lg:py-28">
+          <h2 className="max-w-2xl font-display text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-ink-900 sm:text-[38px]">Made for real classrooms.</h2>
+          <dl className="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+            {CLASSROOM.map(([t, d]) => (
+              <div key={t} className="border-t border-ink-200 pt-5">
+                <dt className="text-[15px] font-semibold text-ink-900">{t}</dt>
+                <dd className="mt-2 text-[15px] leading-relaxed text-ink-600">{d}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      {/* Questions */}
+      <section id="faq" className="scroll-mt-20 border-t border-ink-200/80">
+        <div className="mx-auto grid max-w-6xl gap-12 px-5 py-24 sm:px-8 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] lg:py-28">
+          <div>
+            <h2 className="font-display text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-ink-900 sm:text-[38px]">Questions schools ask.</h2>
+            <p className="mt-4 text-[15px] leading-relaxed text-ink-600">
+              Anything else: <a href={`mailto:${LEGAL.infoEmail}`}>{LEGAL.infoEmail}</a>
+            </p>
+          </div>
+          <div className="divide-y divide-ink-200 border-y border-ink-200">
+            {FAQ.map(([q, a]) => (
+              <details key={q} className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-[16px] font-semibold text-ink-900 [&::-webkit-details-marker]:hidden">
+                  {q}<span aria-hidden className="text-xl font-normal leading-none text-ink-400 transition-transform group-open:rotate-45">+</span>
+                </summary>
+                <p className="mt-3 max-w-[40rem] text-[15px] leading-relaxed text-ink-600">{a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Start */}
+      <section className="bg-ink-950 text-white">
+        <div className="mx-auto max-w-6xl px-5 py-24 sm:px-8 lg:py-28">
+          <div className="flex flex-wrap items-end justify-between gap-8">
+            <div className="max-w-xl">
+              <h2 className="font-display text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-white sm:text-[38px]">Run your next lesson on SwiftCipher.</h2>
+              <p className="mt-4 text-[17px] leading-relaxed text-ink-300">Create your school in a few minutes, or talk to us about bringing in your whole staff.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              <Link href="/signup" className="btn btn-lg bg-white text-ink-950 no-underline hover:bg-ink-100 hover:text-ink-950">Create your school</Link>
+              <a href={`mailto:${LEGAL.infoEmail}`} className="text-[15px] font-semibold text-white no-underline hover:text-accent-300">Talk to us</a>
+            </div>
+          </div>
+          <div className="mt-16 grid gap-px overflow-hidden rounded-2xl bg-white/10 sm:grid-cols-3" aria-label="Sign in">
+            {([
+              ["student", "Students", "Join your lessons and see your progress.", "Join with your class code"],
+              ["parent", "Parents", "Follow each of your children, subject by subject.", "Sign up with your child's code"],
+              ["staff", "Staff", "Teach live and see how your classes are doing.", "Use your invite from the school"]
+            ] as const).map(([who, title, text, signup]) => (
+              <div key={who} className="bg-ink-950 p-6">
+                <p className="text-[15px] font-semibold text-white">{title}</p>
+                <p className="mt-1 text-[14px] leading-relaxed text-ink-400">{text}</p>
+                <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[14px]">
+                  <Link href={`/login?as=${who}`} className="font-semibold text-white no-underline hover:text-accent-300">Sign in</Link>
+                  <Link href={`/signup?as=${who}`} className="text-ink-400 no-underline hover:text-white">{signup}</Link>
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
     </main>
-  );
-}
-
-/** A drawn picture of the teacher's live room (not a screenshot): the student rail, the lesson, and an alert. */
-function ClassroomPicture() {
-  const students = [
-    { n: "Ada Okafor", c: "#E4E9FB" }, { n: "Tunde Bello", away: true }, { n: "Chiamaka Eze", c: "#E6F4D7" },
-    { n: "David Mensah", c: "#FBE7DA" }, { n: "Amara Obi", c: "#EDE4F7" }, { n: "Kofi Asante", c: "#DCF1EE" }
-  ];
-  return (
-    <figure className="overflow-hidden rounded-3xl bg-ink-950 p-2 sm:p-3" aria-label="Illustration: the teacher's live classroom">
-      <div className="flex items-center gap-3 rounded-t-2xl px-3 py-3 text-white sm:px-4">
-        <span className="rounded-md bg-rose-600 px-1.5 py-1 text-[10px] font-bold leading-none">LIVE</span>
-        <span className="truncate text-sm font-semibold">Year 8 Mathematics · Equivalent fractions</span>
-        <span className="ml-auto hidden rounded-lg bg-accent-500 px-2.5 py-1 font-mono text-sm font-extrabold tracking-[0.15em] text-accent-ink sm:inline">K7Q2XM</span>
-      </div>
-      <div className="grid gap-2 sm:gap-3 md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)_260px]">
-        <div className="grid grid-cols-3 gap-2 rounded-2xl bg-white/5 p-2 md:grid-cols-1 md:content-start">
-          {students.map((s) => (
-            <div key={s.n} className={`rounded-xl p-1.5 ${s.away ? "bg-rose-700" : "bg-white/5"}`}>
-              <div className="aspect-video rounded-lg" style={{ background: s.away ? "#9F1239" : s.c }}>
-                {!s.away && <div className="flex h-full flex-col justify-center gap-1 px-2"><span className="h-1 w-3/5 rounded bg-ink-900/70" /><span className="h-1 w-2/5 rounded bg-ink-900/30" /></div>}
-                {s.away && <div className="grid h-full place-items-center text-[10px] font-extrabold text-white">LEFT LESSON</div>}
-              </div>
-              <p className="mt-1 truncate px-0.5 text-[11px] font-medium text-white">{s.n}</p>
-            </div>
-          ))}
-        </div>
-        <div className="flex min-h-[260px] flex-col justify-between rounded-2xl bg-white p-6 sm:p-10">
-          <div>
-            <span className="inline-block rounded-md bg-accent-400 px-2 py-0.5 text-[12px] font-bold text-accent-ink">Level 2 · Core</span>
-            <p className="mt-5 font-display text-3xl font-extrabold leading-tight tracking-tightest text-ink-900 sm:text-5xl">Why is 2/4 the same as 1/2?</p>
-            <p className="mt-3 max-w-md text-[15px] text-ink-600">Multiply or divide the top and the bottom by the same number. Explain your reasoning.</p>
-          </div>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-100"><div className="h-full w-[72%] rounded-full bg-ink-900" /></div>
-            <span className="text-[13px] font-semibold text-ink-700">18 of 25 answered</span>
-          </div>
-        </div>
-        <div className="hidden flex-col gap-2 lg:flex">
-          <div className="rounded-2xl bg-white p-4">
-            <p className="flex items-center gap-2 text-[13px] font-bold text-rose-700"><BellRing className="h-4 w-4" aria-hidden />Tunde Bello left the lesson</p>
-            <p className="mt-1 text-[13px] text-ink-600">Switched to another tab · 1.5 s ago</p>
-          </div>
-          <div className="rounded-2xl bg-white/5 p-4 text-white">
-            <p className="flex items-center gap-2 text-[13px] font-bold"><Gamepad2 className="h-4 w-4 text-accent-400" aria-hidden />Game site blocked</p>
-            <p className="mt-1 text-[13px] text-ink-300">Lesson focus: no games or social media</p>
-          </div>
-          <div className="flex-1 rounded-2xl bg-white/5 p-4 text-white">
-            <p className="text-[13px] font-bold">Leaderboard</p>
-            <ol className="mt-3 space-y-2 text-[13px]">
-              {[["Chiamaka Eze", 1240], ["Ada Okafor", 1180], ["Kofi Asante", 990]].map(([n, xp], i) => (
-                <li key={n} className="flex items-center gap-2">
-                  <span className={`grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold ${i === 0 ? "bg-accent-500 text-accent-ink" : "bg-white/10"}`}>{i + 1}</span>
-                  <span className="flex-1 truncate text-ink-200">{n}</span><span className="font-mono text-ink-300">{xp} XP</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </div>
-      </div>
-    </figure>
   );
 }

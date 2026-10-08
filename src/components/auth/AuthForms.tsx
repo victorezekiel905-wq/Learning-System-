@@ -8,7 +8,7 @@ import { isNetworkMessage, NETWORK_MESSAGE } from "@/lib/errors";
 import { safeNext } from "@/lib/utils";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { WHO_LABEL, type Who } from "@/lib/who";
+import { WHO_LABEL, whoForRole, wrongTabMessage, type Who } from "@/lib/who";
 
 
 /** Student · Parent · Staff, as links that keep the rest of the address (e.g. ?next=). */
@@ -32,7 +32,7 @@ const authMessage = (m: string) => (isNetworkMessage(m) ? NETWORK_MESSAGE : m);
 const SSO = (process.env.NEXT_PUBLIC_SSO_PROVIDERS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const SSO_LABEL: Record<string, string> = { google: "Google", azure: "Microsoft", keycloak: "School SSO" };
 
-function SsoButtons({ next }: { next: string }) {
+function SsoButtons({ next, who }: { next: string; who: Who }) {
   if (!SSO.length) return null;
   return (
     <div className="space-y-2">
@@ -40,7 +40,7 @@ function SsoButtons({ next }: { next: string }) {
         <Button key={p} variant="secondary" className="w-full" onClick={() =>
           createClient().auth.signInWithOAuth({
             provider: p as "google",
-            options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` }
+            options: { redirectTo: `${window.location.origin}/auth/callback?as=${who}&next=${encodeURIComponent(next)}` }
           })}>
           Continue with {SSO_LABEL[p] ?? p}
         </Button>
@@ -68,9 +68,20 @@ export function LoginForm({ who = "student" }: { who?: Who }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
-    const { error } = await createClient().auth.signInWithPassword({ email, password });
+    const sb = createClient();
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) { setBusy(false); setErr(authMessage(error.message)); return; }
+    // Each account signs in only from its own tab: student, parent or staff.
+    const { data: me } = await sb.rpc("me");
+    const m = me as { profile?: { role?: string } | null; super_admin?: boolean } | null;
+    const actual = m?.profile ? whoForRole(m.profile.role) : m?.super_admin ? "staff" : null;
+    if (actual && actual !== who) {
+      await sb.auth.signOut({ scope: "local" });
+      setBusy(false);
+      setErr(wrongTabMessage(actual));
+      return;
+    }
     setBusy(false);
-    if (error) { setErr(authMessage(error.message)); return; }
     router.replace(next);
     router.refresh();
   }
@@ -85,7 +96,7 @@ export function LoginForm({ who = "student" }: { who?: Who }) {
 
   return (
     <div className="space-y-5">
-      {who !== "parent" && <SsoButtons next={next} />}
+      {who !== "parent" && <SsoButtons next={next} who={who} />}
       <form onSubmit={submit} className="space-y-5">
         <Field label="Email" htmlFor="email"><Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label="Password" htmlFor="password"><Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></Field>

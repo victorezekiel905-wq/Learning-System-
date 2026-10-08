@@ -23,8 +23,18 @@ const COPY: Record<Who, { intro: string; statement: React.ReactNode; points: str
   }
 };
 
-export default async function LoginPage(props: { searchParams: Promise<{ as?: string }> }) {
-  const who = parseWho((await props.searchParams).as) ?? "student";
+/** The tab for a page someone was sent from (e.g. a teacher's link): /teacher -> Staff. */
+function whoForPath(next: string | undefined): Who | null {
+  if (!next) return null;
+  if (/^\/(teacher|admin|super|guard|present)(\/|$)/.test(next)) return "staff";
+  if (/^\/parent(\/|$)/.test(next)) return "parent";
+  if (/^\/student(\/|$)/.test(next)) return "student";
+  return null;
+}
+
+export default async function LoginPage(props: { searchParams: Promise<{ as?: string; next?: string }> }) {
+  const sp = await props.searchParams;
+  const who = parseWho(sp.as) ?? whoForPath(sp.next) ?? "student";
   const c = COPY[who];
   return (
     <AuthShell title="Welcome back." intro={c.intro} statement={c.statement} points={c.points}>
