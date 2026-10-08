@@ -32,6 +32,10 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
+# LibreOffice turns PowerPoint uploads into PDF, so imported decks keep their design.
+# Liberation and Carlito/Caladea have the same letter widths as Arial, Times and
+# Calibri/Cambria, so text wraps as it does in PowerPoint.
+RUN apk add --no-cache libreoffice-impress ttf-liberation ttf-dejavu fontconfig  && (apk add --no-cache font-carlito font-caladea || true)
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=builder /app/public ./public

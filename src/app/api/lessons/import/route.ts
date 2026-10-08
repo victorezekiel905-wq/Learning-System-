@@ -1,5 +1,5 @@
 import { fail, ok, requireProfile, withErrorLog } from "@/lib/api";
-import { importLessonFromUpload, renderPdfPages } from "@/lib/lesson-import";
+import { importLessonFromUpload, officeToPdf, renderPdfPages } from "@/lib/lesson-import";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -8,7 +8,7 @@ const MAX_PAGES = 80;
 
 /**
  * POST multipart {file, title?, mode?} → a new draft lesson.
- * PDF (default mode "pictures"): one picture slide per page, so the deck looks exactly
+ * PDF, or PowerPoint converted to PDF by LibreOffice (default mode "pictures"): one picture slide per page, so the deck looks exactly
  * like the original, with the page's text as teacher notes and alt text.
  * Everything else, or mode "text": one editable text slide per slide/section.
  */
@@ -23,15 +23,27 @@ export const POST = withErrorLog(async function POST(req: Request) {
   if (file.size > MAX_BYTES) return fail(413, "Files must be 20 MB or smaller.");
   const bytes = new Uint8Array(await file.arrayBuffer());
   const isPdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
+  const ext = (/\.([a-z0-9]+)$/i.exec(file.name)?.[1] ?? "").toLowerCase();
+  const isDeck = ["pptx", "ppt", "ppsx", "pps", "odp"].includes(ext);
+  const asPictures = form?.get("mode") !== "text";
   const formTitle = String(form?.get("title") ?? "").trim();
   const baseTitle = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Imported lesson";
 
-  if (isPdf && form?.get("mode") !== "text") {
+  // PowerPoint keeps its design by going through LibreOffice to PDF (Docker image).
+  let pdfBytes: Uint8Array | null = isPdf ? bytes : null;
+  let note: string | null = null;
+  if (isDeck && asPictures) {
+    try { pdfBytes = await officeToPdf(bytes, ext); }
+    catch (e) { return fail(422, e instanceof Error ? e.message : "The presentation couldn't be converted."); }
+    if (!pdfBytes) note = "This server can't draw PowerPoint slides, so only the text was imported. To keep the design, save the presentation as PDF and import that.";
+  }
+
+  if (pdfBytes && asPictures) {
     let rendered;
     try {
-      rendered = await renderPdfPages(bytes, { maxPages: MAX_PAGES });
+      rendered = await renderPdfPages(pdfBytes, { maxPages: MAX_PAGES });
     } catch (e) {
-      return fail(422, `Could not read that PDF${e instanceof Error && e.message ? `: ${e.message}` : "."}`);
+      return fail(422, `Could not read that ${isPdf ? "PDF" : "presentation"}${e instanceof Error && e.message ? `: ${e.message}` : "."}`);
     }
     if (!rendered.pages.length) return fail(422, "That PDF has no pages.");
 
@@ -61,7 +73,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
       if (m.error) throw new Error(m.error.message);
       const s = await sb.from("lesson_slides").insert(slides);
       if (s.error) throw new Error(s.error.message);
-      return ok({ lesson_id: lesson.id, slides: slides.length, source: "pdf", pictures: true,
+      return ok({ lesson_id: lesson.id, slides: slides.length, source: isPdf ? "pdf" : ext, pictures: true,
                   skipped: Math.max(0, rendered.total - rendered.pages.length) });
     } catch (e) {
       // Leave nothing half-imported behind.
@@ -92,5 +104,5 @@ export const POST = withErrorLog(async function POST(req: Request) {
   }));
   const { error: slideErr } = await sb.from("lesson_slides").insert(rows);
   if (slideErr) return fail(400, slideErr.message);
-  return ok({ lesson_id: lesson.id, slides: rows.length, source: parsed.sourceType, pictures: false, skipped: 0 });
+  return ok({ lesson_id: lesson.id, slides: rows.length, source: parsed.sourceType, pictures: false, skipped: 0, note });
 });

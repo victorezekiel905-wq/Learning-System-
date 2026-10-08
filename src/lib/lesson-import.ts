@@ -308,3 +308,34 @@ export async function renderPdfPages(bytes: Uint8Array, opts: { maxPages?: numbe
     await parser.destroy();
   }
 }
+
+/**
+ * PowerPoint (or Keynote/OpenDocument export) → PDF with LibreOffice, so a deck keeps
+ * its design: the PDF then goes through renderPdfPages. Returns null when the server
+ * has no LibreOffice (the Docker image installs it; other hosts fall back to text).
+ */
+export async function officeToPdf(bytes: Uint8Array, ext: string): Promise<Uint8Array | null> {
+  const { execFile } = await import("node:child_process");
+  const { mkdtemp, writeFile, readFile, rm, access } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const path = await import("node:path");
+  const candidates = [process.env.SOFFICE_PATH, "/usr/bin/soffice", "/usr/bin/libreoffice", "/usr/lib/libreoffice/program/soffice",
+    "/opt/libreoffice/program/soffice", "C:\\Program Files\\LibreOffice\\program\\soffice.exe"].filter(Boolean) as string[];
+  let bin: string | null = null;
+  for (const c of candidates) { try { await access(c); bin = c; break; } catch { /* next */ } }
+  if (!bin) return null;
+  const dir = await mkdtemp(path.join(tmpdir(), "deck-"));
+  try {
+    const input = path.join(dir, `deck.${ext.replace(/[^a-z]/g, "") || "pptx"}`);
+    await writeFile(input, bytes);
+    await new Promise<void>((resolve, reject) => {
+      // A private profile per conversion: parallel imports don't share LibreOffice's lock.
+      execFile(bin!, ["--headless", "--norestore", `-env:UserInstallation=file://${dir.replace(/\\/g, "/")}/profile`,
+        "--convert-to", "pdf", "--outdir", dir, input], { timeout: 120_000, maxBuffer: 1 << 20 },
+        (err) => (err ? reject(new Error("The presentation couldn't be converted. Try saving it as PDF and importing that.")) : resolve()));
+    });
+    return new Uint8Array(await readFile(path.join(dir, "deck.pdf")));
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}

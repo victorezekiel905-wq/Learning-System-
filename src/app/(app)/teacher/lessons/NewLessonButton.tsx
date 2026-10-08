@@ -14,7 +14,9 @@ export function NewLessonButton({ openInitially, templates }: { openInitially?: 
   const [template, setTemplate] = useState(templates[0]?.id ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [keepLook, setKeepLook] = useState(true);
-  const isPdf = !!file && /.pdf$/i.test(file.name);
+  // PDFs, and PowerPoint where the server has LibreOffice, become picture slides that keep the design.
+  const isPdf = !!file && /\.(pdf|pptx|ppt|ppsx|odp)$/i.test(file.name);
+  const [note, setNote] = useState<{ id: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -34,6 +36,7 @@ export function NewLessonButton({ openInitially, templates }: { openInitially?: 
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? "Import failed");
         id = body.lesson_id;
+        if (body.note) { setNote({ id, text: body.note }); setBusy(false); return; }
       } else {
         const sb = createClient();
         const { data: { user } } = await sb.auth.getUser();
@@ -67,18 +70,19 @@ export function NewLessonButton({ openInitially, templates }: { openInitially?: 
           {tab === "import" && (
             <div className="space-y-3">
               <Field label="Your slides" hint="PDF, PowerPoint, Word, Markdown or text. Up to 20 MB and 80 slides.">
-                <input type="file" accept=".pdf,.pptx,.docx,.md,.markdown,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                <input type="file" accept=".pdf,.pptx,.ppt,.ppsx,.odp,.docx,.md,.markdown,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-ink-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
               </Field>
               {isPdf ? (
                 <Toggle checked={keepLook} onChange={setKeepLook} label="Keep the original look"
-                  description={keepLook ? "Every page becomes a slide that looks exactly like your PDF. Add quizzes, polls and other activities between them afterwards." : "Pages become plain text slides you can edit word by word."} />
+                  description={keepLook ? "Every slide keeps its design, exactly as in your file. Add quizzes, polls and other activities between them afterwards." : "Slides become plain text you can edit word by word."} />
               ) : (
-                <Alert title="Want your slides to look exactly the same?">
-                  Save them as PDF first, then import the PDF. PowerPoint: <b>File → Save As → PDF</b>. Google Slides: <b>File → Download → PDF</b>. Canva: <b>Share → Download → PDF</b>. {file ? "Other files become editable text slides." : ""}
+                <Alert title="Google Slides or Canva?">
+                  Download as PDF or PowerPoint and import that. Google Slides: <b>File → Download</b>. Canva: <b>Share → Download</b>. {file ? "Word and text files become editable text slides." : ""}
                 </Alert>
               )}
               {busy && <p className="text-sm text-ink-600">Importing… a long deck can take up to a minute.</p>}
+              {note && <Alert tone="warn" title="Imported as text">{note.text} <a href={`/teacher/lessons/${note.id}`} className="font-semibold">Open the lesson</a></Alert>}
             </div>
           )}
           {err && <Alert tone="error">{err}</Alert>}

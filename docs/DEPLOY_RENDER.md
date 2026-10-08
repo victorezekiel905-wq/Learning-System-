@@ -10,6 +10,8 @@ The repository contains a Render Blueprint ([`render.yaml`](../render.yaml)). It
 
 No scheduled jobs are needed on Render: hourly maintenance runs inside the database (pg_cron), and uptime checks run in GitHub Actions. Check current prices on render.com/pricing before you start.
 
+**PowerPoint imports keep their design only with the Docker runtime.** The Blueprint uses Docker: the image includes LibreOffice, which turns each uploaded `.pptx` into PDF pages. A service created as "Node" can't run LibreOffice; PowerPoint files then import as text, and teachers are told to upload a PDF instead. LibreOffice needs memory while converting: if large decks fail on Starter (512 MB), use the 2 GB plan.
+
 ## 1. Prepare the database (Supabase)
 
 1. **Update the database.** SQL Editor → New query → paste all of [`supabase/updates/2026-09-27_RUN_THIS_update.sql`](../supabase/updates/2026-09-27_RUN_THIS_update.sql) → Run. The last row should show `schema = 0900` and every other column `true`. It is safe to run again. (A brand-new project runs [`supabase/setup.sql`](../supabase/setup.sql) instead.)

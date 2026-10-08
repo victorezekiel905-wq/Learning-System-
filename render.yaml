@@ -9,17 +9,14 @@
 services:
   - type: web
     name: swiftcipher
-    runtime: node
+    runtime: docker            # the Docker image includes LibreOffice, so PowerPoint imports keep their design
+    dockerfilePath: ./Dockerfile
     region: frankfurt          # closest Render region to the Supabase project in West EU (Ireland)
     plan: starter              # free instances sleep after 15 minutes; live lessons need it always on
     branch: main
     autoDeploy: true
-    buildCommand: npm ci && npm run build
-    startCommand: npm start    # plain `next start`, so it listens on the port Render gives it
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_VERSION
-        value: "22"
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
       # ---- Required ----
