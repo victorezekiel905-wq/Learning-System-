@@ -1,4 +1,5 @@
 "use client";
+import { TimerRing, useSecondsLeft } from "@/components/game/LiveGame";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -122,6 +123,29 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAlerts, sound, toast]);
 
+  // Game countdown (0940): shown here; answers are revealed when time is up, or when everyone has
+  // answered a one-question activity (unless the teacher turned that off).
+  const [skew, setSkew] = useState(0);
+  useEffect(() => { if (s?.server_now) setSkew(new Date(s.server_now).getTime() - Date.now()); }, [s]);
+  const timer = s?.timer ?? null;
+  const timerLeft = useSecondsLeft(timer, skew);
+  const autoRevealed = useRef<string | null>(null);
+  useEffect(() => {
+    const a = s?.activity, cur = s?.session;
+    if (!a || !cur || a.revealed || (cur.phase ?? "active") !== "active") return;
+    if (cur.settings?.timer === false || cur.settings?.auto_reveal === false) return;
+    const everyone = a.questions.length === 1 && (a.joined ?? 0) > 0 && (a.answered ?? 0) >= (a.joined ?? 0);
+    const out = !!timer && timer.activity_id === a.activity.id && timerLeft !== null && timerLeft <= 0;
+    if (!everyone && !out) return;
+    const key = `${a.activity.id}:${timer?.ends_at ?? ""}`;
+    if (autoRevealed.current === key) return;
+    autoRevealed.current = key;
+    // A moment's grace so answers sent in the last second still count.
+    window.setTimeout(() => {
+      rpc("session_control", { p_session: sessionId, p_action: "reveal", p_args: {} }).then(() => state.reload()).catch(() => { /* revealed elsewhere */ });
+    }, out ? 1200 : 600);
+  }, [s, timer, timerLeft, sessionId, state]);
+
   // Keyboard: → next, ← back, L leaderboard, R reveal, P pause/resume, S start.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -188,6 +212,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
         </div>
         <div className="flex flex-wrap items-center gap-2 [&_.btn-secondary:hover]:bg-white/15 [&_.btn-secondary]:border-white/20 [&_.btn-secondary]:bg-white/5 [&_.btn-secondary]:text-white">
           {phase === "lobby" && <Button size="sm" variant="accent" onClick={() => control("start")}>Start lesson</Button>}
+          {phase === "active" && s.activity && !s.activity.revealed && timer && <TimerRing timer={timer} skew={skew} size={36} className="text-white" />}
           {phase === "active" && s.activity && <span className="rounded-lg border border-white/20 px-2.5 py-1 text-[13px] font-semibold tabular-nums" title="Students who have answered the activity on screen">
             {s.activity.answered ?? 0}/{s.activity.joined ?? joined} answered</span>}
           {phase === "active" && s.activity && !s.activity.revealed && <Button size="sm" variant="secondary" onClick={() => control("reveal")} title="Close the activity and show the right answers (R)">Reveal answers</Button>}

@@ -14,6 +14,7 @@ import { useClassroomGuard } from "@/lib/classroom-guard";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader, useNetwork, useRpc } from "@/lib/hooks";
 import { listen, useSignal } from "@/lib/realtime";
+import type { LiveTimer } from "@/components/game/LiveGame";
 import { useOfflineQueue } from "@/lib/offline-queue";
 import { errorText, rpc } from "@/lib/rpc";
 import { FEATURES } from "@/lib/features";
@@ -35,6 +36,9 @@ type StudentState = {
   my_slide: number;
   active_activity: { id: string; kind: string; title: string } | null;
   state_version?: number;
+  /** Countdown on the question on screen (0940). */
+  timer?: LiveTimer | null;
+  server_now?: string;
   spotlight: { me: boolean; show_to_class: boolean; anonymized: boolean } | null;
   hand: { id: string } | null;
   environment_notice: string | null;
@@ -82,6 +86,9 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   const [lastAnnouncement, setLastAnnouncement] = useState<string | null>(null);
 
   const s = withFast(st.data, fast);
+  // Server clock minus this device's clock, so every phone counts down together.
+  const [skew, setSkew] = useState(0);
+  useEffect(() => { if (st.data?.server_now) setSkew(new Date(st.data.server_now).getTime() - Date.now()); }, [st.data]);
   const paced = s?.session.mode === "student_paced";
   const slideIndex = paced ? (ownSlide ?? s?.my_slide ?? 0) : s?.session.current_slide ?? 0;
   const ann = useAnnotations(sessionId, slideIndex);
@@ -125,6 +132,8 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   const slide = slides.find((x) => x.position === slideIndex);
   const activeOnSlide = slide?.kind === "activity" && slide.activity?.id === s.active_activity?.id;
   const revealedId = s.revealed_activity_id ?? null;
+  // Teacher-paced lessons play like a game: tiles and a countdown.
+  const game = !paced ? { timer: s.timer ?? null, skew } : undefined;
   const slideRevealed = !!revealedId && slide?.kind === "activity" && slide.activity?.id === revealedId;
 
   async function openChat(kind: "teacher" | "group") {
@@ -176,7 +185,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
       <StudentReceiver sessionId={sessionId} />
 
       {s.active_activity && !activeOnSlide && s.active_activity.id !== revealedId && (
-        <ActivityPlayer key={s.active_activity.id} activityId={s.active_activity.id} sessionId={sessionId} tenantId={me.tenantId} userId={me.id} />
+        <ActivityPlayer key={s.active_activity.id} activityId={s.active_activity.id} sessionId={sessionId} tenantId={me.tenantId} userId={me.id} live={game} />
       )}
 
       {s.session.mode === "front_of_class" && !s.active_activity ? (
@@ -184,7 +193,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
       ) : slideRevealed ? (
         <RevealedResults sessionId={sessionId} activityId={revealedId!} />
       ) : slide ? (
-        <LessonStage slide={slide} sessionId={sessionId} tenantId={me.tenantId} userId={me.id}
+        <LessonStage slide={slide} sessionId={sessionId} tenantId={me.tenantId} userId={me.id} live={game}
           overlay={ann.strokes.length ? <svg viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} className="h-full w-full"><StrokeLayer strokes={ann.strokes} /></svg> : undefined} />
       ) : lesson.loading ? <p className="text-sm text-ink-500">Loading lesson…</p> : !s.active_activity && <Alert>Waiting for your teacher…</Alert>}
 

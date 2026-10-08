@@ -1,4 +1,6 @@
 "use client";
+import { useEffect, useRef, useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 import { SlideView, type SlideData } from "@/components/slides/SlideView";
 import { BOARD_H, BOARD_W, StrokeLayer } from "@/components/slides/Whiteboard";
 import type { SessionState } from "@/components/live/types";
@@ -11,6 +13,10 @@ import { avatarFor } from "@/components/live/avatars";
 import { Leaderboard } from "@/components/live/Leaderboard";
 import { JoinQr } from "@/components/live/JoinQr";
 import { formatJoinCode } from "@/lib/utils";
+import { AnswerBars, AnswerTiles, TimerRing } from "@/components/game/LiveGame";
+import { getSound } from "@/lib/sound";
+
+const TILE_KINDS = ["mcq", "true_false", "poll", "multi_select"];
 
 export function Presenter({ sessionId }: { sessionId: string }) {
   const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: 15000 });
@@ -24,11 +30,53 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   const host = typeof window !== "undefined" ? window.location.host : "";
   const here = (state.data?.roster ?? []).filter((r) => r.presence === "online" || r.presence === "idle");
 
+  // Clock skew against the server, so the projector counts down with the phones.
+  const [skew, setSkew] = useState(0);
+  useEffect(() => { if (state.data?.server_now) setSkew(new Date(state.data.server_now).getTime() - Date.now()); }, [state.data]);
+  const timer = state.data?.timer ?? null;
+  const q0 = results?.questions[0];
+  const gameOn = s?.phase === "active" && !s.show_leaderboard && !spot.data && !!results && !!q0;
+  const asking = gameOn && !results!.revealed && !s.responses_visible;
+  const revealedTiles = gameOn && results!.revealed && TILE_KINDS.includes(q0!.kind);
+  const [timeUp, setTimeUp] = useState<string | null>(null);
+
+  // Music and sound effects (the projector only; browsers need one click first).
+  const sound = getSound();
+  const [soundOn, setSoundOn] = useState(false);
+  useEffect(() => {
+    if (!sound.wanted) return;
+    const on = () => { sound.enable(); setSoundOn(true); };
+    window.addEventListener("pointerdown", on, { once: true });
+    window.addEventListener("keydown", on, { once: true });
+    return () => { window.removeEventListener("pointerdown", on); window.removeEventListener("keydown", on); };
+  }, [sound]);
+  const track = !soundOn ? null : s?.phase === "lobby" ? "lobby" : asking && timer && timeUp !== timer.ends_at ? "question" : null;
+  useEffect(() => { sound.music(track); }, [sound, track]);
+  useEffect(() => () => sound.music(null), [sound]);
+  const seen = useRef({ revealed: "", board: "", joined: 0 });
+  useEffect(() => {
+    if (!soundOn) return;
+    const key = results?.revealed ? results.activity.id : "";
+    if (key && key !== seen.current.revealed) sound.effect("reveal");
+    seen.current.revealed = key;
+    const board = s?.show_leaderboard ? s.leaderboard?.at ?? "1" : "";
+    if (board && board !== seen.current.board) sound.effect("fanfare");
+    seen.current.board = board;
+    if (s?.phase === "lobby" && here.length > seen.current.joined) sound.effect("join");
+    seen.current.joined = here.length;
+  }, [soundOn, sound, results?.revealed, results?.activity.id, s?.show_leaderboard, s?.leaderboard?.at, s?.phase, here.length]);
+
   return (
     <div className="flex min-h-screen flex-col bg-ink-900 text-white">
       <header className="flex items-center justify-between px-8 py-4">
         <p className="text-lg font-semibold">{s?.title ?? "SwiftCipher"}</p>
-        {s && s.phase !== "lobby" && <p className="text-right text-sm text-ink-300">Join at <strong className="text-white">{host}/join</strong> · code <span className="font-mono text-3xl font-extrabold tracking-[0.2em] text-accent-300">{formatJoinCode(s.join_code)}</span></p>}
+        <div className="flex items-center gap-5">
+          {s && s.phase !== "lobby" && <p className="text-right text-sm text-ink-300">Join at <strong className="text-white">{host}/join</strong> · code <span className="font-mono text-3xl font-extrabold tracking-[0.2em] text-accent-300">{formatJoinCode(s.join_code)}</span></p>}
+          <button type="button" onClick={() => { if (soundOn) { sound.disable(); setSoundOn(false); } else { sound.enable(); setSoundOn(true); } }}
+            className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20" aria-pressed={soundOn}>
+            {soundOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}{soundOn ? "Music on" : "Music off"}
+          </button>
+        </div>
       </header>
       <main className="flex flex-1 items-center justify-center p-6">
         {s?.phase === "lobby" ? (
@@ -56,6 +104,31 @@ export function Presenter({ sessionId }: { sessionId: string }) {
               : <div className="grid aspect-video place-items-center rounded-xl bg-ink-800 text-ink-400">Screen unavailable</div>}
             <figcaption className="mt-3 text-center text-xl font-semibold"><Icon name="star" className="inline h-5 w-5 align-[-3px] text-accent-400" /> {spot.data.student}</figcaption>
           </figure>
+        ) : asking ? (
+          <div className="w-full max-w-6xl space-y-8">
+            <div className="flex items-start justify-between gap-8">
+              <div className="min-w-0">
+                <p className="text-lg text-ink-300">{results!.activity.title}{results!.questions.length > 1 ? ` · ${results!.questions.length} questions, answer on your device` : ""}</p>
+                <h2 className="mt-2 font-display text-5xl font-extrabold leading-tight">{q0!.prompt}</h2>
+              </div>
+              <div className="flex shrink-0 flex-col items-center gap-2">
+                {timer ? <TimerRing timer={timer} skew={skew} size={140} className="text-white"
+                  onDone={() => { setTimeUp(timer.ends_at); if (soundOn) sound.effect("timeup"); }}
+                  onSecond={(left) => sound.urgent(left > 0 && left <= 5)} /> : null}
+                <p className="text-center"><span className="block font-display text-6xl font-extrabold tabular-nums">{results!.answered ?? 0}</span>
+                  <span className="text-lg text-ink-300">{(results!.answered ?? 0) === 1 ? "answer" : "answers"}</span></p>
+              </div>
+            </div>
+            {TILE_KINDS.includes(q0!.kind) && <AnswerTiles options={q0!.options} big />}
+            {timer && timeUp === timer.ends_at && <p className="text-center font-display text-4xl font-extrabold text-accent-300">Time's up!</p>}
+          </div>
+        ) : revealedTiles ? (
+          <div className="w-full max-w-5xl space-y-8 text-center">
+            <h2 className="font-display text-4xl font-extrabold leading-tight">{q0!.prompt}</h2>
+            <AnswerBars options={q0!.options} counts={Object.fromEntries(q0!.options.map((o) => [o.id, o.count]))}
+              correct={q0!.kind === "poll" ? [] : q0!.options.filter((o) => o.is_correct).map((o) => o.id)} />
+            <AnswerTiles options={q0!.options} big correct={q0!.kind === "poll" ? undefined : q0!.options.filter((o) => o.is_correct).map((o) => o.id)} />
+          </div>
         ) : results && s?.responses_visible ? (
           <div className="w-full max-w-4xl space-y-6">
             <div className="flex items-baseline justify-between gap-4"><h2 className="text-3xl font-bold">{results.activity.title}</h2>

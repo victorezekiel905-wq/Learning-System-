@@ -20,7 +20,7 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
   const [title, setTitle] = useState("");
   const [monitorGuests, setMonitorGuests] = useState(false);
   // Lesson settings (live engine): sent once the session exists.
-  const [opts, setOpts] = useState({ leaderboard: true, anonymous_names: false, late_join: true, speed_bonus: true });
+  const [opts, setOpts] = useState({ leaderboard: true, anonymous_names: false, late_join: true, speed_bonus: true, timer: true, auto_reveal: true });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -52,6 +52,10 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
           <p className="text-sm font-semibold text-ink-900">Game settings</p>
           <Toggle checked={opts.leaderboard} onChange={(v) => setOpts({ ...opts, leaderboard: v })} label="Class leaderboard"
             description="Show the top 5 between activities. Off for sensitive checks: only you see the scores." />
+          <Toggle checked={opts.timer} onChange={(v) => setOpts({ ...opts, timer: v })} label="Countdown on questions"
+            description="20 seconds for each choice question, longer for written ones, or the activity's own time limit. Answers close when time is up." />
+          {opts.timer && <Toggle checked={opts.auto_reveal} onChange={(v) => setOpts({ ...opts, auto_reveal: v })} label="Show the answers when time is up"
+            description="Or as soon as everyone has answered a one-question activity. Off: you press Reveal (R)." />}
           <Toggle checked={opts.speed_bonus} onChange={(v) => setOpts({ ...opts, speed_bonus: v })} label="Speed bonus" description="Faster correct answers earn up to 50% more." />
           <Toggle checked={opts.anonymous_names} onChange={(v) => setOpts({ ...opts, anonymous_names: v })} label="Anonymous names on the leaderboard" description='Shows "Player 1, Player 2…" instead of names.' />
           <Toggle checked={opts.late_join} onChange={(v) => setOpts({ ...opts, late_join: v })} label="Late joiners" description="Let people join after you start." />

@@ -1,3 +1,4 @@
+import type { LiveTimer } from "@/components/game/LiveGame";
 export type RosterEntry = {
   student_id: string;
   name: string;
@@ -50,7 +51,7 @@ export type SessionState = {
     guest_monitoring?: boolean; guests_closed?: boolean;
     /** Live engine (0880). Missing on older databases (treated as active). */
     phase?: "lobby" | "active" | "paused" | "ended";
-    settings?: { leaderboard?: boolean; anonymous_names?: boolean; late_join?: boolean; speed_bonus?: boolean };
+    settings?: { leaderboard?: boolean; anonymous_names?: boolean; late_join?: boolean; speed_bonus?: boolean; timer?: boolean; auto_reveal?: boolean };
     show_leaderboard?: boolean;
     leaderboard?: { at: string; top: { name: string; avatar: string | null; score: number; rank: number; delta: number }[] } | null;
   };
@@ -68,6 +69,8 @@ export type SessionState = {
   commands: { id: string; kind: string; status: string; error: string | null; student: string; created_at: string }[];
   spotlight: { id: string; student_id: string; anonymized: boolean; show_to_class: boolean; started_at: string } | null;
   activity: ActivityResults | null;
+  /** Countdown on the activity on screen (0940). */
+  timer?: LiveTimer | null;
 };
 
 export const ALERT_LABEL: Record<string, string> = {

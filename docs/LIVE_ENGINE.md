@@ -165,3 +165,10 @@ Phase 2: `video` (synced), `embed`, `resource`, `short_answer`, `word_cloud`, `d
    - **Retire assignment data from reports:** `parent_report` drops the assignments and grades sections.
    - **Student dashboard:** trend per period, accuracy per subject, strongest and weakest topics, lessons missed.
    - **Parent dashboard:** the same for each linked child, with a child switcher and a printable term report.
+7. ✅ **Game look** (done 2026-10-08, migration 0940): in teacher-paced lessons, choice questions are big coloured
+   shape tiles on phones (tap to answer, full-colour correct/wrong with points and streak, "Answer locked in",
+   "Time's up!"); a shared countdown (game setting `timer`; the activity's time limit, else 20 s per choice question,
+   45 s fill in the blank, 90 s written) that the server enforces and that pauses with the lesson; the projector shows
+   the question with a big countdown, the answer count and the tiles, then Kahoot-style result columns after the
+   reveal; answers are revealed automatically when time is up or everyone has answered a one-question activity
+   (`auto_reveal`); music and sound effects on the projector, generated in the browser (`src/lib/sound.ts`).

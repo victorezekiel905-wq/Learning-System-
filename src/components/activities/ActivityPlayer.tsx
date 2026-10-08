@@ -12,6 +12,13 @@ import { isAnswered, Prompt, QuestionInput, type Answer } from "./QuestionInput"
 import { BADGE_LABEL, CHALLENGE, type Progress } from "@/lib/progress";
 import { Icon } from "@/components/Icon";
 import { useSupports } from "@/lib/supports";
+import { AnswerTiles, TimerRing, useSecondsLeft, type LiveTimer } from "@/components/game/LiveGame";
+import { OptionShape } from "@/components/game/Shape";
+import { OPTION_COLORS } from "@/components/game/types";
+import { buzz } from "@/lib/sound";
+
+/** Question kinds answered by tapping a coloured tile in a live lesson. */
+const TILE_KINDS = ["mcq", "true_false", "poll", "multi_select"];
 
 type Started = {
   attempt: { id: string; attempt_no: number; deadline_at: string | null; status: string; server_now: string; level?: 1 | 2 | 3 | null };
@@ -42,9 +49,11 @@ type Finished = {
  * offline-safe) → submit → feedback. Used in live sessions, assignments and
  * shared lessons.
  */
-export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode, tenantId, userId, onFinished, compact }: {
+export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode, tenantId, userId, onFinished, compact, live }: {
   activityId: string; sessionId?: string; assignmentId?: string; shareCode?: string;
   tenantId: string; userId: string; onFinished?: () => void; compact?: boolean;
+  /** A teacher-paced live lesson: game tiles, and the class countdown (skew = server − local clock). */
+  live?: { timer: LiveTimer | null; skew: number };
 }) {
   const toast = useToast();
   const [data, setData] = useState<Started | null>(null);
@@ -60,6 +69,9 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   const { pending } = useOfflineQueue((m) => toast(`An offline answer was rejected: ${m}`, "error"));
   const now = useNow(1000);
   const supports = useSupports();
+  const liveTimer = live?.timer && live.timer.activity_id === activityId ? live.timer : null;
+  const liveLeft = useSecondsLeft(liveTimer, live?.skew ?? 0);
+  const timeUp = liveLeft !== null && liveLeft <= 0;
 
   useEffect(() => {
     let live = true;
@@ -101,8 +113,8 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   const q = questions[index];
   const settings = data.activity.settings ?? {};
 
-  async function save(question: PublicQuestion) {
-    const response = answers[question.id];
+  async function save(question: PublicQuestion, override?: Answer) {
+    const response = override ?? answers[question.id];
     if (!isAnswered(question, response)) { toast("Answer the question first.", "error"); return false; }
     setSaving(true);
     try {
@@ -114,6 +126,8 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
         toast("You're offline. Your answer is saved on this device and will sync.", "info");
       } else {
         setFeedback((f) => ({ ...f, [question.id]: r }));
+        if (live && r.is_correct === true) buzz("correct");
+        else if (live && r.is_correct === false && !r.second_chance) buzz("wrong");
       }
       return true;
     } catch (e) {
@@ -196,6 +210,60 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   const showTimer = remaining !== null && (!supports.calm_mode || remaining <= 120);
   const answeredCount = questions.filter((x) => feedback[x.id] || data.answers[x.id]).length;
 
+  if (live && TILE_KINDS.includes(q.kind)) {
+    const multi = q.kind === "multi_select";
+    const picked = ((answers[q.id] as { option_ids?: string[]; option_id?: string } | undefined));
+    const pickedIds = picked?.option_ids ?? (picked?.option_id ? [picked.option_id] : []);
+    const pickedIndex = q.options.findIndex((o) => o.id === pickedIds[0]);
+    const pick = async (id: string) => {
+      if (multi) { setAnswers((a) => ({ ...a, [q.id]: { option_ids: pickedIds.includes(id) ? pickedIds.filter((x) => x !== id) : [...pickedIds, id] } })); return; }
+      const response = { option_id: id };
+      setAnswers((a) => ({ ...a, [q.id]: response }));
+      setFeedback((f) => { const x = { ...f }; if (!x[q.id]?.second_chance) delete x[q.id]; return x; });
+      if (await save(q, response) && index < questions.length - 1) window.setTimeout(() => setIndex((i) => Math.min(i + 1, questions.length - 1)), 1400);
+    };
+    const graded = fb && !fb.queued && !fb.second_chance && fb.is_correct !== undefined && fb.status === "auto_graded" && q.kind !== "poll";
+    const rightLabels = fb?.correct_option_ids ? q.options.filter((o) => fb.correct_option_ids!.includes(o.id)).map((o) => o.label).join(", ") : "";
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          {liveTimer && <TimerRing timer={liveTimer} skew={live.skew} size={56} className="text-ink-900" />}
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-ink-600">{data.activity.title}{questions.length > 1 ? ` · Question ${index + 1} of ${questions.length}` : ""}</p>
+            {pending > 0 && <Badge tone="amber">{pending} waiting to sync</Badge>}
+          </div>
+        </div>
+        <div className="rounded-2xl bg-white p-4 text-xl font-bold text-ink-900 shadow-sm sm:text-2xl"><Prompt q={q} readAloud={supports.read_aloud ? "emphasis" : "offer"} /></div>
+        {graded ? (
+          <div role="status" className={cn("rounded-2xl p-6 text-center text-white", fb.is_correct ? "bg-emerald-600" : "bg-rose-600")}>
+            <p className="font-display text-4xl font-extrabold">{fb.is_correct ? (fb.tries === 2 ? "Correct, second try!" : "Correct!") : "Not quite"}</p>
+            {fb.points && <p className="mt-2 font-display text-2xl font-extrabold">+{fb.points.points.toLocaleString()}</p>}
+            {fb.points && fb.points.streak >= 2 && <p className="mt-1 text-lg">🔥 {fb.points.streak} in a row</p>}
+            {!fb.is_correct && rightLabels && <p className="mt-2 text-lg">The answer: <b>{rightLabels}</b></p>}
+            {fb.explanation && <p className="mx-auto mt-3 max-w-md text-[15px] text-white/90">{fb.explanation}</p>}
+          </div>
+        ) : fb && !fb.second_chance ? (
+          <div role="status" className={cn("flex flex-col items-center gap-3 rounded-2xl p-8 text-center text-white", pickedIndex >= 0 ? OPTION_COLORS[pickedIndex % OPTION_COLORS.length] : "bg-ink-800")}>
+            {pickedIndex >= 0 && <OptionShape i={pickedIndex} className="h-14 w-14" />}
+            <p className="font-display text-3xl font-extrabold">{fb.queued ? "Saved offline" : "Answer locked in"}</p>
+            <p className="text-white/90">{fb.points && q.kind === "poll" ? `+${fb.points.points} for taking part. ` : ""}{index < questions.length - 1 ? "Next question coming up…" : "Waiting for your teacher to show the answers."}</p>
+          </div>
+        ) : timeUp ? (
+          <div role="status" className="rounded-2xl bg-ink-800 p-8 text-center text-white">
+            <p className="font-display text-4xl font-extrabold">Time's up!</p>
+            <p className="mt-1 text-ink-300">Be quicker next time. Watch the screen for the answer.</p>
+          </div>
+        ) : (
+          <>
+            {fb?.second_chance && <Alert tone="warn" title="Not quite. One more try.">A right answer now earns half the points.</Alert>}
+            <AnswerTiles options={q.options} picked={pickedIds} disabled={saving} onPick={(id) => void pick(id)} />
+            {multi && <Button size="lg" className="w-full" disabled={!pickedIds.length} loading={saving} onClick={() => void save(q)}>Submit answer</Button>}
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={cn("card space-y-5", compact ? "p-4" : "card-pad")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -206,13 +274,15 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
         <div className="flex items-center gap-2">
           {data.attempt.level && <span title={CHALLENGE[data.attempt.level].hint}><Badge tone="brand">{CHALLENGE[data.attempt.level].name} challenge</Badge></span>}
           {pending > 0 && <Badge tone="amber">{pending} waiting to sync</Badge>}
+          {liveTimer && <TimerRing timer={liveTimer} skew={live!.skew} size={44} className="text-ink-900" />}
           {showTimer && remaining !== null && <Badge tone={remaining < 30 && !supports.calm_mode ? "red" : "gray"}><Icon name="clock" className="h-3.5 w-3.5" /> {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</Badge>}
         </div>
       </div>
       {index === 0 && data.activity.instructions && <RichText text={data.activity.instructions} className="text-sm text-ink-600" />}
 
       <Prompt q={q} readAloud={supports.read_aloud ? "emphasis" : "offer"} />
-      <QuestionInput q={q} value={answers[q.id]} disabled={locked}
+      {timeUp && !fb && <Alert tone="warn" title="Time's up!">Answers are closed for this question.</Alert>}
+      <QuestionInput q={q} value={answers[q.id]} disabled={locked || (timeUp && !fb)}
         onChange={(v) => {
           setAnswers((a) => ({ ...a, [q.id]: v }));
           // Changing an answer clears "saved"; a pending second chance stays so the retry is counted.

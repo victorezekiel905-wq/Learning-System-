@@ -1880,3 +1880,52 @@ test("progress: periods, subjects and topics; seen by the student, their parent 
   await db.as(T, "update public.tenant_settings set parent_portal_enabled = false");
   await rejects(db.rpc(mum, "progress_report", { p_student: ada, p_period: "week" }), /Report not found/);
 });
+
+test("game countdown: shared clock, answers close when time is up, pause stops the clock (0940)", async () => {
+  const L = await lessonWithQuiz("Timer");
+  const kid = await db.signInAnonymously();
+  await db.rpc(kid, "join_session_as_guest", { p_code: L.s.join_code, p_name: "Kemi" });
+  const late = await db.signInAnonymously();
+  await db.rpc(late, "join_session_as_guest", { p_code: L.s.join_code, p_name: "Lola" });
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "start" });
+  assert.equal((await db.rpc(kid, "session_student_state", { p_session: L.s.id })).timer, null, "no countdown on a content slide");
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "next" });
+
+  // One choice question (20 s) and one written answer (90 s) on this activity.
+  let st = await db.rpc(kid, "session_student_state", { p_session: L.s.id });
+  assert.equal(st.timer.activity_id, L.act);
+  assert.equal(st.timer.seconds, 110);
+  assert.equal(new Date(st.timer.ends_at) - new Date(st.timer.started_at), 110000);
+  assert.equal((await db.rpc(L.T, "teacher_session_state", { p_session: L.s.id })).timer.ends_at, st.timer.ends_at, "one clock for everyone");
+
+  const a = (await db.rpc(kid, "start_attempt", { p_activity: L.act, p_session: L.s.id })).attempt.id;
+  await db.rpc(kid, "submit_answer", { p_attempt: a, p_question: L.q1, p_response: JSON.stringify({ option_id: L.right }) });
+
+  // Time runs out: answers are refused.
+  await db.admin("update public.class_sessions set slide_changed_at = now() - interval '2 minutes' where id = $1", [L.s.id]);
+  const b = (await db.rpc(late, "start_attempt", { p_activity: L.act, p_session: L.s.id })).attempt.id;
+  await rejects(db.rpc(late, "submit_answer", { p_attempt: b, p_question: L.q1, p_response: JSON.stringify({ option_id: L.right }) }), /Time's up/);
+
+  // A pause doesn't count: 100 s gone, then a 60 s pause, then resume: 10 s are left.
+  await db.admin("update public.class_sessions set slide_changed_at = now() - interval '100 seconds' where id = $1", [L.s.id]);
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "pause" });
+  assert.equal((await db.rpc(kid, "session_student_state", { p_session: L.s.id })).timer, null, "no countdown while paused");
+  await db.admin("update public.class_sessions set paused_at = now() - interval '60 seconds' where id = $1", [L.s.id]);
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "resume" });
+  st = await db.rpc(kid, "session_student_state", { p_session: L.s.id });
+  const left = (new Date(st.timer.ends_at) - new Date(st.server_now)) / 1000;
+  assert.ok(left > 60 && left < 75, `about 70 s left after the pause, got ${left}`);
+  await db.rpc(late, "submit_answer", { p_attempt: b, p_question: L.q1, p_response: JSON.stringify({ option_id: L.right }) });
+
+  // The teacher can turn the countdown off; then late answers are fine.
+  await rejects(db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "settings", p_args: { countdown: false } }), /Unknown or invalid setting/);
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "settings", p_args: { timer: false, auto_reveal: false } });
+  await db.admin("update public.class_sessions set slide_changed_at = now() - interval '10 minutes' where id = $1", [L.s.id]);
+  assert.equal((await db.rpc(kid, "session_student_state", { p_session: L.s.id })).timer, null);
+  await db.rpc(kid, "submit_answer", { p_attempt: a, p_question: L.q2, p_response: JSON.stringify({ text: "Because" }) });
+
+  // Once revealed, there is no countdown either.
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "settings", p_args: { timer: true } });
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "reveal" });
+  assert.equal((await db.rpc(L.T, "teacher_session_state", { p_session: L.s.id })).timer, null);
+});
