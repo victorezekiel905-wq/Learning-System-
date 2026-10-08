@@ -1,5 +1,6 @@
 import { requireSuperAdmin } from "@/lib/session";
 import { officeCheck } from "@/lib/lesson-import";
+import { checkServiceKey } from "@/lib/supabase/service";
 import { Alert, Card, PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Server check" };
@@ -16,12 +17,18 @@ type Check = {
 export default async function SuperServer(props: { searchParams: Promise<{ run?: string }> }) {
   await requireSuperAdmin();
   const run = (await props.searchParams).run === "1";
-  const c = run ? (await officeCheck()) as Check : null;
+  const [c, key] = await Promise.all([run ? officeCheck() as Promise<Check> : Promise.resolve(null), checkServiceKey()]);
   const slow = c?.conversion?.ok && c.conversion.seconds > 20;
   return (
     <div className="space-y-4">
-      <PageHeader title="Server check" subtitle="Checks that PowerPoint imports can keep their design on this server. Takes up to a minute."
-        actions={<a href="/super/server?run=1" className="btn btn-primary btn-sm no-underline">{run ? "Run again" : "Run check"}</a>} />
+      <PageHeader title="Server check" subtitle="Checks the server's Supabase service key, and that PowerPoint imports can keep their design (takes up to a minute)."
+        actions={<a href="/super/server?run=1" className="btn btn-primary btn-sm no-underline">{run ? "Run again" : "Check PowerPoint import"}</a>} />
+      <Card title="Supabase service key">
+        <p className="text-sm">{key.ok ? "Works. Creating student logins, resetting passwords, deleting accounts and Open as admin can use it." : "Not working."}</p>
+        <p className="mt-1 text-[13px] text-ink-500">Type: {key.kind}. The key itself is never shown.</p>
+        {key.problem && <div className="mt-3"><Alert tone="error">{key.problem}</Alert></div>}
+        {key.detail && <p className="mt-2 text-[13px] text-amber-800">{key.detail}</p>}
+      </Card>
       {c && (
         <Card>
           <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[12rem_1fr]">

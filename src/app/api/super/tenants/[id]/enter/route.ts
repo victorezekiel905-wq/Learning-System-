@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { callRpc, fail, ok, withErrorLog } from "@/lib/api";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
+import { createServiceClient, explainServiceError, hasServiceRole } from "@/lib/supabase/service";
 
 const RETURN_COOKIE = "sc_support_return";
 
@@ -37,13 +37,13 @@ export const POST = withErrorLog(async function POST(_req: Request, { params }: 
         if (data.users.length < 1000) break;
       }
     }
-    if (!uid) return fail(500, made.error?.message ?? "Couldn't create the support account.");
+    if (!uid) return fail(500, explainServiceError(made.error?.message));
     const reg = await callRpc(sb, "sa_register_support", { p_tenant: id, p_user: uid });
     if (reg.response) return reg.response;
   }
 
   const { data: link, error } = await admin.auth.admin.generateLink({ type: "magiclink", email: info.email });
-  if (error || !link.properties?.hashed_token) return fail(500, error?.message ?? "Couldn't sign in to the school.");
+  if (error || !link.properties?.hashed_token) return fail(500, explainServiceError(error?.message));
 
   (await cookies()).set(RETURN_COOKIE, JSON.stringify({ rt: session.refresh_token, tenant: id }), {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 2 * 3600

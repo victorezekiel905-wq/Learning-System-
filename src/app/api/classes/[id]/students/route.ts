@@ -1,5 +1,5 @@
 import { callRpc, fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
-import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
+import { createServiceClient, explainServiceError, hasServiceRole } from "@/lib/supabase/service";
 import { loginEmail } from "@/lib/student-login";
 import { newPassword, usernameBase, usernameCandidate } from "@/lib/server/student-accounts";
 
@@ -48,7 +48,7 @@ export const POST = withErrorLog(async function POST(req: Request, { params }: {
       uid = made.data.user?.id ?? null;
       if (!uid) problem = /already|registered|exists/i.test(made.error?.message ?? "")
         ? "This email already has a SwiftCipher login. Ask the student to join with the class code instead."
-        : made.error?.message ?? "Couldn't create the login.";
+        : explainServiceError(made.error?.message);
     } else {
       const base = usernameBase(name);
       for (let attempt = 0; attempt < 8 && !uid; attempt++) {
@@ -57,7 +57,7 @@ export const POST = withErrorLog(async function POST(req: Request, { params }: {
         if (taken) continue;
         const made = await admin.auth.admin.createUser({ email: loginEmail(candidate), password, email_confirm: true, user_metadata: { full_name: name } });
         if (made.data.user) { uid = made.data.user.id; username = candidate; authEmail = loginEmail(candidate); }
-        else if (!/already|registered|exists/i.test(made.error?.message ?? "")) { problem = made.error?.message ?? "Couldn't create the login."; break; }
+        else if (!/already|registered|exists/i.test(made.error?.message ?? "")) { problem = explainServiceError(made.error?.message); break; }
       }
       if (!uid && !problem) problem = "Couldn't find a free username. Try again.";
     }

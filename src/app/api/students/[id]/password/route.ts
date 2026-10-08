@@ -1,5 +1,5 @@
 import { callRpc, fail, ok, requireProfile, withErrorLog } from "@/lib/api";
-import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
+import { createServiceClient, explainServiceError, hasServiceRole } from "@/lib/supabase/service";
 import { newPassword } from "@/lib/server/student-accounts";
 
 export const runtime = "nodejs";
@@ -14,6 +14,6 @@ export const POST = withErrorLog(async function POST(_req: Request, { params }: 
   if (r.response) return r.response;
   const password = newPassword();
   const { error } = await createServiceClient().auth.admin.updateUserById(id, { password });
-  if (error) return fail(500, error.message);
+  if (error) return fail(500, explainServiceError(error.message));
   return ok({ login: (r.data as { login_name: string }).login_name, password });
 });

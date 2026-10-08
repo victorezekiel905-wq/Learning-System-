@@ -1,5 +1,5 @@
 import { callRpc, fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
-import { createServiceClient, hasServiceRole } from "@/lib/supabase/service";
+import { createServiceClient, explainServiceError, hasServiceRole } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
 
@@ -13,6 +13,6 @@ export const DELETE = withErrorLog(async function DELETE(req: Request, { params 
   const check = await callRpc(sb, "delete_student_check", { p_student: id, p_confirm_name: body?.confirm_name ?? "" });
   if (check.response) return check.response;
   const { error } = await createServiceClient().auth.admin.deleteUser(id);
-  if (error) return fail(500, error.message);
+  if (error) return fail(500, explainServiceError(error.message));
   return ok({ deleted: true });
 });
