@@ -146,3 +146,17 @@ Phase 2: `video` (synced), `embed`, `resource`, `short_answer`, `word_cloud`, `d
 4. **Deck builder:** the slide-type registry, slide sorter, canvas, properties panel.
 5. **Report and proof:** per-question accuracy and per-participant scores;
    cross-school isolation tests; a 30-browser latency test against the 300 ms target.
+6. **Progress dashboards** (agreed 2026-10-08, after *Report and proof*): turns the parent portal back on
+   (`FEATURES.parentPortal`), built on the per-question data from the session report.
+   - **Who sees what:** students see only themselves; a parent sees only children linked to them
+     (`parent_links`, already enforced in the database); teachers see their classes; school admins their school.
+   - **Periods:** day, week, month, term, year. **Terms come from the school:** the school admin enters
+     the school year and each term's start and end dates in Settings (new table, e.g. `school_terms`).
+   - **Weak areas come from topic tags:** teachers type a topic on each question (e.g. "Fractions").
+     Accuracy is grouped per subject → topic, and topics below a threshold are listed as "needs help".
+     Untagged questions count under the lesson title.
+   - **Live results count towards a class:** answers from a session started for a class count for that class and
+     subject. Code-only sessions (no class) are shown under "Other lessons".
+   - **Retire assignment data from reports:** `parent_report` drops the assignments and grades sections.
+   - **Student dashboard:** trend per period, accuracy per subject, strongest and weakest topics, lessons missed.
+   - **Parent dashboard:** the same for each linked child, with a child switcher and a printable term report.
