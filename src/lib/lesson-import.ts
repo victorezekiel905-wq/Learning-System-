@@ -327,15 +327,28 @@ export async function officeToPdf(bytes: Uint8Array, ext: string): Promise<Uint8
   const dir = await mkdtemp(path.join(tmpdir(), "deck-"));
   try {
     const input = path.join(dir, `deck.${ext.replace(/[^a-z]/g, "") || "pptx"}`);
+    const output = path.join(dir, "deck.pdf");
     await writeFile(input, bytes);
-    await new Promise<void>((resolve, reject) => {
-      // A private profile per conversion: parallel imports don't share LibreOffice's lock.
+    // A private profile per conversion, so parallel imports don't share LibreOffice's lock.
+    const profile = `file://${dir.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "/$1:")}/profile`;
+    const run = () => new Promise<{ code: number | string | null; out: string }>((resolve) => {
       // Runs an installed program, not a project file: tell the bundler not to trace it.
-      execFile(/* turbopackIgnore: true */ bin!, ["--headless", "--norestore", `-env:UserInstallation=file://${dir.replace(/\\/g, "/")}/profile`,
-        "--convert-to", "pdf", "--outdir", dir, input], { timeout: 120_000, maxBuffer: 1 << 20 },
-        (err) => (err ? reject(new Error("The presentation couldn't be converted. Try saving it as PDF and importing that.")) : resolve()));
+      execFile(/* turbopackIgnore: true */ bin!, ["--headless", "--invisible", "--nologo", "--norestore", "--nodefault", "--nolockcheck",
+        `-env:UserInstallation=${profile}`, "--convert-to", "pdf", "--outdir", dir, input],
+        { timeout: 120_000, maxBuffer: 1 << 20, env: { ...process.env, HOME: dir, TMPDIR: dir } },
+        (err, stdout, stderr) => resolve({ code: err ? ((err as NodeJS.ErrnoException).code ?? (err as { signal?: string }).signal ?? 1) : 0,
+                                            out: `${stdout ?? ""}\n${stderr ?? ""}`.trim() }));
     });
-    return new Uint8Array(await readFile(path.join(dir, "deck.pdf")));
+    const made = () => access(output).then(() => true, () => false);
+    // A brand-new profile makes LibreOffice set itself up and exit (code 81) without
+    // converting; the second run converts. Success is judged by the PDF, not the exit code.
+    let last = await run();
+    if (!(await made())) last = await run();
+    if (!(await made())) {
+      console.error("[lesson-import] LibreOffice conversion failed", { bin, code: last.code, output: last.out.slice(-2000) });
+      throw new Error("The presentation couldn't be converted. Try saving it as PDF and importing that.");
+    }
+    return new Uint8Array(await readFile(output));
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
