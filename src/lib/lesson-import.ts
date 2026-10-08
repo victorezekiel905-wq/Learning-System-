@@ -330,7 +330,8 @@ export async function officeToPdf(bytes: Uint8Array, ext: string): Promise<Uint8
     await writeFile(input, bytes);
     await new Promise<void>((resolve, reject) => {
       // A private profile per conversion: parallel imports don't share LibreOffice's lock.
-      execFile(bin!, ["--headless", "--norestore", `-env:UserInstallation=file://${dir.replace(/\\/g, "/")}/profile`,
+      // Runs an installed program, not a project file: tell the bundler not to trace it.
+      execFile(/* turbopackIgnore: true */ bin!, ["--headless", "--norestore", `-env:UserInstallation=file://${dir.replace(/\\/g, "/")}/profile`,
         "--convert-to", "pdf", "--outdir", dir, input], { timeout: 120_000, maxBuffer: 1 << 20 },
         (err) => (err ? reject(new Error("The presentation couldn't be converted. Try saving it as PDF and importing that.")) : resolve()));
     });
