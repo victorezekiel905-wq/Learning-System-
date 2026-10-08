@@ -36,7 +36,7 @@ function toEditable(row: Record<string, unknown>): EditableQuestion {
   return {
     id: row.id as string, kind: row.kind as QuestionKind, prompt: row.prompt as string, points: Number(row.points),
     explanation: (row.explanation as string) ?? null, config: (row.config as Record<string, unknown>) ?? {},
-    answer_key: (row.answer_key as Record<string, unknown>) ?? {}, tags: (row.tags as string[]) ?? [],
+    answer_key: (row.answer_key as Record<string, unknown>) ?? {}, tags: (row.tags as string[]) ?? [], topic: (row.topic as string) ?? null,
     difficulty: (row.difficulty as number) ?? null, bloom_level: (row.bloom_level as string) ?? null,
     in_bank: Boolean(row.in_bank), position: Number(row.position ?? 0),
     options: ((row.question_options as (EditableOption & { position: number })[]) ?? [])
@@ -58,7 +58,7 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
 
   const questions = useLoader(async () => {
     const { data, error } = await createClient().from("questions")
-      .select("id,kind,prompt,points,explanation,config,answer_key,tags,difficulty,bloom_level,in_bank,position,question_options(id,label,is_correct,feedback,position)")
+      .select("id,kind,prompt,points,explanation,config,answer_key,tags,topic,difficulty,bloom_level,in_bank,position,question_options(id,label,is_correct,feedback,position)")
       .eq("activity_id", activity.id).order("position").order("created_at");
     if (error) throw error;
     return (data ?? []).map((r) => toEditable(r as Record<string, unknown>));
@@ -183,7 +183,7 @@ function BankPicker({ allowed, onClose, onPick }: { allowed: QuestionKind[]; onC
   const [busy, setBusy] = useState(false);
   const bank = useLoader(async () => {
     let q = createClient().from("questions")
-      .select("id,kind,prompt,points,explanation,config,answer_key,tags,difficulty,bloom_level,in_bank,position,question_options(id,label,is_correct,feedback,position)")
+      .select("id,kind,prompt,points,explanation,config,answer_key,tags,topic,difficulty,bloom_level,in_bank,position,question_options(id,label,is_correct,feedback,position)")
       .or("in_bank.eq.true,activity_id.is.null").in("kind", allowed).order("created_at", { ascending: false }).limit(100);
     if (search.trim()) q = q.ilike("prompt", `%${search.trim().replace(/[%_]/g, "")}%`);
     const { data } = await q;

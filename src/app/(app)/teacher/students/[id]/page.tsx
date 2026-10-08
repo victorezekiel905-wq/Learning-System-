@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { requireRole, TEACHERS } from "@/lib/session";
 import { PageHeader } from "@/components/ui";
-import { ChildReport } from "@/components/parent/ChildReport";
+import { ProgressDashboard } from "@/components/progress/ProgressDashboard";
 
 export const metadata = { title: "Student report" };
 
-/** The same daily/weekly report the student's parents see, for teachers (e.g. before a parent meeting). */
+/** The same progress view the student and their parents see, for teachers (e.g. before a parent meeting). */
 export default async function StudentReportPage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;
   const { me, sb } = await requireRole(TEACHERS);
@@ -14,8 +14,8 @@ export default async function StudentReportPage(props: { params: Promise<{ id: s
   return (
     <div className="page">
       <PageHeader eyebrow="Student report" title={student.full_name}
-        subtitle="Exactly what this student's parents see: participation, progress by subject and focus, day by day and week by week." />
-      <ChildReport studentId={student.id} viewer="staff" meId={me.profile.id} />
+        subtitle="Exactly what the student and their parents see: lessons attended, and results by subject and topic." />
+      <ProgressDashboard studentId={student.id} viewer="staff" isAdmin={["school_admin", "platform_admin"].includes(me.profile.role)} />
     </div>
   );
 }

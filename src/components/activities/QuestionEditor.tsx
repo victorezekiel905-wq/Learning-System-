@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Item, QuestionKind } from "@/lib/types";
 import { BLOOM } from "@/lib/progress";
@@ -18,6 +18,8 @@ export type EditableQuestion = {
   answer_key: Record<string, unknown>;
   options: EditableOption[];
   tags: string[];
+  /** What the question is about, e.g. "Fractions": progress reports group results by it. */
+  topic?: string | null;
   difficulty: number | null;
   bloom_level: string | null;
   in_bank: boolean;
@@ -57,7 +59,7 @@ export async function saveQuestion(q: EditableQuestion, ctx: { tenantId: string;
   }
   const row = {
     tenant_id: ctx.tenantId, owner_id: ctx.ownerId, activity_id: ctx.activityId, kind: q.kind, prompt: q.prompt.trim(),
-    points: q.points, explanation: q.explanation || null, config, answer_key: key, tags: q.tags, difficulty: q.difficulty,
+    points: q.points, explanation: q.explanation || null, config, answer_key: key, tags: q.tags, topic: q.topic?.trim().slice(0, 60) || null, difficulty: q.difficulty,
     bloom_level: q.bloom_level, in_bank: q.in_bank, position: q.position
   };
   const { data, error } = q.id
@@ -99,6 +101,7 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
   const setConfig = (patch: Record<string, unknown>) => set({ config: { ...q.config, ...patch } });
   const toast = useToast();
   const [tagText, setTagText] = useState(q.tags.join(", "));
+  const topics = useSchoolTopics();
 
   return (
     <div className="space-y-4">
@@ -248,6 +251,10 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
         );
       })()}
 
+      <Field label="Topic" hint="What this question tests, e.g. Fractions or Photosynthesis. Students and parents see progress by topic.">
+        <Input value={q.topic ?? ""} maxLength={60} list="school-topics" placeholder="e.g. Fractions" onChange={(e) => set({ topic: e.target.value })} />
+        <datalist id="school-topics">{topics.map((t) => <option key={t} value={t} />)}</datalist>
+      </Field>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Points"><Input type="number" min={0} max={1000} step="0.5" value={q.points} onChange={(e) => set({ points: Number(e.target.value) })} /></Field>
         <Field label="Difficulty" hint="Used for differentiation: Support gets 1–3, Core 2–4, Extension 3–5. Leave blank for everyone.">
@@ -279,4 +286,19 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
       </div>
     </div>
   );
+}
+
+let topicCache: Promise<string[]> | null = null;
+/** Topics already used in the school, offered as suggestions so spellings stay the same. */
+function useSchoolTopics() {
+  const [list, setList] = useState<string[]>([]);
+  useEffect(() => {
+    topicCache ??= Promise.resolve(createClient().from("questions").select("topic").not("topic", "is", null).limit(1000))
+      .then(({ data }) => [...new Set((data ?? []).map((r) => (r.topic as string).trim()))].sort((a, b) => a.localeCompare(b)))
+      .catch(() => []);
+    let live = true;
+    void topicCache.then((t) => { if (live) setList(t); });
+    return () => { live = false; };
+  }, []);
+  return list;
 }

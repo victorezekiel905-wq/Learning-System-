@@ -1,6 +1,7 @@
 import { requireRole, ADMINS } from "@/lib/session";
 import { PageHeader } from "@/components/ui";
 import { SettingsClient } from "./SettingsClient";
+import { TermsEditor } from "./TermsEditor";
 
 export const metadata = { title: "Settings & privacy" };
 
@@ -15,6 +16,7 @@ export default async function SettingsPage() {
   return (
     <div className="page max-w-5xl">
       <PageHeader title="Settings & privacy" subtitle="Every change here is recorded in the audit log." />
+      <div className="mb-6"><TermsEditor tenantId={tenant!.id} /></div>
       <SettingsClient tenant={tenant!} settings={settings!} schools={schools ?? []} flags={flags ?? []} plan={me.plan!} />
     </div>
   );

@@ -151,7 +151,7 @@ Phase 2: `video` (synced), `embed`, `resource`, `short_answer`, `word_cloud`, `d
    Student screens apply the `state` broadcast directly (no 150 ms wait and refetch before the slide changes).
    Speed test: `npm run latency-test` (30 students, 20 slide changes, PASS when p95 <= 300 ms); run it against
    the live project, its result is the proof.
-6. **Progress dashboards** (agreed 2026-10-08, after *Report and proof*): turns the parent portal back on
+6. ✅ **Progress dashboards** (agreed and done 2026-10-08, migration 0930: `questions.topic`, `school_terms`, `progress_report`; pages `/student/progress`, `/parent`, `/teacher/students/[id]`; term dates in admin settings): turns the parent portal back on
    (`FEATURES.parentPortal`), built on the per-question data from the session report.
    - **Who sees what:** students see only themselves; a parent sees only children linked to them
      (`parent_links`, already enforced in the database); teachers see their classes; school admins their school.

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/session";
 import { Alert, Empty, PageHeader } from "@/components/ui";
-import { ChildReport } from "@/components/parent/ChildReport";
+import { ProgressDashboard } from "@/components/progress/ProgressDashboard";
 import { ParentAlerts } from "@/components/parent/ParentAlerts";
 import { firstName } from "@/lib/utils";
 import { FEATURES } from "@/lib/features";
@@ -9,7 +9,7 @@ import { ParentConsent, type ConsentRow } from "./ParentConsent";
 
 export const metadata = { title: "My children" };
 
-export default async function ParentPage(props: { searchParams: Promise<{ child?: string; period?: string; thread?: string }> }) {
+export default async function ParentPage(props: { searchParams: Promise<{ child?: string }> }) {
   const searchParams = await props.searchParams;
   const { me, sb } = await requireRole(["parent"]);
   if (!FEATURES.parentPortal) {
@@ -21,14 +21,15 @@ export default async function ParentPage(props: { searchParams: Promise<{ child?
   const { data: kids } = await sb.rpc("parent_children");
   const children = (kids as { id: string; name: string }[]) ?? [];
   const child = children.find((c) => c.id === searchParams.child) ?? children[0];
-  const { data: consent } = child
+  const monitoring = !!me.settings?.monitoring_enabled;
+  const { data: consent } = child && monitoring
     ? await sb.from("monitoring_consents").select("method,reference,recorded_at,revoked_at").eq("student_id", child.id).maybeSingle()
     : { data: null };
 
   return (
     <div className="page">
       <PageHeader eyebrow={me.tenant?.name} title={child ? `${firstName(child.name)}'s report` : "My children"}
-        subtitle="How your child is taking part and progressing in every subject, day by day and week by week." />
+        subtitle="Lessons attended and how your child is doing in each subject and topic, by day, week, month, term or year." />
       {children.length === 0 ? <Empty title="No linked children">Ask your school for a parent invite code.</Empty> : (
         <>
           {children.length > 1 && (
@@ -40,15 +41,16 @@ export default async function ParentPage(props: { searchParams: Promise<{ child?
             </nav>
           )}
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <ChildReport key={child!.id} studentId={child!.id} viewer="parent" meId={me.profile.id}
-              initialPeriod={searchParams.period === "day" ? "day" : "week"} openThread={searchParams.thread ?? null} />
+            <ProgressDashboard key={child!.id} studentId={child!.id} viewer="parent" />
             <aside className="space-y-6 print:hidden">
               <ParentAlerts studentId={child!.id} name={child!.name} />
-              <ParentConsent studentId={child!.id} name={child!.name} consent={consent as ConsentRow} />
-              <p className="text-[13px] leading-relaxed text-ink-500">
-                Monitoring only happens during live lessons, on the device your child uses for the lesson. SwiftCipher never monitors time
-                outside class, and screenshots are never shared with parents because they can show other children.
-              </p>
+              {monitoring && <>
+                <ParentConsent studentId={child!.id} name={child!.name} consent={consent as ConsentRow} />
+                <p className="text-[13px] leading-relaxed text-ink-500">
+                  Monitoring only happens during live lessons, on the device your child uses for the lesson. SwiftCipher never monitors time
+                  outside class, and screenshots are never shared with parents because they can show other children.
+                </p>
+              </>}
             </aside>
           </div>
         </>

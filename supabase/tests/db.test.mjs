@@ -1801,3 +1801,82 @@ test("cross-school isolation: live lessons, answers, reports and slides stay ins
   const ended = await db.rpc(X.T, "end_session", { p_session: X.s.id });
   await none("select 1 from public.reports where id = $1", [ended.report_id]);
 });
+
+test("progress: periods, subjects and topics; seen by the student, their parent and teachers only (0930)", async () => {
+  const T = await db.signUp("t@progress.test", "Progress Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Progress School", p_full_name: "Progress Teacher" })).tenant_id;
+  const cls = await db.rpc(T, "create_class", { p_name: "JSS 2" });
+  const [ada, ben] = [await db.signUp("ada@progress.test", "Ada Obi"), await db.signUp("ben@progress.test", "Ben Ade")];
+  for (const p of [ada, ben]) await db.rpc(p, "redeem_code", { p_code: cls.join_code });
+  const inv = await db.rpc(T, "create_invite", { p_role: "parent", p_student: ada });
+  const mum = await db.signUp("mum@progress.test", "Mrs Obi");
+  await db.rpc(mum, "redeem_code", { p_code: inv.code });
+  await db.as(T, "update public.tenant_settings set parent_portal_enabled = true");
+
+  // A maths lesson: three questions on Fractions (Ada gets them right), three on Decimals (wrong), one untagged (right).
+  const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title, subject, status) values ($1, $2, 'Numbers', 'Mathematics', 'published') returning id", [tenant, T]);
+  const [{ id: act }] = await db.admin(`insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+    values ($1, $2, $3, 'quiz', 'Check', '{"show_feedback": "after_submit"}') returning id`, [tenant, lesson, T]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, content) values ($1, $2, 0, 'canvas', '{}')", [tenant, lesson]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 1, 'activity', $3, '{}')", [tenant, lesson, act]);
+  const qs = [];
+  for (const [i, topic, rightAnswer] of [[0, "Fractions", true], [1, "Fractions", true], [2, "Fractions", true], [3, "Decimals", false], [4, "Decimals", false], [5, "Decimals", false], [6, null, true]]) {
+    const [{ id: q }] = await db.admin("insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, position, topic) values ($1, $2, $3, 'mcq', $4, 1, $5, $6) returning id",
+      [tenant, act, T, `Q${i}`, i, topic]);
+    const [{ id: right }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'yes', true, 0) returning id", [tenant, q]);
+    const [{ id: wrong }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'no', false, 1) returning id", [tenant, q]);
+    qs.push({ q, pick: rightAnswer ? right : wrong });
+  }
+  await rejects(db.admin("update public.questions set topic = ' ' where id = $1", [qs[0].q]), /questions_topic_check/);
+
+  const s1 = await db.rpc(T, "start_session", { p_class: cls.id, p_lesson: lesson });
+  await db.rpc(ada, "join_session", { p_code: s1.join_code });
+  await db.rpc(T, "session_control", { p_session: s1.id, p_action: "start" });
+  await db.rpc(T, "session_control", { p_session: s1.id, p_action: "next" });
+  const at = (await db.rpc(ada, "start_attempt", { p_activity: act, p_session: s1.id })).attempt.id;
+  for (const { q, pick } of qs) await db.rpc(ada, "submit_answer", { p_attempt: at, p_question: q, p_response: JSON.stringify({ option_id: pick }) });
+  await db.rpc(T, "end_session", { p_session: s1.id });
+  // A second lesson Ada misses.
+  const s2 = await db.rpc(T, "start_session", { p_class: cls.id, p_lesson: lesson });
+  await db.rpc(T, "session_control", { p_session: s2.id, p_action: "start" });
+  await db.rpc(T, "end_session", { p_session: s2.id });
+
+  const r = await db.rpc(ada, "progress_report", { p_student: ada, p_period: "week" });
+  assert.deepEqual([r.summary.held, r.summary.attended, r.summary.answers, r.summary.correct, r.summary.accuracy], [2, 1, 7, 4, 57]);
+  assert.equal(r.trend.length, 7, "a week has seven days");
+  assert.equal(r.trend.reduce((n, d) => n + d.answers, 0), 7);
+  assert.equal(r.subjects[0].subject, "Mathematics");
+  assert.deepEqual(r.subjects[0].topics.map((t) => [t.topic, t.accuracy]), [["Decimals", 0], ["Fractions", 100], ["Numbers", 100]],
+    "weakest first; an untagged question counts under the lesson title");
+  assert.deepEqual(r.strengths.map((t) => t.topic), ["Fractions"]);
+  assert.deepEqual(r.needs_help.map((t) => [t.subject, t.topic, t.accuracy]), [["Mathematics", "Decimals", 0]]);
+  assert.deepEqual(r.lessons.map((l) => l.attended).sort(), [false, true]);
+  assert.equal(r.lessons.find((l) => l.attended).accuracy, 57);
+
+  for (const p of ["day", "month"]) assert.equal((await db.rpc(ada, "progress_report", { p_student: ada, p_period: p })).summary.answers, 7, p);
+  const year = await db.rpc(ada, "progress_report", { p_student: ada, p_period: "year" });
+  assert.match(year.label, /^School year \d{4}\/\d{4}$/, "September to August until the school enters its terms");
+  assert.equal(year.trend.length, 12);
+  assert.equal((await db.rpc(ada, "progress_report", { p_student: ada, p_period: "term" })).needs_terms, true);
+
+  // The school admin enters the terms; students can't.
+  await db.as(T, `insert into public.school_terms (tenant_id, school_year, name, starts_on, ends_on)
+    values ($1, '2026/2027', 'First term', current_date - 10, current_date + 30), ($1, '2026/2027', 'Second term', current_date + 45, current_date + 120)`, [tenant]);
+  await rejects(db.as(T, "insert into public.school_terms (tenant_id, school_year, name, starts_on, ends_on) values ($1, '2026/2027', 'Clash', current_date, current_date + 5)", [tenant]), /overlap/);
+  await rejects(db.as(ada, "insert into public.school_terms (tenant_id, school_year, name, starts_on, ends_on) values ($1, '2027/2028', 'Mine', current_date + 300, current_date + 310)", [tenant]), /row-level security|permission/);
+  const term = await db.rpc(ada, "progress_report", { p_student: ada, p_period: "term" });
+  assert.deepEqual([term.label, term.summary.answers, term.prev_date], ["First term, 2026/2027", 7, null]);
+  const sy = await db.rpc(ada, "progress_report", { p_student: ada, p_period: "year" });
+  assert.equal(sy.label, "School year 2026/2027");
+
+  // Who may see it: Ada, her parent, her teacher. Not a classmate, not her parent for another child, not another school.
+  assert.equal((await db.rpc(mum, "progress_report", { p_student: ada, p_period: "week" })).summary.answers, 7);
+  assert.equal((await db.rpc(T, "progress_report", { p_student: ada, p_period: "week" })).summary.answers, 7);
+  await rejects(db.rpc(mum, "progress_report", { p_student: ben, p_period: "week" }), /Report not found/);
+  await rejects(db.rpc(ben, "progress_report", { p_student: ada, p_period: "week" }), /Report not found/);
+  await rejects(db.rpc(S.teacherA, "progress_report", { p_student: ada, p_period: "week" }), /Report not found/);
+  await rejects(db.rpc(ada, "progress_report", { p_student: ada, p_period: "decade" }), /Period is/);
+  // Turning the parent portal off hides it from parents again.
+  await db.as(T, "update public.tenant_settings set parent_portal_enabled = false");
+  await rejects(db.rpc(mum, "progress_report", { p_student: ada, p_period: "week" }), /Report not found/);
+});

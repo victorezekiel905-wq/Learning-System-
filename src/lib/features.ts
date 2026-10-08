@@ -5,6 +5,6 @@
 export const FEATURES = {
   /** Direct, group and parent chat (Phase 3). */
   messaging: false,
-  /** Parent portal: daily and weekly reports, alerts (Phase 3). */
-  parentPortal: false
+  /** Parent portal: each linked child's progress (on since 2026-10-08; each school still switches it on). */
+  parentPortal: true
 } as const;

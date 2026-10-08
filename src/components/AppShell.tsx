@@ -53,6 +53,7 @@ const NAV: NavItem[] = [
   { href: "/guard/environments", label: "Environments", icon: "shield", roles: IT, group: "Safety", monitoring: true },
   { href: "/student", label: "Home", icon: "home", roles: ["student"], exact: true, group: "Learn" },
   { href: "/student/join", label: "Join with code", short: "Join", icon: "key", roles: ["student"], group: "Learn" },
+  { href: "/student/progress", label: "My progress", short: "Progress", icon: "chart", roles: ["student"], group: "Learn" },
   { href: "/student/device", label: "This device", icon: "laptop", roles: ["student"], group: "Learn", monitoring: true },
   ...(FEATURES.parentPortal ? [{ href: "/parent", label: "My children", short: "Children", icon: "users", roles: ["parent"], group: "Family" } as NavItem] : []),
   ...(FEATURES.messaging ? [{ href: "/messages", label: "Messages", icon: "chat", roles: ["student", "teacher", "school_admin", "platform_admin", "parent"], group: "School" } as NavItem] : []),
@@ -66,7 +67,7 @@ const TABS: Record<Role, string[]> = {
   school_admin: ["/teacher", "/teacher/classes", "/teacher/live", "/admin"],
   platform_admin: ["/teacher", "/teacher/classes", "/teacher/live", "/admin"],
   it_admin: ["/guard", "/guard/environments", "/teacher/classes", "/teacher/reports"],
-  student: ["/student", "/student/join", "/student/device"],
+  student: ["/student", "/student/join", "/student/progress"],
   parent: ["/parent", "/account"],
   guest: []
 };
