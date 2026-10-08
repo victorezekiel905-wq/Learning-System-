@@ -1696,3 +1696,108 @@ test("designed slides: canvas kind, size cap, only the lesson's school can edit 
   assert.equal(await can(back), true);
   assert.equal(await can(`${tenant}/${T}/other.jpg`), false);
 });
+
+/** A school with a class, a quiz lesson (one choice question, one written), and a live session. */
+async function lessonWithQuiz(tag) {
+  const T = await db.signUp(`t@${tag}.test`, `${tag} Teacher`);
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: `${tag} School`, p_full_name: `${tag} Teacher` })).tenant_id;
+  const cls = await db.rpc(T, "create_class", { p_name: `${tag} 1` });
+  const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title, status) values ($1, $2, 'Light', 'published') returning id", [tenant, T]);
+  const [{ id: act }] = await db.admin(`insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+    values ($1, $2, $3, 'quiz', 'Check', '{"show_feedback": "after_submit"}') returning id`, [tenant, lesson, T]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, content) values ($1, $2, 0, 'canvas', '{}')", [tenant, lesson]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 1, 'activity', $3, '{}')", [tenant, lesson, act]);
+  const [{ id: q1 }] = await db.admin("insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, position) values ($1, $2, $3, 'mcq', 'Light travels fastest in?', 1, 0) returning id", [tenant, act, T]);
+  const [{ id: right }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'A vacuum', true, 0) returning id", [tenant, q1]);
+  const [{ id: wrong }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'Glass', false, 1) returning id", [tenant, q1]);
+  const [{ id: q2 }] = await db.admin("insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, position) values ($1, $2, $3, 'open', 'Why?', 0, 1) returning id", [tenant, act, T]);
+  const s = await db.rpc(T, "start_session", { p_class: cls.id, p_lesson: lesson });
+  return { T, tenant, cls, lesson, act, q1, q2, right, wrong, s };
+}
+
+test("session report: everyone who took part, scores and ranks, each question (0920)", async () => {
+  const L = await lessonWithQuiz("Report");
+  const [ada, absent] = [await db.signUp("ada@report.test", "Ada Obi"), await db.signUp("ben@report.test", "Ben Absent")];
+  for (const p of [ada, absent]) await db.rpc(p, "redeem_code", { p_code: L.cls.join_code });
+  await db.rpc(ada, "join_session", { p_code: L.s.join_code });
+  const gina = await db.signInAnonymously();
+  await db.rpc(gina, "join_session_as_guest", { p_code: L.s.join_code, p_name: "Gina" });
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "start" });
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "next" });
+
+  const ta = (await db.rpc(ada, "start_attempt", { p_activity: L.act, p_session: L.s.id })).attempt.id;
+  await db.rpc(ada, "submit_answer", { p_attempt: ta, p_question: L.q1, p_response: JSON.stringify({ option_id: L.right }) });
+  await db.rpc(ada, "submit_answer", { p_attempt: ta, p_question: L.q2, p_response: JSON.stringify({ text: "Nothing slows it down" }) });
+  const tg = (await db.rpc(gina, "start_attempt", { p_activity: L.act, p_session: L.s.id })).attempt.id;
+  await db.rpc(gina, "submit_answer", { p_attempt: tg, p_question: L.q1, p_response: JSON.stringify({ option_id: L.wrong }) });
+  const ended = await db.rpc(L.T, "end_session", { p_session: L.s.id });
+
+  const r = await db.rpc(L.T, "session_report", { p_session: L.s.id });
+  assert.equal(r.version, 2);
+  assert.deepEqual([r.enrolled, r.joined, r.guests, r.accuracy], [2, 2, 1, 50]);
+  assert.equal(r.monitoring, false);
+  assert.equal(r.commands, null, "monitoring numbers only when the school has monitoring");
+  const by = Object.fromEntries(r.students.map((x) => [x.name, x]));
+  assert.deepEqual(Object.keys(by).sort(), ["Ada Obi", "Ben Absent", "Gina"]);
+  assert.equal(by["Ada Obi"].rank, 1);
+  assert.ok(by["Ada Obi"].score > 0);
+  assert.equal(by["Ada Obi"].accuracy, 100);
+  assert.deepEqual([by.Gina.guest, by.Gina.rank, by.Gina.accuracy, by.Gina.answers], [true, 2, 0, 1]);
+  assert.deepEqual([by["Ben Absent"].joined, by["Ben Absent"].rank], [false, null]);
+  assert.equal(r.students[0].name, "Ada Obi", "ranked first");
+
+  const [q1, q2] = r.questions;
+  assert.equal(q1.prompt, "Light travels fastest in?");
+  assert.deepEqual([q1.answered, q1.correct, q1.accuracy], [2, 1, 50]);
+  assert.deepEqual(q1.options.map((o) => [o.label, o.count, o.is_correct]), [["A vacuum", 1, true], ["Glass", 1, false]]);
+  assert.deepEqual(q1.missed_by, ["Gina"]);
+  assert.deepEqual(q2.written.map((w) => [w.name, w.text]), [["Ada Obi", "Nothing slows it down"]]);
+  assert.equal(q1.written, null);
+
+  // The report saved when the lesson ended has the same shape.
+  const [saved] = await db.admin("select payload from public.reports where id = $1", [ended.report_id]);
+  assert.equal(saved.payload.version, 2);
+  assert.equal(saved.payload.questions.length, 2);
+  // Only the lesson's teacher (or the school's admins) may see it.
+  await rejects(db.rpc(ada, "session_report", { p_session: L.s.id }), /Session not found/);
+});
+
+test("cross-school isolation: live lessons, answers, reports and slides stay inside their school", async () => {
+  const X = await lessonWithQuiz("Xschool");
+  const Y = await lessonWithQuiz("Yschool");
+  const pupil = await db.signUp("pupil@xschool.test", "Xavier Pupil");
+  await db.rpc(pupil, "redeem_code", { p_code: X.cls.join_code });
+  await db.rpc(pupil, "join_session", { p_code: X.s.join_code });
+  await db.rpc(X.T, "session_control", { p_session: X.s.id, p_action: "start" });
+  await db.rpc(X.T, "session_control", { p_session: X.s.id, p_action: "next" });
+  const at = (await db.rpc(pupil, "start_attempt", { p_activity: X.act, p_session: X.s.id })).attempt.id;
+  await db.rpc(pupil, "submit_answer", { p_attempt: at, p_question: X.q1, p_response: JSON.stringify({ option_id: X.right }) });
+  const yGuest = await db.signInAnonymously();
+  await db.rpc(yGuest, "join_session_as_guest", { p_code: Y.s.join_code, p_name: "Yemi" });
+
+  // School Y's teacher (who is also its admin) can't see or steer school X's lesson.
+  const O = Y.T;
+  await rejects(db.rpc(O, "teacher_session_state", { p_session: X.s.id }), /not found/i);
+  await rejects(db.rpc(O, "session_control", { p_session: X.s.id, p_action: "next" }), /not found|Not your session/i);
+  await rejects(db.rpc(O, "session_report", { p_session: X.s.id }), /Session not found/);
+  await rejects(db.rpc(O, "activity_results", { p_activity: X.act, p_session: X.s.id }), /not found|not allowed|Not your/i);
+  const none = async (sql, args) => assert.equal((await db.as(O, sql, args)).length, 0, sql);
+  await none("select 1 from public.class_sessions where id = $1", [X.s.id]);
+  await none("select 1 from public.session_participants where session_id = $1", [X.s.id]);
+  await none("select 1 from public.quiz_attempts where session_id = $1", [X.s.id]);
+  await none("select 1 from public.quiz_answers where question_id = $1", [X.q1]);
+  await none("select 1 from public.questions where id = $1", [X.q1]);
+  await none("select 1 from public.lesson_slides where lesson_id = $1", [X.lesson]);
+  await none("select 1 from public.session_guests where session_id = $1", [X.s.id]);
+  // Nor change school X's slides.
+  assert.equal((await db.as(O, "update public.lesson_slides set content = '{}' where lesson_id = $1 returning id", [X.lesson])).length, 0);
+
+  // A guest of school Y's lesson reaches only that lesson.
+  await rejects(db.rpc(yGuest, "session_student_state", { p_session: X.s.id }), /not found/i);
+  await rejects(db.rpc(yGuest, "start_attempt", { p_activity: X.act, p_session: X.s.id }), /not found|not open|not allowed/i);
+  assert.equal((await db.as(yGuest, "select 1 from public.lesson_slides where lesson_id = $1", [X.lesson])).length, 0);
+
+  // School X's report is invisible to school Y once the lesson ends.
+  const ended = await db.rpc(X.T, "end_session", { p_session: X.s.id });
+  await none("select 1 from public.reports where id = $1", [ended.report_id]);
+});

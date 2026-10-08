@@ -15,6 +15,7 @@
     "start:e2e": "cross-env-shell NEXT_DIST_DIR=.next-prod next start -p 3100",
     "test:e2e": "playwright test",
     "keep-alive": "node scripts/keep-alive.mjs",
+    "latency-test": "node scripts/latency-test.mjs",
     "pentest": "node --experimental-strip-types --no-warnings scripts/pentest.mts"
   },
   "dependencies": {

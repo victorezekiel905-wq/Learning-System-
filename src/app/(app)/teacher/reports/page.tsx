@@ -4,13 +4,14 @@ import { Badge, Card, Empty, PageHeader, Stat } from "@/components/ui";
 import { formatDateTime } from "@/lib/utils";
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL } from "@/components/live/types";
+import { SessionReportView, type SessionReportV2 } from "@/components/reports/SessionReportView";
 import { GenerateReport } from "./GenerateReport";
 
 export const metadata = { title: "Reports" };
 
 type SessionReport = {
   session: { title: string; minutes: number; started_at: string };
-  class: { name: string }; enrolled: number; joined: number; commands: number; hands: number;
+  class: { name: string } | null; enrolled: number; joined: number; commands: number; hands: number;
   alerts: Record<string, number>;
   activities: { activity_id: string; title: string; attempts: number; avg_percent: number | null }[];
   students: { student_id: string; name: string; joined: boolean; answers: number; correct: number; alerts: number }[];
@@ -23,11 +24,17 @@ export default async function ReportsPage(props: { searchParams: Promise<{ sessi
   const list = reports ?? [];
   const selected = searchParams.id ? list.find((r) => r.id === searchParams.id) : searchParams.session ? list.find((r) => r.scope_id === searchParams.session) : undefined;
   const { data: full } = selected ? await sb.from("reports").select("payload").eq("id", selected.id).single() : { data: null };
+  // Reports saved before the 0920 update are rebuilt from the lesson's answers, which are still there.
+  let v2 = (full?.payload as { version?: number } | undefined)?.version === 2 ? (full!.payload as SessionReportV2) : null;
+  if (!v2 && selected?.kind === "session_summary" && selected.scope_id) {
+    const { data } = await sb.rpc("session_report", { p_session: selected.scope_id });
+    if ((data as { version?: number } | null)?.version === 2) v2 = data as SessionReportV2;
+  }
   const { data: classes } = await sb.rpc("my_teaching_classes");
 
   return (
     <div className="page">
-      <PageHeader title="Reports" subtitle="Session summaries are generated automatically when a session ends. Export any report as CSV."
+      <PageHeader title="Reports" subtitle="A report appears when each live lesson ends: scores, and how the class did on every question. Export any report as CSV."
         actions={<GenerateReport classes={(classes as { id: string; name: string }[]) ?? []} />} />
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <Card title="All reports" pad={false}>
@@ -39,7 +46,7 @@ export default async function ReportsPage(props: { searchParams: Promise<{ sessi
             ))}</ul>
           )}
         </Card>
-        {!selected ? <Empty icon={<Icon name="chart" />} title={list.length ? "Pick a report" : "Your first report is one lesson away"}>{list.length ? "Choose a report on the left to see attendance, activity results and alerts." : "Run a live lesson and its summary (who joined, how they answered, who left the class) lands here when you end it."}</Empty> : selected.kind === "session_summary" && full ? <SessionView id={selected.id} r={full.payload as SessionReport} /> : (
+        {!selected ? <Empty icon={<Icon name="chart" />} title={list.length ? "Pick a report" : "Your first report is one lesson away"}>{list.length ? "Choose a report on the left to see attendance, activity results and alerts." : "Run a live lesson and its summary (who joined, how they answered, who left the class) lands here when you end it."}</Empty> : v2 ? <SessionReportView id={selected.id} r={v2} /> : selected.kind === "session_summary" && full ? <SessionView id={selected.id} r={full.payload as SessionReport} /> : (
           <Card title={selected.title} actions={<a className="btn btn-secondary btn-sm no-underline" href={`/api/reports/${selected.id}/export`}>Export CSV</a>}>
             <pre className="max-h-[60vh] overflow-auto rounded bg-ink-50 p-3 text-xs">{JSON.stringify(full?.payload, null, 2)}</pre>
           </Card>
@@ -52,7 +59,7 @@ export default async function ReportsPage(props: { searchParams: Promise<{ sessi
 function SessionView({ id, r }: { id: string; r: SessionReport }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between"><h2 className="text-lg font-bold">{r.session.title} · {r.class.name}</h2>
+      <div className="flex items-center justify-between"><h2 className="text-lg font-bold">{r.session.title}{r.class ? ` · ${r.class.name}` : ""}</h2>
         <a className="btn btn-secondary btn-sm no-underline" href={`/api/reports/${id}/export`}>Export CSV</a></div>
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Joined" value={`${r.joined}/${r.enrolled}`} /><Stat label="Duration" value={`${r.session.minutes} min`} />

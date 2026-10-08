@@ -13,7 +13,7 @@ import { useAnnotations } from "@/lib/annotations";
 import { useClassroomGuard } from "@/lib/classroom-guard";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader, useNetwork, useRpc } from "@/lib/hooks";
-import { useSignal } from "@/lib/realtime";
+import { listen, useSignal } from "@/lib/realtime";
 import { useOfflineQueue } from "@/lib/offline-queue";
 import { errorText, rpc } from "@/lib/rpc";
 import { FEATURES } from "@/lib/features";
@@ -34,12 +34,24 @@ type StudentState = {
   revealed_activity_id?: string | null;
   my_slide: number;
   active_activity: { id: string; kind: string; title: string } | null;
+  state_version?: number;
   spotlight: { me: boolean; show_to_class: boolean; anonymized: boolean } | null;
   hand: { id: string } | null;
   environment_notice: string | null;
   device_monitored: boolean;
   announcements: { id: string; body: string; created_at: string }[];
 };
+
+type FastState = { v: number; phase?: StudentState["session"]["phase"]; status?: string; slide?: number; activity?: string | null; mode?: string };
+
+/** The fetched state, with a newer broadcast (same version counter) applied on top. */
+function withFast(base: StudentState | null | undefined, f: FastState | null): StudentState | null | undefined {
+  if (!base || !f || f.v <= (base.state_version ?? Number.MAX_SAFE_INTEGER)) return base;
+  const activity = f.activity === undefined ? base.active_activity
+    : f.activity === null ? null : base.active_activity?.id === f.activity ? base.active_activity : { id: f.activity, kind: "", title: "" };
+  return { ...base, active_activity: activity, session: { ...base.session, phase: f.phase ?? base.session.phase, status: f.status ?? base.session.status,
+    current_slide: f.slide ?? base.session.current_slide, mode: f.mode ?? base.session.mode } };
+}
 
 export function StudentLive({ sessionId, me, notice, consented, guest = false }: {
   sessionId: string; me: { id: string; tenantId: string; name: string }; notice: string; consented: boolean;
@@ -54,6 +66,13 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   const st = useRpc<StudentState>("session_student_state", { p_session: sessionId }, [sessionId], { intervalMs: quality === "slow" ? 120000 : 60000 });
   const lesson = useLoader(() => rpc<{ slides: LearnerSlide[] }>("session_lesson", { p_session: sessionId }), [sessionId]);
   useSignal(`session:${sessionId}`, ["state"], () => void st.reload(), { debounceMs: 150 });
+  // The broadcast carries the new slide, phase and activity: show them at once, and let
+  // the refetch above fill in the rest (score, board, reveal) a moment later.
+  const [fast, setFast] = useState<FastState | null>(null);
+  useEffect(() => listen(`session:${sessionId}`, (event, payload) => {
+    const p = payload as FastState | null;
+    if (event === "state" && p && typeof p.v === "number") setFast((f) => (f && f.v >= p.v ? f : p));
+  }), [sessionId]);
 
   const [ownSlide, setOwnSlide] = useState<number | null>(null);
   const [handMsg, setHandMsg] = useState("");
@@ -62,7 +81,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   const [ack, setAck] = useState(consented);
   const [lastAnnouncement, setLastAnnouncement] = useState<string | null>(null);
 
-  const s = st.data;
+  const s = withFast(st.data, fast);
   const paced = s?.session.mode === "student_paced";
   const slideIndex = paced ? (ownSlide ?? s?.my_slide ?? 0) : s?.session.current_slide ?? 0;
   const ann = useAnnotations(sessionId, slideIndex);

@@ -144,8 +144,13 @@ Phase 2: `video` (synced), `embed`, `resource`, `short_answer`, `word_cloud`, `d
 2. ✅ **Scoring** (done 2026-10-07, migration 0890): server-side points (correct, speed, streak, participation), the frozen leaderboard snapshot with rank movement, the points line after each answer, own rank privately, final score.
 3. ✅ **Teacher control panel** (done 2026-10-08, migration 0900): keyboard shortcuts (→ ← L R P S), reveal, live answered counts, QR code, projector results and leaderboard, game settings at the start.
 4. ✅ **Deck builder** (done 2026-10-08, migration 0910): designed slides (kind `canvas`: text boxes, pictures, shapes on a 1600 x 900 grid, `src/slides/canvas.ts`), the editor (drag, resize, rotate, snapping guides, undo, copy and paste, drop or paste pictures), ready-made layouts, slide sorter with thumbnails and drag-to-reorder, "Design this slide" for title, text and picture slides (including imported pages), the registry in `src/slides/registry.ts`.
-5. **Report and proof:** per-question accuracy and per-participant scores;
-   cross-school isolation tests; a 30-browser latency test against the 300 ms target.
+5. ✅ **Report and proof** (done 2026-10-08, migration 0920): the session report lists everyone who took part
+   (guests and code-only lessons included) with points, rank, accuracy and answer time, and every question
+   with accuracy, answer choices (most common wrong answer), who got it wrong and the written answers;
+   scores and questions CSV. Cross-school isolation test for sessions, answers, reports, slides and guests.
+   Student screens apply the `state` broadcast directly (no 150 ms wait and refetch before the slide changes).
+   Speed test: `npm run latency-test` (30 students, 20 slide changes, PASS when p95 <= 300 ms); run it against
+   the live project, its result is the proof.
 6. **Progress dashboards** (agreed 2026-10-08, after *Report and proof*): turns the parent portal back on
    (`FEATURES.parentPortal`), built on the per-question data from the session report.
    - **Who sees what:** students see only themselves; a parent sees only children linked to them
