@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChoosePassword } from "@/components/auth/ChoosePassword";
 import { LogOut, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useNetwork } from "@/lib/hooks";
@@ -193,6 +194,7 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
         </header>
 
         {me.profile.is_support && <SupportBar school={me.tenant?.name ?? "this school"} />}
+        {me.profile.must_change_password && !me.profile.is_support && <ChoosePassword name={me.profile.full_name} />}
         <main id="main" className={cn("flex-1", !focus && "pb-24 lg:pb-0")}>{children}</main>
       </div>
 

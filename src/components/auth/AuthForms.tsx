@@ -9,6 +9,7 @@ import { safeNext } from "@/lib/utils";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { WHO_LABEL, whoForRole, wrongTabMessage, type Who } from "@/lib/who";
+import { isUsername, loginEmail } from "@/lib/student-login";
 
 
 /** Student · Parent · Staff, as links that keep the rest of the address (e.g. ?next=). */
@@ -69,7 +70,9 @@ export function LoginForm({ who = "student" }: { who?: Who }) {
     e.preventDefault();
     setBusy(true); setErr(null);
     const sb = createClient();
-    const { error } = await sb.auth.signInWithPassword({ email, password });
+    // Students made by their school sign in with a username instead of an email.
+    const address = who === "student" && isUsername(email) ? loginEmail(email) : email.trim();
+    const { error } = await sb.auth.signInWithPassword({ email: address, password });
     if (error) { setBusy(false); setErr(authMessage(error.message)); return; }
     // Each account signs in only from its own tab: student, parent or staff.
     const { data: me } = await sb.rpc("me");
@@ -88,6 +91,7 @@ export function LoginForm({ who = "student" }: { who?: Who }) {
 
   async function reset() {
     if (!email) { setErr("Enter your email first."); return; }
+    if (who === "student" && isUsername(email)) { setErr("Ask your teacher for a new starting password. They can reset it on the class page."); return; }
     const { error } = await createClient().auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account?reset=1")}`
     });
@@ -98,7 +102,10 @@ export function LoginForm({ who = "student" }: { who?: Who }) {
     <div className="space-y-5">
       {who !== "parent" && <SsoButtons next={next} who={who} />}
       <form onSubmit={submit} className="space-y-5">
-        <Field label="Email" htmlFor="email"><Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field label={who === "student" ? "Email or username" : "Email"} htmlFor="email">
+          <Input id="email" type={who === "student" ? "text" : "email"} autoComplete={who === "student" ? "username" : "email"} autoCapitalize="none" spellCheck={false}
+            required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
         <Field label="Password" htmlFor="password"><Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
         {err && <Alert tone="error">{err}</Alert>}
         {info && <Alert tone="success">{info}</Alert>}

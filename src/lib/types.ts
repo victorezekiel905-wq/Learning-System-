@@ -11,6 +11,8 @@ export type Profile = {
   status: "active" | "suspended";
   /** The platform's support account inside this school (0960). */
   is_support?: boolean;
+  /** Must choose their own password before going on (school-made logins, 0970). */
+  must_change_password?: boolean;
 };
 
 export type TenantSettings = {

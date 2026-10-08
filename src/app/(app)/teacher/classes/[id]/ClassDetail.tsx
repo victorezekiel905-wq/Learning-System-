@@ -8,13 +8,16 @@ import { api, errorText, rpc, must } from "@/lib/rpc";
 import { formatDate } from "@/lib/utils";
 import { LevelsPanel } from "./LevelsPanel";
 import { SupportsPanel } from "./SupportsPanel";
+import { AddStudents, LoginCards, printCards, type AddedRow } from "./AddStudents";
+import { Promote } from "./Promote";
 import { FEATURES } from "@/lib/features";
 import { Icon } from "@/components/Icon";
 import {
-  Alert, Avatar, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, PageHeader, Select, Tabs, Textarea, useToast, useDialog, Menu } from "@/components/ui";
+  Alert, Avatar, Badge, Button, Card, CopyButton, Empty, Field, Input, Modal, PageHeader, Select, Tabs, useToast, useDialog, Menu } from "@/components/ui";
 
 type Cls = { id: string; name: string; subject: string | null; grade_level: string | null; join_code: string; archived_at: string | null; teacher_id: string; tenant_id: string };
-type Member = { user_id: string; role: string; joined_at: string; users: { full_name: string; email: string } | null };
+type Member = { user_id: string; role: string; joined_at: string;
+  users: { full_name: string; email: string; login_name: string | null; student_profiles: { student_number: string | null } | null } | null };
 
 export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
   cls: Cls; canManage: boolean; isAdmin: boolean; policies: { id: string; name: string }[]; teachers: { id: string; full_name: string }[];
@@ -22,7 +25,7 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
   const [tab, setTab] = useState<"roster" | "levels" | "supports" | "groups" | "settings">("roster");
   const members = useLoader(async () => {
     const { data, error } = await createClient().from("class_members")
-      .select("user_id,role,joined_at,users(full_name,email)").eq("class_id", cls.id).order("role", { ascending: false });
+      .select("user_id,role,joined_at,users(full_name,email,login_name,student_profiles(student_number))").eq("class_id", cls.id).order("role", { ascending: false });
     if (error) throw error;
     return (data ?? []) as unknown as Member[];
   }, [cls.id]);
@@ -47,7 +50,7 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
         ...(canManage ? [{ id: "settings" as const, label: "Settings" }] : [])
       ]} />
 
-      {tab === "roster" && <Roster cls={cls} canManage={canManage} members={members.data ?? []} loading={members.loading} reload={members.reload} />}
+      {tab === "roster" && <Roster cls={cls} canManage={canManage} isAdmin={isAdmin} members={members.data ?? []} loading={members.loading} reload={members.reload} />}
       {tab === "levels" && canManage && <LevelsPanel classId={cls.id} />}
       {tab === "supports" && canManage && <SupportsPanel classId={cls.id} />}
       {tab === "groups" && <Groups cls={cls} canManage={canManage} students={students} policies={policies} />}
@@ -56,10 +59,14 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
   );
 }
 
-function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canManage: boolean; members: Member[]; loading: boolean; reload: () => Promise<void> }) {
+function Roster({ cls, canManage, isAdmin, members, loading, reload }: { cls: Cls; canManage: boolean; isAdmin: boolean; members: Member[]; loading: boolean; reload: () => Promise<void> }) {
   const toast = useToast();
   const dialog = useDialog();
-  const [importOpen, setImportOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
+  const [editing, setEditing] = useState<Member | null>(null);
+  const [newLogin, setNewLogin] = useState<AddedRow | null>(null);
+  const studentRows = members.filter((m) => m.role === "student");
   const [codeModal, setCodeModal] = useState<{ title: string; code: string; note: string } | null>(null);
   const [parents, setParents] = useState<{ student: string; list: { parent_id: string; parent: string; relation: string }[]; studentId: string } | null>(null);
   const router = useRouter();
@@ -83,6 +90,26 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
     if (error) toast(error.message, "error"); else { toast("Removed", "success"); void reload(); }
   }
 
+  async function resetPassword(m: Member) {
+    const name = m.users?.full_name ?? "this student";
+    if (!(await dialog.confirm({ title: `New starting password for ${name}?`, body: "Their current password stops working. They choose their own again when they next sign in.", confirmLabel: "Make a new password" }))) return;
+    try {
+      const r = await api<{ login: string; password: string }>(`/api/students/${m.user_id}/password`, { method: "POST" });
+      setNewLogin({ name, login: r.login, password: r.password, status: "Reset", ok: true });
+    } catch (e) { toast(errorText(e), "error"); }
+  }
+
+  async function deleteAccount(m: Member) {
+    const name = m.users?.full_name ?? "";
+    const typed = await dialog.ask({ title: `Delete ${name}'s account?`, tone: "danger", confirmLabel: "Delete account", label: "Type the student's full name to confirm",
+      body: "This deletes the account from the school, with all their results, answers and reports. It can't be undone. To take them out of this class only, use Remove from class." });
+    if (typed === null) return;
+    try {
+      await api(`/api/students/${m.user_id}`, { method: "DELETE", json: { confirm_name: typed } });
+      toast("Account deleted", "success"); void reload();
+    } catch (e) { toast(errorText(e), "error"); }
+  }
+
   async function parentInvite(studentId: string, name: string) {
     try {
       // The student's standing parent code (the same one on the class's printable letters).
@@ -103,9 +130,12 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Card className="lg:col-span-2" title="People" pad={false}
-        actions={canManage && <Button size="sm" variant="secondary" onClick={() => setImportOpen(true)}>Import CSV</Button>}>
+        actions={canManage && <>
+          {studentRows.length > 0 && <Button size="sm" variant="secondary" onClick={() => setPromoteOpen(true)}>Promote</Button>}
+          <Button size="sm" onClick={() => setAddOpen(true)}>Add students</Button>
+        </>}>
         {loading ? <p className="p-5 text-sm text-ink-500">Loading…</p> : members.length <= 1 ? (
-          <div className="p-5"><Empty title="No students yet">Share the class code <strong className="font-mono">{cls.join_code}</strong>, or import a CSV.</Empty></div>
+          <div className="p-5"><Empty title="No students yet" action={canManage ? <Button onClick={() => setAddOpen(true)}>Add students</Button> : undefined}>Add them one by one or from a CSV or Excel file, or let them join with the class code <strong className="font-mono">{cls.join_code}</strong>.</Empty></div>
         ) : (
           <table className="table">
             <thead><tr><th>Name</th><th className="hidden sm:table-cell">Role</th><th className="hidden sm:table-cell">Joined</th>{canManage && <th className="text-right"><span className="sr-only">Actions</span></th>}</tr></thead>
@@ -120,7 +150,10 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
                           : <span className="max-w-[9rem] truncate font-semibold text-ink-900 sm:max-w-[16rem]">{m.users?.full_name}</span>}
                         {m.role === "teacher" && <Badge tone="ink" className="sm:hidden">Teacher</Badge>}
                       </p>
-                      <p className="max-w-[9rem] truncate text-[13px] text-ink-500 sm:max-w-[18rem]">{m.users?.email}</p>
+                      <p className="max-w-[9rem] truncate text-[13px] text-ink-500 sm:max-w-[18rem]">
+                        {m.users?.login_name ? <>Username <span className="font-mono text-ink-700">{m.users.login_name}</span></> : m.users?.email}
+                        {m.users?.student_profiles?.student_number ? ` · ${m.users.student_profiles.student_number}` : ""}
+                      </p>
                     </div></div></td>
                   <td className="hidden sm:table-cell"><Badge tone={m.role === "teacher" ? "ink" : "gray"}>{m.role === "teacher" ? "Teacher" : "Student"}</Badge></td>
                   <td className="hidden text-ink-500 sm:table-cell">{formatDate(m.joined_at)}</td>
@@ -131,8 +164,11 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
                         <Menu label={`More for ${m.users?.full_name ?? "this student"}`} items={[
                           ...(FEATURES.messaging ? [{ label: "Message parent", icon: <Icon name="chat" className="h-4 w-4" />, onSelect: () => messageParent(m.user_id, m.users?.full_name ?? "this student") }] : []),
                           ...(FEATURES.parentPortal ? [{ label: "Parent code", icon: <Icon name="users" className="h-4 w-4" />, onSelect: () => parentInvite(m.user_id, m.users?.full_name ?? "student") }] : []),
+                          { label: "Edit details", icon: <Icon name="write" className="h-4 w-4" />, onSelect: () => setEditing(m) },
+                          ...(m.users?.login_name ? [{ label: "Reset password", icon: <Icon name="key" className="h-4 w-4" />, onSelect: () => resetPassword(m) }] : []),
                           { label: "Pair a device", icon: <Icon name="laptop" className="h-4 w-4" />, onSelect: () => pairDevice(m.user_id, m.users?.full_name ?? "student") },
-                          { label: "Remove from class", icon: <Icon name="trash" className="h-4 w-4" />, tone: "danger", onSelect: () => remove(m.user_id) }
+                          { label: "Remove from class", icon: <Icon name="x" className="h-4 w-4" />, tone: "danger" as const, onSelect: () => remove(m.user_id) },
+                          ...(isAdmin ? [{ label: "Delete account", icon: <Icon name="trash" className="h-4 w-4" />, tone: "danger" as const, onSelect: () => deleteAccount(m) }] : [])
                         ]} />
                       </div>}
                     </td>
@@ -143,14 +179,26 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
           </table>
         )}
       </Card>
-      <Card title="Invite students">
-        <p className="text-sm text-ink-600">Students join at <strong>/join</strong> with this code:</p>
+      <Card title="Or let students join with a code">
+        <p className="text-sm text-ink-600">Students with their own account join at <strong>/join</strong> with this code:</p>
         <p className="my-4 rounded-2xl bg-accent-500 py-5 text-center font-mono text-4xl font-extrabold tracking-[0.25em] text-accent-ink">{cls.join_code}</p>
         <div className="flex flex-wrap gap-2"><CopyButton value={cls.join_code} label="Copy code" /><CopyButton value={joinUrl} label="Copy join link" /></div>
         <p className="hint mt-3">Students who already have an account enter the code under "Join with code".</p>
       </Card>
 
-      {importOpen && <RosterImport cls={cls} onClose={() => { setImportOpen(false); void reload(); }} />}
+      {addOpen && <AddStudents classId={cls.id} className={cls.name} onClose={(changed) => { setAddOpen(false); if (changed) void reload(); }} />}
+      {promoteOpen && <Promote cls={cls} students={studentRows.map((m) => ({ user_id: m.user_id, name: m.users?.full_name ?? "Student" }))}
+        onClose={(changed) => { setPromoteOpen(false); if (changed) void reload(); }} />}
+      {editing && <EditStudent m={editing} onClose={(changed) => { setEditing(null); if (changed) void reload(); }} />}
+      <Modal open={!!newLogin} onClose={() => setNewLogin(null)} title={`New starting password for ${newLogin?.name ?? ""}`}
+        footer={<><Button variant="secondary" onClick={printCards}>Print login card</Button><Button onClick={() => setNewLogin(null)}>Done</Button></>}>
+        {newLogin && <div className="space-y-3 text-sm">
+          <p>Username: <span className="font-mono text-base font-bold">{newLogin.login}</span></p>
+          <p>Starting password: <span className="font-mono text-base font-bold">{newLogin.password}</span></p>
+          <p className="text-ink-600">Shown only now. The student chooses their own password when they sign in.</p>
+          <LoginCards className={cls.name} rows={[newLogin]} />
+        </div>}
+      </Modal>
       <Modal open={!!parents} onClose={() => setParents(null)} title={`Message a parent of ${parents?.student ?? ""}`}>
         <ul className="space-y-2">{parents?.list.map((x) => (
           <li key={x.parent_id} className="flex items-center justify-between gap-3 rounded-xl border border-ink-200 px-3 py-2">
@@ -170,43 +218,25 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
   );
 }
 
-function RosterImport({ cls, onClose }: { cls: Cls; onClose: () => void }) {
-  const [csv, setCsv] = useState("");
-  const [sendEmail, setSendEmail] = useState(true);
+/** Edit a student's name and admission number. */
+function EditStudent({ m, onClose }: { m: Member; onClose: (changed: boolean) => void }) {
+  const toast = useToast();
+  const [name, setName] = useState(m.users?.full_name ?? "");
+  const [adm, setAdm] = useState(m.users?.student_profiles?.student_number ?? "");
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [result, setResult] = useState<{ rows: { email: string; full_name: string; code: string | null; status: string }[]; emailed: number } | null>(null);
-
-  async function run() {
-    setBusy(true); setErr(null);
-    try {
-      setResult(await api("/api/roster/import", { method: "POST", json: { class_id: cls.id, csv, send_email: sendEmail } }));
-    } catch (e) { setErr(errorText(e)); }
-    setBusy(false);
+  async function save() {
+    setBusy(true);
+    try { await rpc("update_student", { p_student: m.user_id, p_name: name, p_admission: adm }); toast("Saved", "success"); onClose(true); }
+    catch (e) { toast(errorText(e), "error"); setBusy(false); }
   }
-
   return (
-    <Modal open onClose={onClose} wide title="Import roster from CSV"
-      footer={result ? <Button onClick={onClose}>Done</Button> : <><Button variant="ghost" onClick={onClose}>Cancel</Button><Button loading={busy} disabled={!csv.trim()} onClick={run}>Import</Button></>}>
-      {!result ? (
-        <div className="space-y-3">
-          <p className="text-sm text-ink-600">Paste CSV with a header row containing <code>email</code> and <code>full_name</code> (or <code>first_name</code>, <code>last_name</code>). Each student gets a one-time invite code tied to their email address.</p>
-          <input type="file" accept=".csv,text/csv" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} />
-          <Textarea rows={8} className="font-mono text-xs" value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={"email,full_name\nada@school.org,Ada Lovelace"} />
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /> Email invitations (needs server email set up)</label>
-          {err && <Alert tone="error">{err}</Alert>}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <Alert tone="success">{result.rows.filter((r) => r.code).length} invites created{result.emailed ? `, ${result.emailed} emailed` : ""}. Print or share the codes below.</Alert>
-          <table className="table">
-            <thead><tr><th>Name</th><th>Email</th><th>Code</th><th>Status</th></tr></thead>
-            <tbody>{result.rows.map((r, i) => (
-              <tr key={i}><td>{r.full_name}</td><td>{r.email}</td><td className="font-mono">{r.code ?? "—"}</td><td>{r.status}</td></tr>
-            ))}</tbody>
-          </table>
-        </div>
-      )}
+    <Modal open onClose={() => onClose(false)} title="Edit student"
+      footer={<><Button variant="ghost" onClick={() => onClose(false)}>Cancel</Button><Button loading={busy} disabled={!name.trim()} onClick={save}>Save</Button></>}>
+      <div className="space-y-4">
+        <Field label="Full name" htmlFor="ed-name"><Input id="ed-name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Admission number" htmlFor="ed-adm"><Input id="ed-adm" value={adm} onChange={(e) => setAdm(e.target.value)} /></Field>
+        {m.users?.login_name && <p className="text-[13px] text-ink-500">Username <span className="font-mono text-ink-800">{m.users.login_name}</span> stays the same.</p>}
+      </div>
     </Modal>
   );
 }

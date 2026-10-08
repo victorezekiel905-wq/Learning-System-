@@ -2077,3 +2077,68 @@ test("sign-up checks who is joining; the platform's support account acts as a sc
   await db.admin("delete from public.platform_admins");
   await db.admin("insert into public.platform_admins (user_id) values ($1)", [S.superA]);
 });
+
+test("rosters: staff-made logins, editing, password resets, promotion, a student's own classes (0970)", async () => {
+  const H = await db.signUp("head@roster.test", "Head Teacher");
+  const tenant = (await db.rpc(H, "bootstrap_school", { p_school_name: "Roster School", p_full_name: "Head Teacher" })).tenant_id;
+  await db.admin("update public.tenants set plan_code = 'school' where id = $1", [tenant]);
+  const inv = await db.rpc(H, "create_invite", { p_role: "teacher" });
+  const T = await db.signUp("t@roster.test", "Mr Bello");
+  await db.rpc(T, "redeem_code", { p_code: inv.code });
+  const [j1, j2, j3] = [await db.rpc(T, "create_class", { p_name: "JSS 1 Gold" }), await db.rpc(T, "create_class", { p_name: "JSS 2 Gold" }), await db.rpc(H, "create_class", { p_name: "JSS 3 Gold" })];
+
+  // The server creates the login; the class teacher makes it a student of the class.
+  const email = "ada.obi12@students.swiftcipher.invalid";
+  const ada = await db.signUp(email, "x");
+  assert.equal(await db.rpc(T, "add_managed_student", { p_class: j1.id, p_user: ada, p_email: email, p_name: "Ada Obi", p_login: "ada.obi12", p_admission: "ADM/001" }), ada);
+  const [row] = await db.admin("select u.role, u.login_name, u.must_change_password, p.student_number from public.users u join public.student_profiles p on p.user_id = u.id where u.id = $1", [ada]);
+  assert.deepEqual(row, { role: "student", login_name: "ada.obi12", must_change_password: true, student_number: "ADM/001" });
+  await rejects(db.rpc(T, "add_managed_student", { p_class: j1.id, p_user: ada, p_email: email, p_name: "Again" }), /not new/);
+  const other = await db.signUp("stranger@roster.test", "Stranger");
+  await rejects(db.rpc(S.teacherA, "add_managed_student", { p_class: j1.id, p_user: other, p_email: "stranger@roster.test", p_name: "X" }), /Class not found/);
+
+  // First sign-in: the student must choose a password.
+  assert.equal((await db.rpc(ada, "me", {})).profile.must_change_password, true);
+  await db.rpc(ada, "password_changed", {});
+  assert.equal((await db.rpc(ada, "me", {})).profile.must_change_password, false);
+
+  // Editing and password resets.
+  await db.rpc(T, "update_student", { p_student: ada, p_name: "Ada N. Obi", p_admission: "ADM/002" });
+  assert.equal((await db.admin("select full_name from public.users where id = $1", [ada]))[0].full_name, "Ada N. Obi");
+  await rejects(db.rpc(S.teacherA, "update_student", { p_student: ada, p_name: "Hacked" }), /Student not found/);
+  assert.equal((await db.rpc(T, "prepare_password_reset", { p_student: ada })).login_name, "ada.obi12");
+  assert.equal((await db.rpc(ada, "me", {})).profile.must_change_password, true);
+  const ben = await db.signUp("ben@roster.test", "Ben Own");
+  await db.rpc(ben, "redeem_code", { p_code: j1.join_code });
+  await rejects(db.rpc(T, "prepare_password_reset", { p_student: ben }), /their own email/);
+  // A student who already has an account joins by email.
+  assert.equal(await db.rpc(T, "add_existing_student", { p_class: j2.id, p_email: "BEN@roster.test" }), ben);
+  assert.equal(await db.rpc(T, "add_existing_student", { p_class: j2.id, p_email: "nobody@roster.test" }), null);
+
+  // Promotion: JSS 1 Gold into JSS 2 Gold.
+  assert.ok((await db.rpc(T, "promotion_targets", { p_class: j1.id })).some((c) => c.name === "JSS 3 Gold"));
+  assert.equal(await db.rpc(T, "promote_students", { p_from: j1.id, p_to: j2.id }), 2);
+  const inClass = async (c) => (await db.admin("select user_id from public.class_members where class_id = $1 and role = 'student' order by user_id", [c])).map((r) => r.user_id);
+  assert.deepEqual(await inClass(j1.id), []);
+  assert.deepEqual((await inClass(j2.id)).sort(), [ada, ben].sort());
+  await rejects(db.rpc(T, "promote_students", { p_from: j2.id, p_to: j2.id }), /another open class/);
+
+  // Whole school at the end of the year: chains work and the top class leaves.
+  const kemi = await db.signUp("kemi@roster.test", "Kemi");
+  await db.rpc(kemi, "redeem_code", { p_code: j3.join_code });
+  await rejects(db.rpc(T, "promote_school", { p_moves: JSON.stringify([]) }), /Only school admins/);
+  const res = await db.rpc(H, "promote_school", { p_moves: JSON.stringify([{ from: j2.id, to: j3.id }, { from: j3.id, to: null }]) });
+  assert.deepEqual(res, { moved: 2, left: 1 });
+  assert.deepEqual((await inClass(j3.id)).sort(), [ada, ben].sort());
+  assert.deepEqual(await inClass(j2.id), []);
+
+  // A student sees only their own classes, with their results.
+  const mine = await db.rpc(ada, "my_classes", {});
+  assert.deepEqual(mine.map((c) => c.name), ["JSS 3 Gold"]);
+  assert.ok("accuracy" in mine[0] && "held" in mine[0]);
+
+  // Deleting a student's account: school admins only, with the exact name.
+  await rejects(db.rpc(T, "delete_student_check", { p_student: ada, p_confirm_name: "Ada N. Obi" }), /Student not found/);
+  await rejects(db.rpc(H, "delete_student_check", { p_student: ada, p_confirm_name: "Ada" }), /exactly/);
+  await db.rpc(H, "delete_student_check", { p_student: ada, p_confirm_name: "ada n. obi" });
+});

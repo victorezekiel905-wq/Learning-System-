@@ -18,7 +18,11 @@ export default async function ClassesPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Classes" subtitle="Optional rosters for your sessions: join codes, groups and learning supports." actions={canCreate && <CreateClassButton />} />
+      <PageHeader title="Classes" subtitle="Your classes and their students: add students, print their logins, and promote them at the end of the year."
+        actions={<>
+          {["school_admin", "platform_admin"].includes(me.profile.role) && <Link href="/admin/promote" className="btn btn-secondary no-underline">End-of-year promotion</Link>}
+          {canCreate && <CreateClassButton />}
+        </>} />
       {classes.length === 0 ? (
         <Empty title="No classes yet" action={canCreate && <CreateClassButton />}>Classes hold your roster. Students join with the class code.</Empty>
       ) : (

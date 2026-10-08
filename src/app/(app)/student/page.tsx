@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/session";
-import { Alert, Card, Empty, PageHeader } from "@/components/ui";
+import { Alert, Empty, PageHeader } from "@/components/ui";
 import { firstName } from "@/lib/utils";
 import { ProgressPanel } from "./ProgressPanel";
+import { MyClasses, type MyClass } from "./MyClasses";
 import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "Home" };
@@ -19,7 +20,8 @@ type Home = {
 
 export default async function StudentHome() {
   const { me, sb } = await requireRole(["student"]);
-  const { data, error } = await sb.rpc("student_home");
+  const [{ data, error }, mine] = await Promise.all([sb.rpc("student_home"), sb.rpc("my_classes")]);
+  const myClasses = (mine.data as MyClass[] | null) ?? [];
   // A dropped connection shows the retry screen (error.tsx), not a crash inside the page.
   if (error || !data) throw new Error(`Couldn't load the student home page: ${error?.message ?? "no data"}`);
   const h = data as Home;
@@ -58,25 +60,13 @@ export default async function StudentHome() {
         <div className="mb-4"><Alert>A managed class session is active. While it runs, your teacher can see the site you're on and a low-resolution picture of your screen. <Link href="/student/device">What's shared?</Link></Alert></div>
       )}
 
-      <ProgressPanel />
+      {myClasses.length > 0 ? <MyClasses classes={myClasses} /> : (
+        <div className="mb-8"><Empty title="You're not in a class yet" action={<Link href="/student/join" className="btn btn-primary no-underline">Enter a code</Link>}>
+          Your teacher adds you to your class, or gives you a class code. You can also join any live lesson with its code.
+        </Empty></div>
+      )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2" title="My classes">
-          {h.classes.length === 0 ? <Empty title="No classes yet" action={<Link href="/student/join" className="btn btn-primary no-underline">Enter a code</Link>}>You can also join any live lesson with its code, no class needed.</Empty> : (
-            <ul className="space-y-2 text-sm">{h.classes.map((c) => (
-              <li key={c.id}><span className="font-medium">{c.name}</span><span className="block text-xs text-ink-500">{c.teacher}</span></li>
-            ))}</ul>
-          )}
-        </Card>
-        <Card title="Recent scores">
-          {h.scores.length === 0 ? <p className="text-sm text-ink-500">Scores from activities and quizzes appear here.</p> : (
-            <ul className="space-y-2 text-sm">{h.scores.map((s, i) => (
-              <li key={i} className="flex justify-between gap-3"><span className="truncate">{s.activity}</span>
-                <span className="whitespace-nowrap tabular-nums text-ink-600">{s.max ? `${Number(s.score ?? 0)}/${Number(s.max)}` : "done"}</span></li>
-            ))}</ul>
-          )}
-        </Card>
-      </div>
+      <ProgressPanel />
     </div>
   );
 }

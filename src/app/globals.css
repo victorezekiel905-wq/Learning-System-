@@ -105,3 +105,9 @@ html.readable body { line-height: 1.75; word-spacing: 0.08em; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
+
+/* "Print login cards": only the cards, not the page or window behind them. */
+@media print {
+  body.print-cards > :not(.login-cards) { display: none !important; }
+  body.print-cards > .login-cards { display: grid !important; }
+}
