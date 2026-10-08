@@ -4,6 +4,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityEditor, ACTIVITY_LABEL, type Activity } from "@/components/activities/ActivityEditor";
 import { SlideView, type SlideData } from "@/components/slides/SlideView";
+import { CanvasEditor } from "@/components/slides/CanvasEditor";
+import { CanvasFrame } from "@/components/slides/CanvasView";
+import { useSignedUrl } from "@/lib/media";
+import { CONVERTIBLE, LAYOUTS, toCanvas, type CanvasContent } from "@/slides/canvas";
+import { MEDIA_KINDS, SLIDE_TYPES, slideLabel } from "@/slides/registry";
 import { Alert, Badge, Button, CopyButton, Field, Modal, Select, Tabs, useToast, useDialog } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
@@ -16,25 +21,6 @@ import { SlideForm } from "./SlideForm";
 type Lesson = { id: string; tenant_id: string; owner_id: string; title: string; description: string | null; subject: string | null; status: string; is_template: boolean; current_version: number; default_mode: string };
 type SlideRow = { id: string; position: number; kind: SlideKind; content: SlideContent; notes: string | null; activity_id: string | null };
 
-export const SLIDE_KINDS: { kind: SlideKind; label: string }[] = [
-  { kind: "title", label: "Title" }, { kind: "text", label: "Text" }, { kind: "image", label: "Image" }, { kind: "video", label: "Video (interactive)" },
-  { kind: "audio", label: "Audio" }, { kind: "embed", label: "Embed website" }, { kind: "link", label: "Link" }, { kind: "attachment", label: "Attachment" },
-  { kind: "shapes", label: "Shapes / diagram" }, { kind: "whiteboard", label: "Whiteboard" }, { kind: "activity", label: "Activity" }
-];
-
-/** What each slide type is for, in the "Add slide" picker. */
-const CONTENT_HELP: Partial<Record<SlideKind, [string, string]>> = {
-  title: ["Title", "A big heading to open the lesson or a section."],
-  text: ["Text", "A heading and paragraphs."],
-  image: ["Image", "A picture or diagram from your media library."],
-  video: ["Video with questions", "YouTube, Vimeo or your own video. It pauses to ask questions."],
-  audio: ["Audio", "A recording students can play."],
-  embed: ["Web page or simulation", "Any secure website, such as a PhET simulation or a 3D model."],
-  link: ["Link", "A button that opens a website."],
-  attachment: ["File", "A worksheet or document to download."],
-  shapes: ["Diagram", "Shapes, arrows and labels."],
-  whiteboard: ["Whiteboard", "A blank board to draw on during the lesson."]
-};
 const ACTIVITY_HELP: Record<ActivityKind, string> = {
   multiple_choice: "Pick the right answer, with instant feedback.",
   poll: "Quick opinions or checks, no right answer. Results live.",
@@ -63,6 +49,8 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
   const [share, setShare] = useState(false);
   const [versions, setVersions] = useState(false);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty">("saved");
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<number | null>(null);
   const timers = useRef<Record<string, number>>({});
 
   const slides = useLoader(async () => {
@@ -113,7 +101,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
     for (const [i, id] of ids.entries()) must(await sb.from("lesson_slides").update({ position: i }).eq("id", id));
   }
 
-  async function addSlide(kind: SlideKind, activityKind?: ActivityKind) {
+  async function addSlide(kind: SlideKind, activityKind?: ActivityKind, design?: CanvasContent) {
     const sb = createClient();
     // New slides go straight after the selected one (or at the end).
     const at = current ? ordered().indexOf(current.id) + 1 : local.length;
@@ -128,7 +116,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
         activityId = data.id;
       }
       const { data, error } = await sb.from("lesson_slides").insert({
-        tenant_id: lesson.tenant_id, lesson_id: lesson.id, position: local.length, kind, content: kind === "text" ? { heading: "New slide", body: "" } : {}, activity_id: activityId
+        tenant_id: lesson.tenant_id, lesson_id: lesson.id, position: local.length, kind, content: design ?? (kind === "text" ? { heading: "New slide", body: "" } : {}), activity_id: activityId
       }).select("id").single();
       if (error) throw new Error(error.message);
       const ids = ordered();
@@ -148,6 +136,24 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
     [ids[i], ids[j]] = [ids[j]!, ids[i]!];
     try { await saveOrder(ids); } catch (e) { toast(errorText(e), "error"); }
     void slides.reload();
+  }
+
+  /** Drag-and-drop in the slide list: puts the dragged slide where it was dropped. */
+  async function moveTo(id: string, index: number) {
+    const ids = ordered().filter((x) => x !== id);
+    ids.splice(Math.min(index, ids.length), 0, id);
+    setLocal((ls) => ls.map((s) => ({ ...s, position: ids.indexOf(s.id) })).sort((a, b) => a.position - b.position));
+    try { await saveOrder(ids); } catch (e) { toast(errorText(e), "error"); }
+    void slides.reload();
+  }
+
+  /** Title, text and picture slides (including imported pages) become designed slides. */
+  async function designIt(s: SlideRow) {
+    const content = toCanvas(s.kind, s.content);
+    try {
+      must(await createClient().from("lesson_slides").update({ kind: "canvas", content }).eq("id", s.id));
+      setLocal((ls) => ls.map((x) => (x.id === s.id ? { ...x, kind: "canvas", content } : x)));
+    } catch (e) { toast(errorText(e), "error"); }
   }
 
   async function remove(s: SlideRow) {
@@ -230,19 +236,25 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
       {!canEdit && <div className="px-4 pt-3"><Alert>You're viewing a colleague's published lesson. Make a copy to edit it.</Alert></div>}
 
       <div className="grid flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="border-r border-ink-200 bg-ink-50 p-3">
-          <ol className="space-y-1.5">
+        <aside className="border-r border-ink-200 bg-ink-50 p-3 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto">
+          <ol className="flex gap-3 overflow-x-auto pb-1 lg:block lg:space-y-3 lg:overflow-visible lg:pb-0" aria-label="Slides">
             {local.map((s, i) => (
-              <li key={s.id}>
+              <li key={s.id} className={cn("relative w-40 shrink-0 lg:w-auto", dropAt === i && dragging !== s.id && "before:absolute before:-top-2 before:inset-x-0 before:h-1 before:rounded-full before:bg-brand-500")}
+                draggable={canEdit} onDragStart={(e) => { setDragging(s.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", s.id); }}
+                onDragOver={(e) => { if (!dragging) return; e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); setDropAt(e.clientY > r.top + r.height / 2 ? i + 1 : i); }}
+                onDrop={(e) => { e.preventDefault(); if (dragging && dropAt !== null) void moveTo(dragging, dropAt > ordered().indexOf(dragging) ? dropAt - 1 : dropAt); setDragging(null); setDropAt(null); }}
+                onDragEnd={() => { setDragging(null); setDropAt(null); }}>
                 <button onClick={() => { setSelected(s.id); setPanel(s.kind === "activity" ? "activity" : "slide"); }}
-                  className={cn("w-full rounded-lg border px-2.5 py-2 text-left text-xs transition", s.id === selected ? "border-brand-400 bg-white shadow-sm" : "border-transparent hover:bg-white")}>
-                  <span className="flex items-center justify-between"><span className="font-bold text-ink-500">{i + 1}</span><span className="text-[11px] capitalize text-ink-500">{s.kind}</span></span>
-                  <span className="mt-0.5 block truncate font-medium text-ink-800">
-                    {s.kind === "activity" ? activities.data?.[s.activity_id ?? ""]?.title ?? "Activity" : s.content.heading || s.content.caption || s.content.url || "Untitled"}
+                  className={cn("flex w-full gap-2 text-left", dragging === s.id && "opacity-40")}>
+                  <span className="w-5 shrink-0 pt-0.5 text-right text-[11px] font-bold text-ink-500">{i + 1}</span>
+                  <span className={cn("block min-w-0 flex-1 overflow-hidden rounded-lg border-2 bg-white transition", s.id === selected ? "border-brand-500 shadow-sm" : "border-ink-200 hover:border-ink-400")}>
+                    <SlideThumb slide={s} title={s.kind === "activity" ? activities.data?.[s.activity_id ?? ""]?.title ?? "Activity" : s.content.heading || s.content.caption || s.content.url || slideLabel(s.kind)} />
                   </span>
                 </button>
               </li>
             ))}
+            {dragging && <li className="hidden h-6 lg:block" onDragOver={(e) => { e.preventDefault(); setDropAt(local.length); }}
+              onDrop={(e) => { e.preventDefault(); void moveTo(dragging, local.length); setDragging(null); setDropAt(null); }} />}
           </ol>
           {canEdit && (
             <div className="mt-3">
@@ -261,13 +273,17 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
               </div>
             )
           ) : (
-            <div className="mx-auto max-w-5xl space-y-5">
+            <div className={cn("mx-auto space-y-5", current.kind === "canvas" && canEdit ? "max-w-[1400px]" : "max-w-5xl")}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 {current.kind === "activity" ? (
                   <Tabs value={panel} onChange={setPanel} tabs={[{ id: "activity", label: "Activity & questions" }, { id: "slide", label: "Slide preview" }]} />
-                ) : <p className="text-sm font-semibold text-ink-700">Slide {local.indexOf(current) + 1} · {SLIDE_KINDS.find((k) => k.kind === current.kind)?.label}</p>}
+                ) : <p className="text-sm font-semibold text-ink-700">Slide {local.indexOf(current) + 1} · {slideLabel(current.kind)}</p>}
                 {canEdit && (
                   <div className="flex gap-1">
+                    {CONVERTIBLE.includes(current.kind) && (
+                      <Button size="sm" variant="secondary" onClick={() => designIt(current)}
+                        title="Open this slide in the designer, to add text boxes, pictures and shapes">Design this slide</Button>
+                    )}
                     <Button size="sm" variant="ghost" onClick={() => move(current, -1)} disabled={current.position === 0} aria-label="Move slide up">↑</Button>
                     <Button size="sm" variant="ghost" onClick={() => move(current, 1)} disabled={current.position === local.length - 1} aria-label="Move slide down">↓</Button>
                     <Button size="sm" variant="ghost" onClick={() => duplicateSlide(current)}>Duplicate</Button>
@@ -276,7 +292,10 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
                 )}
               </div>
 
-              {current.kind === "activity" && panel === "activity" && currentActivity ? (
+              {current.kind === "canvas" && canEdit ? (
+                <CanvasEditor key={current.id} content={current.content} notes={current.notes} lesson={lesson} userId={userId}
+                  onChange={(content) => patchSlide(current.id, { content })} onNotes={(notes) => patchSlide(current.id, { notes })} />
+              ) : current.kind === "activity" && panel === "activity" && currentActivity ? (
                 canEdit ? <ActivityEditor key={currentActivity.id} activity={currentActivity} rubrics={rubrics} onChanged={() => void activities.reload()} />
                   : <SlideView slide={slideData} />
               ) : (
@@ -296,15 +315,19 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
 
       <Modal open={addKind === "activity"} onClose={() => setAddKind(null)} title="Add a slide" wide>
         <p className="-mt-1 mb-4 text-sm text-ink-600">It goes straight after the slide you have selected.</p>
+        <section aria-labelledby="add-design" className="mb-6">
+          <h3 id="add-design" className="mb-2 text-sm font-bold text-ink-900">Slides <span className="font-normal text-ink-500">(design them freely: text, pictures, shapes)</span></h3>
+          <LayoutChoices onPick={(content) => { setAddKind(null); void addSlide("canvas", undefined, content); }} />
+        </section>
         <div className="grid gap-6 md:grid-cols-2">
           <section aria-labelledby="add-content">
-            <h3 id="add-content" className="mb-2 text-sm font-bold text-ink-900">Content</h3>
+            <h3 id="add-content" className="mb-2 text-sm font-bold text-ink-900">Media and web</h3>
             <div className="grid gap-2">
-              {(Object.keys(CONTENT_HELP) as SlideKind[]).map((k) => (
+              {MEDIA_KINDS.map((k) => (
                 <button key={k} type="button" onClick={() => { setAddKind(null); void addSlide(k); }}
                   className="rounded-xl border border-ink-200 bg-white px-4 py-3 text-left transition-colors hover:border-ink-900">
-                  <span className="block text-sm font-semibold text-ink-900">{CONTENT_HELP[k]![0]}</span>
-                  <span className="block text-[13px] leading-snug text-ink-600">{CONTENT_HELP[k]![1]}</span>
+                  <span className="block text-sm font-semibold text-ink-900">{SLIDE_TYPES[k].label}</span>
+                  <span className="block text-[13px] leading-snug text-ink-600">{SLIDE_TYPES[k].help}</span>
                 </button>
               ))}
             </div>
@@ -326,6 +349,38 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
       {share && <ShareModal lessonId={lesson.id} classes={classes} onClose={() => setShare(false)} />}
       {versions && <VersionsModal lessonId={lesson.id} onClose={() => setVersions(false)} />}
     </div>
+  );
+}
+
+/** Ready-made layouts for a new designed slide, each shown as a small preview. */
+function LayoutChoices({ onPick }: { onPick: (c: CanvasContent) => void }) {
+  const layouts = useMemo(() => LAYOUTS.map((l) => ({ ...l, preview: l.make() })), []);
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {layouts.map((l) => (
+        <button key={l.key} type="button" title={l.help} onClick={() => onPick(l.make())}
+          className="group rounded-xl border border-ink-200 bg-white p-1.5 text-left transition hover:border-brand-500 hover:shadow-sm">
+          <CanvasFrame content={l.preview} className="pointer-events-none rounded-lg border border-ink-100" />
+          <span className="block px-1 pb-0.5 pt-1.5 text-[13px] font-semibold text-ink-900">{l.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A slide in the slide list: designed slides and pictures in miniature, other kinds as a labelled card. */
+function SlideThumb({ slide, title }: { slide: SlideRow; title: string }) {
+  const picture = useSignedUrl(slide.kind === "image" ? slide.content.media_path : null);
+  if (slide.kind === "canvas") return <CanvasFrame content={slide.content} className="pointer-events-none" />;
+  if (slide.kind === "image" && (picture || slide.content.url)) {
+    return <span className="block aspect-video bg-ink-900"><img src={picture ?? slide.content.url} alt="" className="h-full w-full object-contain" /></span>;
+  }
+  const dark = slide.kind === "title";
+  return (
+    <span className={cn("flex aspect-video flex-col justify-between p-2", dark ? "bg-ink-950 text-white" : slide.kind === "activity" ? "bg-brand-50" : "bg-white")}>
+      <span className={cn("text-[10px] font-semibold uppercase tracking-wide", dark ? "text-ink-300" : "text-ink-500")}>{slideLabel(slide.kind)}</span>
+      <span className="line-clamp-2 text-xs font-semibold leading-tight">{title}</span>
+    </span>
   );
 }
 

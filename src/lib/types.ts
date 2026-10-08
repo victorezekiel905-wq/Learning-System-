@@ -1,3 +1,4 @@
+import type { CanvasBackground, CanvasElement } from "@/slides/canvas";
 export type Role = "student" | "teacher" | "school_admin" | "it_admin" | "parent" | "platform_admin" | "guest";
 
 export type Profile = {
@@ -52,7 +53,7 @@ export type Me = {
 export type DeliveryMode = "live_participation" | "student_paced" | "front_of_class";
 
 export type SlideKind =
-  | "title" | "text" | "image" | "video" | "audio" | "embed" | "link" | "attachment" | "shapes" | "whiteboard" | "activity";
+  | "title" | "text" | "image" | "video" | "audio" | "embed" | "link" | "attachment" | "shapes" | "whiteboard" | "activity" | "canvas";
 
 export type Shape = { id: string; type: "rect" | "ellipse" | "arrow" | "text"; x: number; y: number; w: number; h: number; color: string; text?: string };
 export type Stroke = { color: string; width: number; points: [number, number][] };
@@ -70,6 +71,9 @@ export type SlideContent = {
   label?: string;
   /** Imported deck page: shown edge to edge, like the original slide. */
   full?: boolean;
+  /** Designed ("canvas") slides: see src/slides/canvas.ts. */
+  background?: CanvasBackground;
+  elements?: CanvasElement[];
 };
 
 export type ActivityKind =

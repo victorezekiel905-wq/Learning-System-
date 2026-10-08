@@ -1668,3 +1668,31 @@ test("reveal closes the activity and shows the right answers; live answered coun
   await rejects(db.rpc(a, "session_control", { p_session: s.id, p_action: "reveal" }), /Not your session/);
   await db.rpc(T, "session_control", { p_session: s.id, p_action: "end" });
 });
+
+test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {
+  const T = await db.signUp("t@canvas.test", "Canvas Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Canvas School", p_full_name: "Canvas Teacher" })).tenant_id;
+  const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title) values ($1, $2, 'Designed deck') returning id", [tenant, T]);
+  const content = { background: { color: "#0f172a" }, elements: [{ id: "a", type: "text", x: 100, y: 100, w: 800, h: 160, text: "Hello", size: 96 }] };
+  const [{ id: slide }] = await db.as(T, "insert into public.lesson_slides (tenant_id, lesson_id, position, kind, content) values ($1, $2, 0, 'canvas', $3) returning id",
+    [tenant, lesson, JSON.stringify(content)]);
+  assert.ok(slide);
+  await rejects(db.as(T, "update public.lesson_slides set content = $2 where id = $1",
+    [slide, JSON.stringify({ elements: [{ id: "b", type: "text", text: "x".repeat(300000) }] })]), /lesson_slides_content_size/);
+  // Another school's teacher can neither see nor change it.
+  const rows = await db.as(S.teacherB ?? S.adminB, "update public.lesson_slides set content = '{}' where id = $1 returning id", [slide]);
+  assert.equal(rows.length, 0);
+  assert.equal((await db.admin("select content -> 'elements' -> 0 ->> 'text' t from public.lesson_slides where id = $1", [slide]))[0].t, "Hello");
+
+  // A guest in the live lesson may load the pictures placed on its designed slides, and nothing else.
+  const pic = `${tenant}/${T}/photo.jpg`, back = `${tenant}/${T}/back.jpg`;
+  await db.admin("update public.lesson_slides set content = $2 where id = $1", [slide, JSON.stringify({ background: { media_path: back },
+    elements: [{ id: "p", type: "image", x: 0, y: 0, w: 800, h: 450, media_path: pic, alt: "A photo" }] })]);
+  const s = await db.rpc(T, "start_session", { p_class: null, p_lesson: lesson });
+  const g = await db.signInAnonymously();
+  await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Gina" });
+  const can = async (p) => (await db.as(g, "select app.guest_can_read_media($1) ok", [p]))[0].ok;
+  assert.equal(await can(pic), true);
+  assert.equal(await can(back), true);
+  assert.equal(await can(`${tenant}/${T}/other.jpg`), false);
+});

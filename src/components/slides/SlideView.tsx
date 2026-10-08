@@ -6,6 +6,7 @@ import { safeHref } from "@/lib/utils";
 import { Icon } from "@/components/Icon";
 import type { Shape, SlideContent, SlideKind } from "@/lib/types";
 import { BOARD_H, BOARD_W, StrokeLayer } from "./Whiteboard";
+import { CanvasView } from "./CanvasView";
 
 export type SlideData = {
   id: string;
@@ -131,6 +132,9 @@ export function SlideView({ slide, activitySlot, overlay, onVideoTime, videoRef 
           <StrokeLayer strokes={c.strokes ?? []} />
         </svg>
       );
+      break;
+    case "canvas":
+      inner = <CanvasView content={c} />;
       break;
     case "activity":
       inner = activitySlot ?? (
