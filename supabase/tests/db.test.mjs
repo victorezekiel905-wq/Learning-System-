@@ -88,7 +88,8 @@ test("tenant isolation (§4, §20)", async () => {
   assert.equal((await db.as(b, "select * from public.users where tenant_id = $1", [S.tenantA])).length, 0);
   assert.equal((await db.as(b, "select * from public.classes")).length, 0);
   assert.equal((await db.as(b, "select * from public.tenants")).length, 1);
-  await rejects(db.rpc(b, "redeem_code", { p_code: S.classCode }), /different school/);
+  // Another school's code looks like no code at all: a school never learns another exists.
+  await rejects(db.rpc(b, "redeem_code", { p_code: S.classCode }), /No class or invite matches that code/);
   await rejects(
     db.as(b, "insert into public.lessons (tenant_id, owner_id, title) values ($1, $2, 'x')", [S.tenantA, b]),
     /row-level security|violates/
@@ -1477,7 +1478,7 @@ test("live engine core: lobby, start, pause, end; no class needed; join by code 
   assert.equal((await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Tobi" })).session_id, s.id);
   const code = s.join_code.slice(0, 3) + "-" + s.join_code.slice(3);
   assert.equal((await db.rpc(pupil, "join_session", { p_code: code })).session_id, s.id);
-  await rejects(db.rpc(other, "join_session", { p_code: s.join_code }), /another school/);
+  await rejects(db.rpc(other, "join_session", { p_code: s.join_code }), /No live lesson has that code/, "another school's lesson looks like no lesson at all");
   let st = await db.rpc(pupil, "session_student_state", { p_session: s.id });
   assert.equal(st.session.phase, "lobby");
   assert.equal(st.me.name, "Pupil Two");
@@ -1928,4 +1929,102 @@ test("game countdown: shared clock, answers close when time is up, pause stops t
   await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "settings", p_args: { timer: true } });
   await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "reveal" });
   assert.equal((await db.rpc(L.T, "teacher_session_state", { p_session: L.s.id })).timer, null);
+});
+
+test("roles: teachers see their own subjects, parent codes, feedback to teachers, school progress (0950)", async () => {
+  const A = await db.signUp("head@roles.test", "Head Teacher");
+  const tenant = (await db.rpc(A, "bootstrap_school", { p_school_name: "Roles School", p_full_name: "Head Teacher" })).tenant_id;
+  await db.admin("update public.tenants set plan_code = 'school' where id = $1", [tenant]);
+  const staff = async (email, name) => {
+    const inv = await db.rpc(A, "create_invite", { p_role: "teacher", p_email: email });
+    const u = await db.signUp(email, name);
+    await db.rpc(u, "redeem_code", { p_code: inv.code });
+    return u;
+  };
+  const [maths, english] = [await staff("maths@roles.test", "Mr Maths"), await staff("english@roles.test", "Mrs English")];
+  const mc = await db.rpc(maths, "create_class", { p_name: "JSS2 Maths", p_subject: "Mathematics" });
+  const ec = await db.rpc(english, "create_class", { p_name: "JSS2 English", p_subject: "English" });
+  const [ada, obi] = [await db.signUp("ada@roles.test", "Ada Obi"), await db.signUp("obi@roles.test", "Obi Obi")];
+  for (const kid of [ada, obi]) for (const c of [mc, ec]) await db.rpc(kid, "redeem_code", { p_code: c.join_code });
+  await db.as(A, "update public.tenant_settings set parent_portal_enabled = true");
+
+  // One quiz lesson per subject, taught live, Ada answers right in maths and wrong in English.
+  const teach = async (T, cls, subject, right) => {
+    const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title, subject, status) values ($1, $2, $3, $4, 'published') returning id", [tenant, T, `${subject} lesson`, subject]);
+    const [{ id: act }] = await db.admin("insert into public.activities (tenant_id, lesson_id, owner_id, kind, title) values ($1, $2, $3, 'quiz', 'Check') returning id", [tenant, lesson, T]);
+    await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 0, 'activity', $3, '{}')", [tenant, lesson, act]);
+    const qs = [];
+    for (let i = 0; i < 5; i++) {
+      const [{ id: q }] = await db.admin("insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, position, topic) values ($1, $2, $3, 'mcq', 'Q', 1, $4, $5) returning id", [tenant, act, T, i, `${subject} topic`]);
+      const [{ id: ok }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'y', true, 0) returning id", [tenant, q]);
+      const [{ id: no }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'n', false, 1) returning id", [tenant, q]);
+      qs.push({ q, pick: right ? ok : no });
+    }
+    const s = await db.rpc(T, "start_session", { p_class: cls.id, p_lesson: lesson });
+    await db.rpc(ada, "join_session", { p_code: s.join_code });
+    await db.rpc(T, "session_control", { p_session: s.id, p_action: "start" });
+    const at = (await db.rpc(ada, "start_attempt", { p_activity: act, p_session: s.id })).attempt.id;
+    for (const { q, pick } of qs) await db.rpc(ada, "submit_answer", { p_attempt: at, p_question: q, p_response: JSON.stringify({ option_id: pick }) });
+    await db.rpc(T, "end_session", { p_session: s.id });
+  };
+  await teach(maths, mc, "Mathematics", true);
+  await teach(english, ec, "English", false);
+
+  // Each teacher sees only their own subject; the admin and Ada see both.
+  const subjects = async (who) => (await db.rpc(who, "progress_report", { p_student: ada, p_period: "week" })).subjects.map((s) => s.subject).sort();
+  assert.deepEqual(await subjects(maths), ["Mathematics"]);
+  assert.deepEqual(await subjects(english), ["English"]);
+  assert.deepEqual(await subjects(A), ["English", "Mathematics"]);
+  assert.deepEqual(await subjects(ada), ["English", "Mathematics"]);
+  assert.equal((await db.rpc(maths, "progress_report", { p_student: ada, p_period: "week" })).scope, "teacher");
+
+  // Parent codes: staff only. A parent signs up with one and adds a second child with the other.
+  const codes = await db.rpc(maths, "parent_codes", { p_class: mc.id });
+  assert.deepEqual(codes.students.map((s) => s.name), ["Ada Obi", "Obi Obi"]);
+  assert.equal((await db.rpc(maths, "parent_codes", { p_class: mc.id })).students[0].code, codes.students[0].code, "the code stays the same");
+  await rejects(db.rpc(ada, "parent_codes", { p_class: mc.id }), /Class not found/);
+  await rejects(db.rpc(english, "parent_codes", { p_class: mc.id }), /Class not found/);
+  const mum = await db.signUp("mum@roles.test", "Mrs Obi");
+  const r = await db.rpc(mum, "redeem_code", { p_code: codes.students[0].code, p_full_name: "Mrs Obi" });
+  assert.equal(r.role, "parent");
+  await db.rpc(mum, "redeem_code", { p_code: codes.students[1].code });
+  assert.deepEqual((await db.rpc(mum, "parent_children", {})).map((k) => k.name).sort(), ["Ada Obi", "Obi Obi"]);
+  // A new code: the old one stops working, the parent stays linked.
+  const fresh = await db.rpc(maths, "new_parent_code", { p_student: ada });
+  assert.notEqual(fresh, codes.students[0].code);
+  const dad = await db.signUp("dad@roles.test", "Mr Obi");
+  assert.match((await db.rpc(dad, "redeem_code", { p_code: codes.students[0].code })).error, /No class or invite matches/);
+  assert.equal((await db.rpc(mum, "parent_children", {})).length, 2);
+
+  // Feedback to each subject teacher, with a reply. Teachers see their own; the admin sees all.
+  const targets = await db.rpc(mum, "feedback_targets", { p_student: ada });
+  assert.deepEqual(targets.map((t) => [t.subject, t.teacher]), [["English", "Mrs English"], ["Mathematics", "Mr Maths"]]);
+  await db.rpc(mum, "send_parent_feedback", { p_student: ada, p_class: ec.id, p_body: "Ada finds the reading hard at home." });
+  await db.rpc(mum, "send_parent_feedback", { p_student: ada, p_class: mc.id, p_body: "Thank you, she loves fractions now." });
+  await rejects(db.rpc(mum, "send_parent_feedback", { p_student: ada, p_class: ec.id, p_body: "x" }), /check/);
+  await db.rpc(dad, "redeem_code", { p_code: codes.students[1].code });   // Obi's parent only
+  await rejects(db.rpc(dad, "send_parent_feedback", { p_student: ada, p_class: ec.id, p_body: "Hello" }), /Not your child/);
+  const inbox = await db.rpc(english, "parent_feedback_list", {});
+  assert.deepEqual(inbox.map((f) => [f.subject, f.parent, f.student]), [["English", "Mrs Obi", "Ada Obi"]]);
+  const f = inbox[0];
+  await rejects(db.rpc(maths, "reply_parent_feedback", { p_feedback: f.id, p_reply: "Not mine" }), /Feedback not found/);
+  await db.rpc(english, "reply_parent_feedback", { p_feedback: f.id, p_reply: "Thanks, I'll give her extra reading time." });
+  const mine = await db.rpc(mum, "parent_feedback_list", { p_student: ada });
+  assert.equal(mine.find((x) => x.subject === "English").reply, "Thanks, I'll give her extra reading time.");
+  assert.equal((await db.rpc(A, "parent_feedback_list", {})).length, 2, "the school admin reads all feedback");
+  assert.equal((await db.as(maths, "select count(*)::int n from public.parent_feedback"))[0].n, 1, "a teacher reads only their own");
+
+  // School-wide progress, for admins only.
+  const sp = await db.rpc(A, "school_progress", { p_period: "week" });
+  assert.deepEqual([sp.summary.answers, sp.summary.accuracy, sp.summary.active], [10, 50, 1]);
+  assert.equal(sp.hardest[0].topic, "English topic");
+  assert.equal(sp.hardest[0].struggling, 1);
+  assert.deepEqual(sp.feedback, { total: 2, unanswered: 1 });
+  const byClass = await db.rpc(A, "school_progress", { p_period: "week", p_class: mc.id });
+  assert.equal(byClass.summary.pupils, 2);
+  await rejects(db.rpc(maths, "school_progress", { p_period: "week" }), /Only school admins/);
+  const other = await db.signUp("head@other-roles.test", "Other Head");
+  await db.rpc(other, "bootstrap_school", { p_school_name: "Other School", p_full_name: "Other Head" });
+  await rejects(db.rpc(other, "school_progress", { p_period: "week", p_class: mc.id }), /Class not found/);
+  assert.equal((await db.rpc(other, "school_progress", { p_period: "week" })).summary.answers, 0, "another school sees none of it");
 });
