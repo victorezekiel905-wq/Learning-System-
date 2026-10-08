@@ -315,7 +315,6 @@ export async function renderPdfPages(bytes: Uint8Array, opts: { maxPages?: numbe
  * has no LibreOffice (the Docker image installs it; other hosts fall back to text).
  */
 export async function officeToPdf(bytes: Uint8Array, ext: string): Promise<Uint8Array | null> {
-  const { execFile } = await import("node:child_process");
   const { mkdtemp, writeFile, readFile, rm, access } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const path = await import("node:path");
@@ -331,24 +330,85 @@ export async function officeToPdf(bytes: Uint8Array, ext: string): Promise<Uint8
     await writeFile(input, bytes);
     // A private profile per conversion, so parallel imports don't share LibreOffice's lock.
     const profile = `file://${dir.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "/$1:")}/profile`;
-    const run = () => new Promise<{ code: number | string | null; out: string }>((resolve) => {
-      // Runs an installed program, not a project file: tell the bundler not to trace it.
-      execFile(/* turbopackIgnore: true */ bin!, ["--headless", "--invisible", "--nologo", "--norestore", "--nodefault", "--nolockcheck",
-        `-env:UserInstallation=${profile}`, "--convert-to", "pdf", "--outdir", dir, input],
-        { timeout: 120_000, maxBuffer: 1 << 20, env: { ...process.env, HOME: dir, TMPDIR: dir } },
-        (err, stdout, stderr) => resolve({ code: err ? ((err as NodeJS.ErrnoException).code ?? (err as { signal?: string }).signal ?? 1) : 0,
-                                            out: `${stdout ?? ""}\n${stderr ?? ""}`.trim() }));
-    });
+    const started = Date.now();
+    const run = () => runOffice(bin!, ["--headless", "--invisible", "--nologo", "--norestore", "--nodefault", "--nolockcheck",
+      `-env:UserInstallation=${profile}`, "--convert-to", "pdf", "--outdir", dir, input], dir, OFFICE_TIMEOUT_MS);
     const made = () => access(output).then(() => true, () => false);
     // A brand-new profile makes LibreOffice set itself up and exit (code 81) without
     // converting; the second run converts. Success is judged by the PDF, not the exit code.
     let last = await run();
-    if (!(await made())) last = await run();
+    if (!(await made()) && last.reason !== "timeout" && last.reason !== "memory") last = await run();
     if (!(await made())) {
-      console.error("[lesson-import] LibreOffice conversion failed", { bin, code: last.code, output: last.out.slice(-2000) });
-      throw new Error("The presentation couldn't be converted. Try saving it as PDF and importing that.");
+      console.error("[lesson-import] LibreOffice conversion failed", { bin, ...last, seconds: Math.round((Date.now() - started) / 1000) });
+      throw new Error(`The presentation couldn't be converted: ${officeReason(last)} Saving it as PDF and importing that always works.`);
     }
     return new Uint8Array(await readFile(output));
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+const OFFICE_TIMEOUT_MS = 240_000;
+
+type OfficeRun = { reason: "ok" | "timeout" | "memory" | "missing" | "failed"; code: number | string | null; signal: string | null; output: string };
+
+/** Runs LibreOffice and says why it stopped: timed out, killed for memory, couldn't start, or its own error. */
+async function runOffice(bin: string, args: string[], home: string, timeout: number): Promise<OfficeRun> {
+  const { execFile } = await import("node:child_process");
+  return new Promise((resolve) => {
+    // Runs an installed program, not a project file: tell the bundler not to trace it.
+    execFile(/* turbopackIgnore: true */ bin, args, { timeout, maxBuffer: 1 << 20, env: { ...process.env, HOME: home, TMPDIR: home } },
+      (err, stdout, stderr) => {
+        const output = `${stdout ?? ""}\n${stderr ?? ""}`.trim().slice(-2000);
+        if (!err) return resolve({ reason: "ok", code: 0, signal: null, output });
+        const e = err as NodeJS.ErrnoException & { killed?: boolean; signal?: string | null; code?: number | string };
+        const reason = e.killed ? "timeout" : e.signal === "SIGKILL" ? "memory"
+          : e.code === "ENOENT" || e.code === "EACCES" ? "missing" : "failed";
+        resolve({ reason, code: e.code ?? null, signal: e.signal ?? null, output });
+      });
+  });
+}
+
+function officeReason(r: OfficeRun): string {
+  switch (r.reason) {
+    case "timeout": return `the server took longer than ${OFFICE_TIMEOUT_MS / 60_000} minutes (it is too slow: Render's free plan has a tenth of a CPU; use Starter or higher).`;
+    case "memory": return "the server ran out of memory (use a plan with more memory, e.g. Standard with 2 GB).";
+    case "missing": return "LibreOffice could not be started on this server.";
+    default: return `LibreOffice stopped (${r.signal ?? `code ${r.code}`}: ${r.output.split("\n").filter(Boolean).pop() ?? "no details"}).`;
+  }
+}
+
+/**
+ * For the platform console: is LibreOffice installed, how fast does it start here,
+ * and what does the server have? Converts a one-line document to PDF.
+ */
+export async function officeCheck(): Promise<Record<string, unknown>> {
+  const { mkdtemp, writeFile, rm, access, stat } = await import("node:fs/promises");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const server = { cpus: os.cpus().length, memory_mb: Math.round(os.totalmem() / 1048576), free_mb: Math.round(os.freemem() / 1048576) };
+  const candidates = [process.env.SOFFICE_PATH, "/usr/bin/soffice", "/usr/bin/libreoffice", "/usr/lib/libreoffice/program/soffice",
+    "/opt/libreoffice/program/soffice", "C:\\Program Files\\LibreOffice\\program\\soffice.exe"].filter(Boolean) as string[];
+  let bin: string | null = null;
+  for (const c of candidates) { try { await access(c); bin = c; break; } catch { /* next */ } }
+  if (!bin) return { installed: false, server, advice: "LibreOffice is not installed. Use the Docker runtime (render.yaml) so PowerPoint imports keep their design." };
+  const dir = await mkdtemp(path.join(os.tmpdir(), "office-check-"));
+  try {
+    const version = await runOffice(bin, ["--version"], dir, 60_000);
+    const input = path.join(dir, "check.txt");
+    await writeFile(input, "SwiftCipher conversion check");
+    const profile = `file://${dir.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "/$1:")}/profile`;
+    const args = ["--headless", "--invisible", "--nologo", "--norestore", "--nodefault", "--nolockcheck", `-env:UserInstallation=${profile}`,
+      "--convert-to", "pdf", "--outdir", dir, input];
+    const t0 = Date.now();
+    let run = await runOffice(bin, args, dir, OFFICE_TIMEOUT_MS);
+    const pdf = path.join(dir, "check.pdf");
+    let ok = await stat(pdf).then(() => true, () => false);
+    if (!ok && run.reason === "failed") { run = await runOffice(bin, args, dir, OFFICE_TIMEOUT_MS); ok = await stat(pdf).then(() => true, () => false); }
+    return {
+      installed: true, bin, version: version.output.split("\n")[0] ?? null, server,
+      conversion: { ok, seconds: Math.round((Date.now() - t0) / 100) / 10, reason: ok ? "ok" : officeReason(run), output: ok ? undefined : run.output }
+    };
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
