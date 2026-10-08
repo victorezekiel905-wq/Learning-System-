@@ -7,6 +7,24 @@ import { rpc, errorText } from "@/lib/rpc";
 import { isNetworkMessage, NETWORK_MESSAGE } from "@/lib/errors";
 import { safeNext } from "@/lib/utils";
 import { Alert, Button, Field, Input } from "@/components/ui";
+import { cn } from "@/lib/utils";
+import { WHO_LABEL, type Who } from "@/lib/who";
+
+
+/** Student · Parent · Staff, as links that keep the rest of the address (e.g. ?next=). */
+export function RolePicker({ value, base }: { value: Who | null; base: "/login" | "/signup" }) {
+  const params = useSearchParams();
+  const href = (w: Who) => { const p = new URLSearchParams(params.toString()); p.set("as", w); return `${base}?${p.toString()}`; };
+  return (
+    <nav aria-label="I am a" className="mb-6 grid grid-cols-3 rounded-xl border border-ink-200 bg-white p-1">
+      {(["student", "parent", "staff"] as Who[]).map((w) => (
+        <Link key={w} href={href(w)} replace aria-current={value === w ? "page" : undefined}
+          className={cn("rounded-lg px-3 py-2 text-center text-sm font-semibold no-underline transition",
+            value === w ? "bg-ink-900 text-white hover:text-white" : "text-ink-700 hover:bg-ink-100 hover:text-ink-900")}>{WHO_LABEL[w]}</Link>
+      ))}
+    </nav>
+  );
+}
 
 /** Supabase Auth messages are user-facing, except when the request never got there. */
 const authMessage = (m: string) => (isNetworkMessage(m) ? NETWORK_MESSAGE : m);
@@ -32,7 +50,7 @@ function SsoButtons({ next }: { next: string }) {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ who = "student" }: { who?: Who }) {
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNext(params.get("next"));
@@ -67,7 +85,7 @@ export function LoginForm() {
 
   return (
     <div className="space-y-5">
-      <SsoButtons next={next} />
+      {who !== "parent" && <SsoButtons next={next} />}
       <form onSubmit={submit} className="space-y-5">
         <Field label="Email" htmlFor="email"><Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label="Password" htmlFor="password"><Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
@@ -75,17 +93,27 @@ export function LoginForm() {
         {info && <Alert tone="success">{info}</Alert>}
         <Button type="submit" size="lg" className="w-full" loading={busy}>Sign in</Button>
       </form>
-      <div className="flex justify-between border-t border-ink-200 pt-5 text-[13px]">
-        <button type="button" className="font-semibold text-brand-700 hover:text-brand-800" onClick={reset}>Forgot password?</button>
-        <Link href="/signup">Create a school</Link>
+      <div className="space-y-3 border-t border-ink-200 pt-5 text-[13px]">
+        <div className="flex flex-wrap justify-between gap-2">
+          <button type="button" className="font-semibold text-brand-700 hover:text-brand-800" onClick={reset}>Forgot password?</button>
+          <Link href={`/signup?as=${who}`}>{who === "student" ? "New? Join with your class code" : who === "parent" ? "New parent? Sign up with your child's code" : "New staff? Use your invite code"}</Link>
+        </div>
+        {who === "staff" && <p className="text-ink-500">Setting up SwiftCipher for a new school? <Link href="/signup">Create a school</Link></p>}
+        {who === "student" && <p className="text-ink-500">Joining a live lesson with a code? <Link href="/join">Join without an account</Link></p>}
       </div>
     </div>
   );
 }
 
-type Intent = { intent: "school"; school_name: string } | { intent: "code"; code: string };
+type Intent = { intent: "school"; school_name: string } | { intent: "code"; code: string; as?: Who };
 
-export function SignupForm({ mode }: { mode: "school" | "code" }) {
+const CODE_FIELD: Record<Who, { label: string; hint: string; button: string }> = {
+  student: { label: "Class code", hint: "From your teacher (6 letters and numbers).", button: "Create account and join my class" },
+  parent: { label: "Parent code", hint: "From your child's school (10 letters and numbers). One code per child: add your other children after you sign up.", button: "Create account and see my child" },
+  staff: { label: "Staff invite code", hint: "From your school admin. Use the email address the invite was sent to.", button: "Create staff account" }
+};
+
+export function SignupForm({ mode, who }: { mode: "school" | "code"; who?: Who }) {
   const router = useRouter();
   const params = useSearchParams();
   const [fullName, setFullName] = useState("");
@@ -102,7 +130,7 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
     e.preventDefault();
     if (!agreed) { setErr("Please accept the Terms of Service and Privacy Notice to continue."); return; }
     setBusy(true); setErr(null);
-    const intent: Intent = mode === "school" ? { intent: "school", school_name: school.trim() } : { intent: "code", code: code.trim().toUpperCase() };
+    const intent: Intent = mode === "school" ? { intent: "school", school_name: school.trim() } : { intent: "code", code: code.trim().toUpperCase(), ...(who ? { as: who } : {}) };
     const sb = createClient();
     const { data, error } = await sb.auth.signUp({
       email, password,
@@ -141,7 +169,7 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
   return (
     <form onSubmit={submit} className="space-y-5">
       {mode === "code" ? (
-        <Field label="Join code" hint="From your teacher (class code) or your school (invite code)." htmlFor="code">
+        <Field label={who ? CODE_FIELD[who].label : "Join code"} hint={who ? CODE_FIELD[who].hint : "From your teacher (class code) or your school (invite code)."} htmlFor="code">
           <Input id="code" required value={code} maxLength={12} className="font-mono uppercase tracking-widest"
                  onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
         </Field>
@@ -165,7 +193,7 @@ export function SignupForm({ mode }: { mode: "school" | "code" }) {
         </span>
       </label>
       {err && <Alert tone="error">{err}</Alert>}
-      <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!agreed}>{mode === "school" ? "Create school workspace" : "Create account and join"}</Button>
+      <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!agreed}>{mode === "school" ? "Create school workspace" : who ? CODE_FIELD[who].button : "Create account and join"}</Button>
     </form>
   );
 }
@@ -174,7 +202,7 @@ export async function completeIntent(intent: Intent, fullName: string) {
   if (intent.intent === "school") {
     await rpc("bootstrap_school", { p_school_name: intent.school_name, p_full_name: fullName });
   } else {
-    const r = await rpc<{ error?: string }>("redeem_code", { p_code: intent.code, p_full_name: fullName });
+    const r = await rpc<{ error?: string }>("redeem_code", { p_code: intent.code, p_full_name: fullName, p_as: intent.as ?? null });
     // A wrong code comes back as a value (so the server can count it), not an exception.
     if (r?.error) throw new Error(r.error);
   }

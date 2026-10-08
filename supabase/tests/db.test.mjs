@@ -2028,3 +2028,52 @@ test("roles: teachers see their own subjects, parent codes, feedback to teachers
   await rejects(db.rpc(other, "school_progress", { p_period: "week", p_class: mc.id }), /Class not found/);
   assert.equal((await db.rpc(other, "school_progress", { p_period: "week" })).summary.answers, 0, "another school sees none of it");
 });
+
+test("sign-up checks who is joining; the platform's support account acts as a school admin (0960)", async () => {
+  const H = await db.signUp("head@support.test", "Head");
+  const tenant = (await db.rpc(H, "bootstrap_school", { p_school_name: "Support School", p_full_name: "Head" })).tenant_id;
+  await db.admin("update public.tenants set plan_code = 'school' where id = $1", [tenant]);
+  const cls = await db.rpc(H, "create_class", { p_name: "Basic 5" });
+  const kid = await db.signUp("kid@support.test", "Kid");
+  await db.rpc(kid, "redeem_code", { p_code: cls.join_code, p_as: "student" });
+  const pcode = (await db.rpc(H, "parent_codes", { p_class: cls.id })).students[0].code;
+
+  // A parent who types the class code, or a student who types a parent code, is told so and nothing is created.
+  const mum = await db.signUp("mum@support.test", "Mum");
+  await rejects(db.rpc(mum, "redeem_code", { p_code: cls.join_code, p_as: "parent" }), /class code for students/);
+  await rejects(db.rpc(mum, "redeem_code", { p_code: pcode, p_as: "student" }), /parent code/);
+  assert.equal((await db.admin("select count(*)::int n from public.users where id = $1", [mum]))[0].n, 0);
+  assert.equal((await db.rpc(mum, "redeem_code", { p_code: pcode, p_as: "parent" })).role, "parent");
+  const inv = await db.rpc(H, "create_invite", { p_role: "teacher" });
+  const t = await db.signUp("t@support.test", "Teacher");
+  await rejects(db.rpc(t, "redeem_code", { p_code: inv.code, p_as: "parent" }), /staff invite/);
+  await db.rpc(t, "redeem_code", { p_code: inv.code, p_as: "staff" });
+
+  // Only the super admin can open a school as its support account.
+  await rejects(db.rpc(H, "sa_support_account", { p_tenant: tenant }), /Not found/);
+  const boss = await db.signUp("owner@platform.test", "Platform Owner");
+  await db.admin("delete from public.platform_admins");
+  await db.admin("insert into public.platform_admins (user_id) values ($1)", [boss]);
+  const acct = await db.rpc(boss, "sa_support_account", { p_tenant: tenant });
+  assert.equal(acct.user_id, null);
+  assert.match(acct.email, /^support-[0-9a-f]{16}@support\.swiftcipher\.invalid$/);
+  const wrong = await db.signUp("someone@else.test", "Someone");
+  await rejects(db.rpc(boss, "sa_register_support", { p_tenant: tenant, p_user: wrong }), /Not a support account/);
+  const support = await db.signUp(acct.email, "x");
+  await db.rpc(boss, "sa_register_support", { p_tenant: tenant, p_user: support });
+  assert.equal((await db.rpc(boss, "sa_support_account", { p_tenant: tenant })).user_id, support);
+  const [row] = await db.admin("select role, full_name, is_support from public.users where id = $1", [support]);
+  assert.deepEqual(row, { role: "school_admin", full_name: "SwiftCipher support", is_support: true });
+
+  // Inside, it is a school admin of that school only.
+  assert.equal((await db.rpc(support, "me", {})).profile.is_support, true);
+  assert.equal((await db.rpc(H, "me", {})).profile.is_support, false);
+  assert.equal((await db.rpc(support, "school_progress", { p_period: "week" })).summary.pupils, 1);
+  assert.equal((await db.as(support, "select count(*)::int n from public.tenants"))[0].n, 1);
+  // It never takes a staff seat, and visits are recorded for the platform.
+  const seats = (await db.admin("select count(*)::int n from public.users where tenant_id = $1 and role in ('teacher','school_admin') and not is_support", [tenant]))[0].n;
+  assert.equal(seats, 2);
+  assert.ok((await db.admin("select count(*)::int n from public.platform_audit where action = 'support.enter' and actor_id = $1", [boss]))[0].n >= 2);
+  await db.admin("delete from public.platform_admins");
+  await db.admin("insert into public.platform_admins (user_id) values ($1)", [S.superA]);
+});

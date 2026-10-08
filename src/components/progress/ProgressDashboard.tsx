@@ -10,6 +10,8 @@ import { cn, plural } from "@/lib/utils";
 export type Progress = {
   student: { id: string; name: string };
   period: Period; date: string; today: string; needs_terms: boolean;
+  /** "teacher": only the viewing teacher's own lessons and classes (0950). */
+  scope?: "all" | "teacher";
   terms: { id: string; name: string; school_year: string; starts_on: string; ends_on: string }[];
   from?: string; to?: string; label?: string; unit?: "day" | "week" | "month" | null;
   prev_date?: string | null; next_date?: string | null;
@@ -115,6 +117,7 @@ export function ProgressView({ p, error, viewer, isAdmin, period, date, onPeriod
 
       {p && p.summary && (
         <>
+          {p.scope === "teacher" && <p className="rounded-xl bg-ink-100 px-4 py-2.5 text-[13px] text-ink-700 print:hidden">Showing your own subjects and lessons only. School admins see every subject.</p>}
           <h2 className="hidden font-display text-xl font-bold print:block">Progress: {p.student.name} · {p.label}</h2>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Big label="Lessons attended" value={p.summary.held ? `${p.summary.attended} of ${p.summary.held}` : p.summary.attended}>

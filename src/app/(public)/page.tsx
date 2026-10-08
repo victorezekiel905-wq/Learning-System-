@@ -64,6 +64,24 @@ export default async function Landing() {
             <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-ink-900" strokeWidth={2.6} aria-hidden />{t}</li>
           ))}
         </ul>
+
+        {/* Sign in or sign up, by who you are */}
+        <div className="mt-12 grid gap-4 sm:grid-cols-3" aria-label="Sign in">
+          {([
+            ["student", "Students", "Join your lessons, play the quizzes, and see your progress in every subject.", "Join with your class code"],
+            ["parent", "Parents", "Follow each of your children: lessons, results, strengths, and where they need help.", "Sign up with your child's code"],
+            ["staff", "Staff", "Design slides, teach live, and see how your students are doing in your subjects.", "Use your invite from the school"]
+          ] as const).map(([who, title, text, signup]) => (
+            <div key={who} className="flex flex-col rounded-2xl border border-ink-200 bg-white p-5">
+              <h2 className="font-display text-xl font-extrabold text-ink-900">{title}</h2>
+              <p className="mt-1 flex-1 text-[15px] leading-relaxed text-ink-600">{text}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Link href={`/login?as=${who}`} className="btn btn-ink no-underline">Sign in</Link>
+                <Link href={`/signup?as=${who}`} className="text-sm font-semibold">{signup}</Link>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* The product, as the teacher sees it */}

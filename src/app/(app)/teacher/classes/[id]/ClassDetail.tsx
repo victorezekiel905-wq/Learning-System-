@@ -34,6 +34,7 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
         subtitle={[cls.subject, cls.grade_level].filter(Boolean).join(" · ") || undefined}
         actions={canManage && <>
           <Link href={`/teacher/insights?class=${cls.id}`} className="btn btn-secondary no-underline">Analytics</Link>
+          {FEATURES.parentPortal && <Link href={`/teacher/classes/${cls.id}/parent-codes`} className="btn btn-secondary no-underline">Parent codes</Link>}
           <Link href={`/teacher/live/new?class=${cls.id}`} className="btn btn-primary no-underline">Go live</Link>
         </>} />
 
@@ -84,8 +85,11 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
 
   async function parentInvite(studentId: string, name: string) {
     try {
-      const inv = await rpc<{ code: string }>("create_invite", { p_role: "parent", p_student: studentId, p_days: 30 });
-      setCodeModal({ title: `Parent invite for ${name}`, code: inv.code, note: "Give this code to the parent or guardian. They sign up at /join. It is valid for 30 days and works once." });
+      // The student's standing parent code (the same one on the class's printable letters).
+      const r = await rpc<{ students: { student_id: string; code: string }[] }>("parent_codes", { p_class: cls.id });
+      const code = r.students.find((s) => s.student_id === studentId)?.code;
+      if (!code) throw new Error("No parent code for this student.");
+      setCodeModal({ title: `Parent code for ${name}`, code, note: `Give this code to the parent or guardian. They sign up at ${window.location.origin}/signup?as=parent, or add it under My children if they already have an account. Up to 4 parents can use it.` });
     } catch (e) { toast(errorText(e), "error"); }
   }
 
@@ -126,7 +130,7 @@ function Roster({ cls, canManage, members, loading, reload }: { cls: Cls; canMan
                         <Link href={`/teacher/students/${m.user_id}`} className="btn btn-secondary btn-sm hidden no-underline sm:inline-flex">Report</Link>
                         <Menu label={`More for ${m.users?.full_name ?? "this student"}`} items={[
                           ...(FEATURES.messaging ? [{ label: "Message parent", icon: <Icon name="chat" className="h-4 w-4" />, onSelect: () => messageParent(m.user_id, m.users?.full_name ?? "this student") }] : []),
-                          ...(FEATURES.parentPortal ? [{ label: "Parent invite code", icon: <Icon name="users" className="h-4 w-4" />, onSelect: () => parentInvite(m.user_id, m.users?.full_name ?? "student") }] : []),
+                          ...(FEATURES.parentPortal ? [{ label: "Parent code", icon: <Icon name="users" className="h-4 w-4" />, onSelect: () => parentInvite(m.user_id, m.users?.full_name ?? "student") }] : []),
                           { label: "Pair a device", icon: <Icon name="laptop" className="h-4 w-4" />, onSelect: () => pairDevice(m.user_id, m.users?.full_name ?? "student") },
                           { label: "Remove from class", icon: <Icon name="trash" className="h-4 w-4" />, tone: "danger", onSelect: () => remove(m.user_id) }
                         ]} />

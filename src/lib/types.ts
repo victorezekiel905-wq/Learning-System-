@@ -9,6 +9,8 @@ export type Profile = {
   nickname: string | null;
   role: Role;
   status: "active" | "suspended";
+  /** The platform's support account inside this school (0960). */
+  is_support?: boolean;
 };
 
 export type TenantSettings = {

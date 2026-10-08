@@ -11,7 +11,7 @@ export default async function OnboardingPage() {
   if (!me) redirect("/login?next=/onboarding");
   if (me.profile) redirect(homeFor(me.profile.role));
   const { data: { user } } = await (await createClient()).auth.getUser();
-  const meta = (user?.user_metadata ?? {}) as { full_name?: string; intent?: string; school_name?: string; code?: string };
+  const meta = (user?.user_metadata ?? {}) as { full_name?: string; intent?: string; school_name?: string; code?: string; as?: string };
   return (
     <main className="mx-auto max-w-lg px-6 py-10">
       <h1 className="text-2xl font-bold">Finish setting up</h1>

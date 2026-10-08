@@ -49,6 +49,8 @@ const NAV: NavItem[] = [
   { href: "/teacher/challenge", label: "Challenge", icon: "trophy", roles: T, group: "Run" },
   { href: "/teacher/insights", label: "Analytics", icon: "chart", roles: T, group: "Assess" },
   { href: "/teacher/reports", label: "Reports", icon: "file", roles: [...T, "it_admin"], group: "Assess" },
+  { href: "/admin/progress", label: "School progress", icon: "chart", roles: A, group: "Assess" },
+  ...(FEATURES.parentPortal ? [{ href: "/teacher/feedback", label: "Parent feedback", icon: "chat", roles: T, group: "Assess" } as NavItem] : []),
   { href: "/guard", label: "Devices", icon: "laptop", roles: IT, exact: true, group: "Safety", monitoring: true },
   { href: "/guard/environments", label: "Environments", icon: "shield", roles: IT, group: "Safety", monitoring: true },
   { href: "/student", label: "Home", icon: "home", roles: ["student"], exact: true, group: "Learn" },
@@ -147,9 +149,9 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
   );
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[256px_minmax(0,1fr)]" style={themeVars}>
+    <div className="min-h-screen lg:grid lg:grid-cols-[256px_minmax(0,1fr)] print:!block" style={themeVars}>
       {/* Desktop: a dark rail that frames the work. */}
-      <aside className="hidden bg-ink-950 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+      <aside className="hidden bg-ink-950 text-white print:!hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
         <div className="flex h-16 shrink-0 items-center px-5"><SchoolBrand logoPath={s?.brand_logo_path} name={s?.brand_name} onDark /></div>
         <div className="flex-1 overflow-y-auto px-3 pb-6 pt-2 [scrollbar-width:thin]">{nav(true)}</div>
         <div className="border-t border-white/10 p-3">
@@ -167,7 +169,7 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
       </aside>
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-ink-200 bg-ink-50/85 px-4 backdrop-blur-md sm:px-6 lg:h-16 lg:px-8">
+        <header className="sticky top-0 z-30 flex h-14 print:hidden items-center justify-between gap-3 border-b border-ink-200 bg-ink-50/85 px-4 backdrop-blur-md sm:px-6 lg:h-16 lg:px-8">
           <div className="flex min-w-0 items-center gap-1 lg:hidden">
             <button className="btn btn-ghost -ml-2 h-10 w-10 px-0" onClick={() => setMenuOpen(true)} aria-label="Menu" aria-expanded={menuOpen} aria-controls="app-menu">
               <Icon name="menu" className="h-5 w-5" />
@@ -191,12 +193,13 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
           </div>
         </header>
 
+        {me.profile.is_support && <SupportBar school={me.tenant?.name ?? "this school"} />}
         <main id="main" className={cn("flex-1", !focus && "pb-24 lg:pb-0")}>{children}</main>
       </div>
 
       {/* Phones and tablets: a tab bar for the daily destinations. */}
       {!focus && tabs.length > 0 && (
-        <nav aria-label="Quick" className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-ink-200 bg-white/95 backdrop-blur-md lg:hidden">
+        <nav aria-label="Quick" className="pb-safe fixed print:hidden inset-x-0 bottom-0 z-40 border-t border-ink-200 bg-white/95 backdrop-blur-md lg:hidden">
           <ul className="mx-auto grid max-w-xl" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
             {tabs.map((n) => {
               const active = isActive(n);
@@ -332,6 +335,23 @@ function NotificationBell({ userId, initialUnread }: { userId: string; initialUn
           <Link href="/notifications" className="block border-t border-ink-100 px-4 py-3 text-center text-[13px] font-semibold no-underline">See all notifications</Link>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Shown while the platform owner is inside a school with "Open as admin". */
+function SupportBar({ school }: { school: string }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div role="status" className="flex flex-wrap items-center justify-between gap-2 bg-rose-700 px-4 py-2 text-sm text-white sm:px-6 lg:px-8 print:hidden">
+      <span>You are in <b>{school}</b> as SwiftCipher support. Everything you change is recorded.</span>
+      <button type="button" disabled={busy} className="rounded-lg bg-white/15 px-3 py-1 font-semibold hover:bg-white/25"
+        onClick={async () => {
+          setBusy(true);
+          // A full reload: the session changes.
+          try { const r = await fetch("/api/support/exit", { method: "POST" }).then((x) => x.json()); window.location.assign(new URL(r.redirect ?? "/login?as=staff", window.location.origin)); }
+          catch { window.location.assign(new URL("/login?as=staff", window.location.origin)); }
+        }}>{busy ? "Returning…" : "Return to platform console"}</button>
     </div>
   );
 }

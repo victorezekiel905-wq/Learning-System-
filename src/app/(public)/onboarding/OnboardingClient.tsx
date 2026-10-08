@@ -2,10 +2,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { completeIntent } from "@/components/auth/AuthForms";
+import { parseWho } from "@/lib/who";
 import { Alert, Button, Field, Input, Tabs } from "@/components/ui";
 import { errorText } from "@/lib/rpc";
 
-export function OnboardingClient({ defaults }: { defaults: { full_name?: string; intent?: string; school_name?: string; code?: string } }) {
+export function OnboardingClient({ defaults }: { defaults: { full_name?: string; intent?: string; school_name?: string; code?: string; as?: string } }) {
   const router = useRouter();
   const [tab, setTab] = useState<"code" | "school">(defaults.intent === "school" ? "school" : "code");
   const [name, setName] = useState(defaults.full_name ?? "");
@@ -18,7 +19,7 @@ export function OnboardingClient({ defaults }: { defaults: { full_name?: string;
   async function run(kind: "school" | "code") {
     setBusy(true); setErr(null);
     try {
-      await completeIntent(kind === "school" ? { intent: "school", school_name: school.trim() } : { intent: "code", code: code.trim() }, name.trim());
+      await completeIntent(kind === "school" ? { intent: "school", school_name: school.trim() } : { intent: "code", code: code.trim(), as: parseWho(defaults.as) ?? undefined }, name.trim());
       router.replace("/dashboard");
       router.refresh();
     } catch (e) {
