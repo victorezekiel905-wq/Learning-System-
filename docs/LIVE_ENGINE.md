@@ -142,8 +142,7 @@ Phase 2: `video` (synced), `embed`, `resource`, `short_answer`, `word_cloud`, `d
    portal; monitoring behind a per-school switch (off by default for new schools, migration 0870).
 1. ✅ **Engine core** (done 2026-10-07, migration 0880): phases, `session_control`, `state` broadcasts with the compact state, lobby with avatars, pause, end screens, classless sessions, join by code for students.
 2. ✅ **Scoring** (done 2026-10-07, migration 0890): server-side points (correct, speed, streak, participation), the frozen leaderboard snapshot with rank movement, the points line after each answer, own rank privately, final score.
-3. **Teacher control panel** with keyboard shortcuts (→ ← L R P), the projector view
-   (slide, code, QR, results, leaderboard).
+3. ✅ **Teacher control panel** (done 2026-10-08, migration 0900): keyboard shortcuts (→ ← L R P S), reveal, live answered counts, QR code, projector results and leaderboard, game settings at the start.
 4. **Deck builder:** the slide-type registry, slide sorter, canvas, properties panel.
 5. **Report and proof:** per-question accuracy and per-participant scores;
    cross-school isolation tests; a 30-browser latency test against the 300 ms target.

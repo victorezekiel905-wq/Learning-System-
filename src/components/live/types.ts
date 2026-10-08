@@ -32,6 +32,8 @@ export type ActivityResults = {
   activity: { id: string; title: string; kind: string };
   attempts: number;
   submitted: number;
+  /** Live engine (0900): students who answered, people in the lesson, and whether answers were revealed. */
+  answered?: number; joined?: number; revealed?: boolean;
   questions: {
     question_id: string; prompt: string; kind: string; points: number; responses: number; correct: number; avg_elapsed_ms: number | null;
     options: { id: string; label: string; is_correct: boolean; count: number }[];

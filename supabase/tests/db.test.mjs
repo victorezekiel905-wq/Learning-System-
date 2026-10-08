@@ -1617,3 +1617,54 @@ test("points and leaderboard: server scoring, speed, streaks, private ranks (089
   assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).session.show_leaderboard, false);
   await db.rpc(T, "session_control", { p_session: s.id, p_action: "end" });
 });
+
+test("reveal closes the activity and shows the right answers; live answered counts (0900)", async () => {
+  const T = await db.signUp("t@reveal.test", "Reveal Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Reveal School", p_full_name: "Reveal Teacher" })).tenant_id;
+  const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title, status) values ($1, $2, 'Reveal deck', 'published') returning id", [tenant, T]);
+  const [{ id: act }] = await db.admin(`insert into public.activities (tenant_id, lesson_id, owner_id, kind, title, settings)
+    values ($1, $2, $3, 'quiz', 'Check', '{"show_feedback": "after_submit"}') returning id`, [tenant, lesson, T]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, content) values ($1, $2, 0, 'title', '{}')", [tenant, lesson]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 1, 'activity', $3, '{}')", [tenant, lesson, act]);
+  const [{ id: qid }] = await db.admin("insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, position) values ($1, $2, $3, 'mcq', '2+2?', 1, 0) returning id", [tenant, act, T]);
+  const [{ id: right }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, '4', true, 0) returning id", [tenant, qid]);
+  const [{ id: wrong }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, '5', false, 1) returning id", [tenant, qid]);
+
+  const s = await db.rpc(T, "start_session", { p_class: null, p_lesson: lesson });
+  const [a, b, c] = [await db.signInAnonymously(), await db.signInAnonymously(), await db.signInAnonymously()];
+  for (const [g, n] of [[a, "Amy"], [b, "Bola"], [c, "Chidi"]]) await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: n });
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "start" });
+  await rejects(db.rpc(T, "session_control", { p_session: s.id, p_action: "reveal" }), /no activity on this slide/);
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "next" });
+
+  // Amy answers right, Bola wrong, Chidi doesn't answer. The teacher sees 2 of 3.
+  const ta = (await db.rpc(a, "start_attempt", { p_activity: act, p_session: s.id })).attempt.id;
+  const tb = (await db.rpc(b, "start_attempt", { p_activity: act, p_session: s.id })).attempt.id;
+  await db.rpc(a, "submit_answer", { p_attempt: ta, p_question: qid, p_response: JSON.stringify({ option_id: right }) });
+  await db.rpc(b, "submit_answer", { p_attempt: tb, p_question: qid, p_response: JSON.stringify({ option_id: wrong }) });
+  let ts = await db.rpc(T, "teacher_session_state", { p_session: s.id });
+  assert.equal(ts.activity.activity.id, act, "the activity on the current slide, without launching it");
+  assert.deepEqual([ts.activity.answered, ts.activity.joined, ts.activity.revealed], [2, 3, false]);
+
+  // Shared results before the reveal: counts, but not which option is right.
+  await db.rpc(T, "set_session_state", { p_session: s.id, p_responses_visible: true });
+  // Regression (0900): changing a setting without naming a slide kept the class where it was.
+  assert.equal((await db.admin("select current_slide from public.class_sessions where id = $1", [s.id]))[0].current_slide, 1);
+  let seen = await db.rpc(c, "activity_results", { p_activity: act, p_session: s.id });
+  assert.ok(seen.questions[0].options.every((o) => o.is_correct === null));
+
+  // Reveal: unfinished attempts are submitted, no more answers, right answers shown.
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "reveal" });
+  const statuses = await db.admin("select status from public.quiz_attempts where session_id = $1", [s.id]);
+  assert.ok(statuses.every((r) => r.status !== "in_progress"));
+  await rejects(db.rpc(b, "submit_answer", { p_attempt: tb, p_question: qid, p_response: JSON.stringify({ option_id: right }) }), /already been submitted|closed/);
+  await rejects(db.rpc(c, "start_attempt", { p_activity: act, p_session: s.id }), /not open/);
+  seen = await db.rpc(c, "activity_results", { p_activity: act, p_session: s.id });
+  assert.equal(seen.questions[0].options.find((o) => o.id === right).is_correct, true);
+  assert.equal(seen.questions[0].options.find((o) => o.id === right).count, 1);
+  assert.equal((await db.rpc(c, "session_student_state", { p_session: s.id })).revealed_activity_id, act);
+  ts = await db.rpc(T, "teacher_session_state", { p_session: s.id });
+  assert.equal(ts.activity.revealed, true);
+  await rejects(db.rpc(a, "session_control", { p_session: s.id, p_action: "reveal" }), /Not your session/);
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "end" });
+});

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, formatJoinCode } from "@/lib/utils";
@@ -109,6 +109,41 @@ export function BoardOverlay({ entries, me, my }: { entries: BoardEntry[]; me: s
         )}
         <div className="mt-6 text-center"><button type="button" onClick={() => setHidden(key)} className="text-sm text-ink-300 underline hover:text-white">Back to the lesson</button></div>
       </div>
+    </div>
+  );
+}
+
+type Shared = { questions: { question_id: string; prompt: string; options: { id: string; label: string; count: number; is_correct: boolean | null }[] }[] };
+
+/** After the teacher reveals the answers: the class's answers, with the right ones marked. */
+export function RevealedResults({ sessionId, activityId }: { sessionId: string; activityId: string }) {
+  const [data, setData] = useState<Shared | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    rpc<Shared>("activity_results", { p_activity: activityId, p_session: sessionId })
+      .then((d) => { if (live) setData(d); }).catch((e) => { if (live) setErr(errorText(e)); });
+    return () => { live = false; };
+  }, [activityId, sessionId]);
+  if (err) return <p className="text-sm text-ink-500">{err}</p>;
+  if (!data) return <p className="text-sm text-ink-500">Loading the answers…</p>;
+  return (
+    <div className="space-y-6 rounded-2xl bg-ink-950 p-5 text-white sm:p-6">
+      <p className="text-sm font-semibold text-accent-400">Answers revealed</p>
+      {data.questions.map((q) => {
+        const total = Math.max(1, q.options.reduce((n, o) => n + o.count, 0));
+        return (
+          <div key={q.question_id}>
+            <p className="font-display text-lg font-bold">{q.prompt}</p>
+            <ul className="mt-3 space-y-2">{q.options.map((o) => (
+              <li key={o.id}>
+                <div className="mb-1 flex justify-between text-sm"><span>{o.is_correct ? "✓ " : ""}{o.label}</span><span className="tabular-nums">{o.count}</span></div>
+                <div className="h-3 rounded-full bg-white/10"><div className={cn("h-full rounded-full", o.is_correct ? "bg-accent-400" : "bg-white/30")} style={{ width: `${(100 * o.count) / total}%` }} /></div>
+              </li>
+            ))}</ul>
+          </div>
+        );
+      })}
     </div>
   );
 }

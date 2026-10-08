@@ -9,6 +9,7 @@ import { rpc } from "@/lib/rpc";
 import { Icon } from "@/components/Icon";
 import { avatarFor } from "@/components/live/avatars";
 import { Leaderboard } from "@/components/live/Leaderboard";
+import { JoinQr } from "@/components/live/JoinQr";
 import { formatJoinCode } from "@/lib/utils";
 
 export function Presenter({ sessionId }: { sessionId: string }) {
@@ -33,7 +34,10 @@ export function Presenter({ sessionId }: { sessionId: string }) {
         {s?.phase === "lobby" ? (
           <div className="text-center">
             <p className="text-2xl text-ink-300">Join at <strong className="text-white">{host}/join</strong></p>
-            <p className="mt-4 font-mono text-[9rem] font-extrabold leading-none tracking-[0.15em] text-accent-400">{formatJoinCode(s.join_code)}</p>
+            <div className="mt-4 flex items-center justify-center gap-10">
+              <p className="font-mono text-[9rem] font-extrabold leading-none tracking-[0.15em] text-accent-400">{formatJoinCode(s.join_code)}</p>
+              <JoinQr code={s.join_code} className="w-48 rounded-2xl bg-white p-3" />
+            </div>
             <p className="mt-8 text-2xl text-ink-300">{here.length === 0 ? "Waiting for players…" : `${here.length} joined`}</p>
             <ul className="mx-auto mt-4 flex max-w-5xl flex-wrap justify-center gap-3">
               {here.map((r) => <li key={r.student_id} className="rounded-full bg-white/10 px-4 py-2 text-xl"><span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span> {r.name}</li>)}
@@ -54,14 +58,15 @@ export function Presenter({ sessionId }: { sessionId: string }) {
           </figure>
         ) : results && s?.responses_visible ? (
           <div className="w-full max-w-4xl space-y-6">
-            <h2 className="text-3xl font-bold">{results.activity.title}</h2>
+            <div className="flex items-baseline justify-between gap-4"><h2 className="text-3xl font-bold">{results.activity.title}</h2>
+              {results.answered !== undefined && <p className="text-xl text-ink-300">{results.answered}/{results.joined} answered</p>}</div>
             {results.questions.slice(0, 1).map((q) => (
               <div key={q.question_id} className="space-y-4">
                 <p className="text-2xl">{q.prompt}</p>
                 {q.options.map((o) => (
                   <div key={o.id}>
-                    <div className="mb-1 flex justify-between text-lg"><span>{o.label}</span><span>{o.count}</span></div>
-                    <div className="h-6 rounded-full bg-ink-700"><div className="h-full rounded-full bg-accent-400" style={{ width: `${(100 * o.count) / Math.max(q.responses, 1)}%` }} /></div>
+                    <div className="mb-1 flex justify-between text-lg"><span>{results.revealed && o.is_correct ? "✓ " : ""}{o.label}</span><span>{o.count}</span></div>
+                    <div className="h-6 rounded-full bg-ink-700"><div className={`h-full rounded-full ${results.revealed && !o.is_correct ? "bg-ink-500" : "bg-accent-400"}`} style={{ width: `${(100 * o.count) / Math.max(q.responses, 1)}%` }} /></div>
                   </div>
                 ))}
               </div>

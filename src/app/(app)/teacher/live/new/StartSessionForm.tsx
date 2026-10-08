@@ -19,6 +19,8 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
   const [env, setEnv] = useState(envs.find((e) => e.name.startsWith("Lesson focus"))?.id ?? "");
   const [title, setTitle] = useState("");
   const [monitorGuests, setMonitorGuests] = useState(false);
+  // Lesson settings (live engine): sent once the session exists.
+  const [opts, setOpts] = useState({ leaderboard: true, anonymous_names: false, late_join: true, speed_bonus: true });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -46,6 +48,14 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
           <Select value={env} onChange={(e) => setEnv(e.target.value)}><option value="">None (monitor only)</option>{envs.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</Select>
         </Field>}
         <Field label="Session title (optional)"><Input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
+        <div className="space-y-3 rounded-xl border border-ink-200 bg-white p-4">
+          <p className="text-sm font-semibold text-ink-900">Game settings</p>
+          <Toggle checked={opts.leaderboard} onChange={(v) => setOpts({ ...opts, leaderboard: v })} label="Class leaderboard"
+            description="Show the top 5 between activities. Off for sensitive checks: only you see the scores." />
+          <Toggle checked={opts.speed_bonus} onChange={(v) => setOpts({ ...opts, speed_bonus: v })} label="Speed bonus" description="Faster correct answers earn up to 50% more." />
+          <Toggle checked={opts.anonymous_names} onChange={(v) => setOpts({ ...opts, anonymous_names: v })} label="Anonymous names on the leaderboard" description='Shows "Player 1, Player 2…" instead of names.' />
+          <Toggle checked={opts.late_join} onChange={(v) => setOpts({ ...opts, late_join: v })} label="Late joiners" description="Let people join after you start." />
+        </div>
         <div className="rounded-xl border border-ink-200 bg-ink-50 p-4">
           <p className="text-sm font-semibold text-ink-900">Guests</p>
           <p className="mb-3 mt-0.5 text-[13px] text-ink-600">Anyone with the code can also join at <b>/join</b> by typing a name, with no account. You can stop new guests or remove one during the lesson.</p>
@@ -57,6 +67,7 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
           setBusy(true); setErr(null);
           try {
             const s = await rpc<{ id: string }>("start_session", { p_class: cls || null, p_lesson: lesson || null, p_mode: mode, p_title: title || null, p_environment: monitoring ? env || null : null });
+            await rpc("session_control", { p_session: s.id, p_action: "settings", p_args: opts });
             if (monitoring && monitorGuests) await rpc("set_session_guests", { p_session: s.id, p_monitor: true });
             router.push(`/teacher/live/${s.id}`);
           } catch (e) { setErr(errorText(e)); setBusy(false); }

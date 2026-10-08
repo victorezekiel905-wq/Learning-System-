@@ -12,6 +12,7 @@ import { useScreenFeed } from "@/lib/screen-feed";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, formatJoinCode, timeAgo } from "@/lib/utils";
 import { avatarFor } from "@/components/live/avatars";
+import { JoinQr } from "@/components/live/JoinQr";
 import { FEATURES } from "@/lib/features";
 import { LessonPanel } from "./LessonPanel";
 import { ResponsesPanel } from "./ResponsesPanel";
@@ -121,6 +122,28 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAlerts, sound, toast]);
 
+  // Keyboard: → next, ← back, L leaderboard, R reveal, P pause/resume, S start.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
+      const cur = s?.session;
+      if (!cur) return;
+      const ph = cur.phase ?? "active";
+      const act = (action: string, args: Record<string, unknown> = {}) =>
+        rpc("session_control", { p_session: sessionId, p_action: action, p_args: args }).then(() => state.reload()).catch((err) => toast(errorText(err), "error"));
+      const k = e.key.toLowerCase();
+      if (e.key === "ArrowRight" && ph === "active") { e.preventDefault(); void act("next"); }
+      else if (e.key === "ArrowLeft" && ph === "active") { e.preventDefault(); void act("prev"); }
+      else if (k === "s" && ph === "lobby") void act("start");
+      else if (k === "p" && (ph === "active" || ph === "paused")) void act(ph === "active" ? "pause" : "resume");
+      else if (k === "l" && ph !== "lobby") void act("leaderboard", { show: !cur.show_leaderboard });
+      else if (k === "r" && ph === "active") void act("reveal");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [s, sessionId, state, toast]);
+
   if (state.error && !s) return <div className="page"><Alert tone="error">{state.error}</Alert></div>;
   if (!s) return <div className="page text-sm text-ink-500">Connecting to the session…</div>;
 
@@ -128,7 +151,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
   const mon = s.settings.monitoring_enabled !== false;
   const joined = s.roster.filter((r) => r.presence === "online" || r.presence === "idle").length;
   const phase = s.session.phase ?? "active";
-  async function control(action: "start" | "pause" | "resume" | "leaderboard", args?: Record<string, unknown>) {
+  async function control(action: "start" | "pause" | "resume" | "leaderboard" | "next" | "prev" | "reveal", args?: Record<string, unknown>) {
     try { await rpc("session_control", { p_session: sessionId, p_action: action, p_args: args ?? {} }); void state.reload(); }
     catch (e) { toast(errorText(e), "error"); }
   }
@@ -165,6 +188,9 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
         </div>
         <div className="flex flex-wrap items-center gap-2 [&_.btn-secondary:hover]:bg-white/15 [&_.btn-secondary]:border-white/20 [&_.btn-secondary]:bg-white/5 [&_.btn-secondary]:text-white">
           {phase === "lobby" && <Button size="sm" variant="accent" onClick={() => control("start")}>Start lesson</Button>}
+          {phase === "active" && s.activity && <span className="rounded-lg border border-white/20 px-2.5 py-1 text-[13px] font-semibold tabular-nums" title="Students who have answered the activity on screen">
+            {s.activity.answered ?? 0}/{s.activity.joined ?? joined} answered</span>}
+          {phase === "active" && s.activity && !s.activity.revealed && <Button size="sm" variant="secondary" onClick={() => control("reveal")} title="Close the activity and show the right answers (R)">Reveal answers</Button>}
           {phase === "active" && <Button size="sm" variant="secondary" onClick={() => control("pause")} title="Students see 'Eyes on your teacher' until you resume">Pause</Button>}
           {phase === "paused" && <Button size="sm" variant="accent" onClick={() => control("resume")}>Resume</Button>}
           {phase !== "lobby" && s.ranking && <Button size="sm" variant={s.session.show_leaderboard ? "accent" : "secondary"} aria-pressed={!!s.session.show_leaderboard}
@@ -350,6 +376,7 @@ function WaitingRoom({ state, onStart }: { state: SessionState; onStart: () => v
       <p className="text-sm font-semibold text-accent-400">Waiting room</p>
       <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight">Students join at <span className="text-accent-400">{host}/join</span></h2>
       <p className="mt-4 font-mono text-6xl font-extrabold tracking-[0.2em] sm:text-7xl">{formatJoinCode(state.session.join_code)}</p>
+      <JoinQr code={state.session.join_code} className="mt-6 w-40 rounded-xl bg-white p-2" />
       <p className="mt-6 text-ink-300">{here.length === 0 ? "Nobody has joined yet." : `${here.length} joined`}</p>
       <ul className="mt-3 flex flex-wrap gap-2">
         {here.map((r) => (

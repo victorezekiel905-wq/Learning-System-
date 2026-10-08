@@ -17,7 +17,7 @@ import { useSignal } from "@/lib/realtime";
 import { useOfflineQueue } from "@/lib/offline-queue";
 import { errorText, rpc } from "@/lib/rpc";
 import { FEATURES } from "@/lib/features";
-import { BoardOverlay, EndScreen, Lobby, PausedOverlay } from "@/components/live/StudentPhases";
+import { BoardOverlay, EndScreen, Lobby, PausedOverlay, RevealedResults } from "@/components/live/StudentPhases";
 import type { BoardEntry } from "@/components/live/Leaderboard";
 
 type StudentState = {
@@ -30,6 +30,8 @@ type StudentState = {
   /** Points (0890): own score and rank only; the top 5 while the teacher shows the board. */
   my?: { score: number; rank: number; of: number; streak: number } | null;
   leaderboard?: BoardEntry[] | null;
+  /** Reveal (0900): the activity whose answers the teacher has shown. */
+  revealed_activity_id?: string | null;
   my_slide: number;
   active_activity: { id: string; kind: string; title: string } | null;
   spotlight: { me: boolean; show_to_class: boolean; anonymized: boolean } | null;
@@ -103,6 +105,8 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   const slides = lesson.data?.slides ?? [];
   const slide = slides.find((x) => x.position === slideIndex);
   const activeOnSlide = slide?.kind === "activity" && slide.activity?.id === s.active_activity?.id;
+  const revealedId = s.revealed_activity_id ?? null;
+  const slideRevealed = !!revealedId && slide?.kind === "activity" && slide.activity?.id === revealedId;
 
   async function openChat(kind: "teacher" | "group") {
     try {
@@ -152,12 +156,14 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
       {s.spotlight?.show_to_class && !s.spotlight.me && <SpotlightView sessionId={sessionId} />}
       <StudentReceiver sessionId={sessionId} />
 
-      {s.active_activity && !activeOnSlide && (
+      {s.active_activity && !activeOnSlide && s.active_activity.id !== revealedId && (
         <ActivityPlayer key={s.active_activity.id} activityId={s.active_activity.id} sessionId={sessionId} tenantId={me.tenantId} userId={me.id} />
       )}
 
       {s.session.mode === "front_of_class" && !s.active_activity ? (
         <Alert>Your teacher is presenting at the front of the class. Activities will appear here when they're opened.</Alert>
+      ) : slideRevealed ? (
+        <RevealedResults sessionId={sessionId} activityId={revealedId!} />
       ) : slide ? (
         <LessonStage slide={slide} sessionId={sessionId} tenantId={me.tenantId} userId={me.id}
           overlay={ann.strokes.length ? <svg viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} className="h-full w-full"><StrokeLayer strokes={ann.strokes} /></svg> : undefined} />

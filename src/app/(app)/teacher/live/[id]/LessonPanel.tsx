@@ -30,6 +30,11 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
   const slides = lesson.data?.slides ?? [];
   const slide = slides.find((x) => x.position === s.current_slide) ?? slides[0];
 
+  // Next/back go through session_control: refused unless the lesson has started.
+  async function nav(action: "next" | "prev") {
+    try { await rpc("session_control", { p_session: s.id, p_action: action }); await reload(); }
+    catch (e) { toast(errorText(e), "error"); }
+  }
   async function update(args: Record<string, unknown>) {
     try { await rpc("set_session_state", { p_session: s.id, ...args }); await reload(); }
     catch (e) { toast(errorText(e), "error"); }
@@ -56,9 +61,9 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled={s.current_slide <= 0} onClick={() => update({ p_slide: s.current_slide - 1 })}><Icon name="chevronLeft" className="h-4 w-4" />Prev</Button>
+          <Button variant="secondary" disabled={s.current_slide <= 0} onClick={() => nav("prev")} title="Previous slide (←)"><Icon name="chevronLeft" className="h-4 w-4" />Prev</Button>
           <span className="text-sm font-medium">Slide {s.current_slide + 1} / {slides.length}</span>
-          <Button variant="secondary" disabled={s.current_slide >= slides.length - 1} onClick={() => update({ p_slide: s.current_slide + 1 })}>Next<Icon name="chevronRight" className="h-4 w-4" /></Button>
+          <Button variant="secondary" disabled={s.current_slide >= slides.length - 1} onClick={() => nav("next")} title="Next slide (→)">Next<Icon name="chevronRight" className="h-4 w-4" /></Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select className="w-auto py-1 text-xs" value={s.mode} onChange={(e) => update({ p_mode: e.target.value })} aria-label="Delivery mode">
