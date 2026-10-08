@@ -18,7 +18,7 @@ type Data = {
   feedback?: { total: number; unanswered: number };
 };
 
-const tone = (p: number | null) => (p === null ? "bg-ink-300" : p >= 75 ? "bg-emerald-500" : p >= 50 ? "bg-amber-400" : "bg-rose-500");
+const tone = (p: number | null) => (p === null ? "bg-ink-200" : p < 50 ? "bg-rose-500" : "bg-ink-800");
 const Meter = ({ v, className }: { v: number | null; className?: string }) => (
   <span className={cn("block h-2 overflow-hidden rounded-full bg-ink-100", className)} aria-hidden>
     <span className={cn("block h-full rounded-full", tone(v))} style={{ width: `${v ?? 0}%` }} />

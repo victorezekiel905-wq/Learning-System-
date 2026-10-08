@@ -131,12 +131,12 @@ export function Card({ className, children, title, actions, pad = true }: {
   return (
     <section className={cn("card", className)}>
       {(title || actions) && (
-        <header className="flex min-h-[56px] flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-3 sm:px-6">
-          <h2 className="font-display text-[15px] font-bold tracking-tight text-ink-900">{title}</h2>
+        <header className={cn("flex flex-wrap items-center justify-between gap-3 px-5 pt-4 sm:px-6 sm:pt-5", !pad && "pb-3")}>
+          <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink-900">{title}</h2>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className={cn(pad && "card-pad")}>{children}</div>
+      <div className={cn(pad && "card-pad", pad && (title || actions) && "!pt-3")}>{children}</div>
     </section>
   );
 }
@@ -147,11 +147,7 @@ export function PageHeader({ title, subtitle, actions, eyebrow }: {
   return (
     <div className="mb-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-4 sm:mb-9">
       <div className="min-w-0">
-        {eyebrow && (
-          <p className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-ink-600">
-            <span aria-hidden className="h-2 w-2 rounded-full bg-accent-500 ring-4 ring-accent-500/20" />{eyebrow}
-          </p>
-        )}
+        {eyebrow && <p className="mb-1.5 text-[13px] font-medium text-ink-500">{eyebrow}</p>}
         <h1 className="page-title">{title}</h1>
         {subtitle && <p className="page-sub">{subtitle}</p>}
       </div>
@@ -185,8 +181,8 @@ export function Badge({ tone = "gray", children, className, dot }: {
 export function Stat({ label, value, sub, tone }: { label: ReactNode; value: ReactNode; sub?: ReactNode; tone?: "red" | "green" }) {
   return (
     <div className="card card-pad">
-      <p className="text-[13px] font-semibold text-ink-500">{label}</p>
-      <p className={cn("mt-2 font-display text-[32px] font-extrabold leading-none tracking-tightest tabular-nums text-ink-900",
+      <p className="text-[13px] font-medium text-ink-500">{label}</p>
+      <p className={cn("mt-2 font-display text-[28px] font-bold leading-none tracking-[-0.02em] tabular-nums text-ink-900",
         tone === "red" && "text-rose-700", tone === "green" && "text-emerald-700")}>{value}</p>
       {sub && <p className="mt-2 text-[13px] text-ink-500">{sub}</p>}
     </div>
@@ -195,9 +191,9 @@ export function Stat({ label, value, sub, tone }: { label: ReactNode; value: Rea
 
 export function Empty({ title, children, action, icon }: { title: ReactNode; children?: ReactNode; action?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-300 bg-white/60 px-6 py-12 text-center">
-      {icon && <div className="mb-4 grid h-12 w-12 place-items-center rounded-xl bg-ink-100 text-ink-700 [&_svg]:h-5 [&_svg]:w-5">{icon}</div>}
-      <p className="font-display text-base font-bold text-ink-900">{title}</p>
+    <div className="flex flex-col items-center justify-center rounded-[14px] border border-dashed border-ink-300 bg-white/50 px-6 py-12 text-center">
+      {icon && <div className="mb-4 grid h-10 w-10 place-items-center rounded-full bg-ink-100 text-ink-600 [&_svg]:h-[18px] [&_svg]:w-[18px]">{icon}</div>}
+      <p className="font-display text-[15px] font-semibold text-ink-900">{title}</p>
       {children && <div className="mt-1.5 max-w-md text-sm text-ink-600">{children}</div>}
       {action && <div className="mt-5">{action}</div>}
     </div>

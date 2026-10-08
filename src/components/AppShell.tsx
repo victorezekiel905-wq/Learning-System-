@@ -24,8 +24,8 @@ function SchoolBrand({ logoPath, name, compact, onDark }: { logoPath?: string | 
   return (
     <Link href="/dashboard" className={cn("flex min-w-0 items-center gap-2.5 no-underline", onDark ? "text-white hover:text-white" : "text-ink-900 hover:text-ink-900")}>
       {logo ? <img src={logo} alt="" className="h-8 w-8 rounded-lg bg-white object-contain" />
-        : <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-brand-600 font-display text-sm font-extrabold text-white">{(name ?? "S")[0]}</span>}
-      {!compact && <span className="truncate font-display text-[16px] font-extrabold tracking-tight">{name ?? "SwiftCipher"}</span>}
+        : <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ink-900 font-display text-[13px] font-bold text-white">{(name ?? "S")[0]}</span>}
+      {!compact && <span className="truncate font-display text-[15px] font-bold tracking-tight">{name ?? "SwiftCipher"}</span>}
     </Link>
   );
 }
@@ -124,19 +124,18 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
       )}
       {groups.map((g) => (
         <div key={g}>
-          <p className={cn("mb-1 px-3 text-[12px] font-semibold", dark ? "text-ink-400" : "text-ink-500")}>{g}</p>
+          <p className={cn("mb-1 px-3 text-[12px] font-medium", dark ? "text-ink-400" : "text-ink-400")}>{g}</p>
           <ul className="flex flex-col gap-px">
             {items.filter((n) => n.group === g).map((n) => {
               const active = isActive(n);
               return (
                 <li key={n.href}>
                   <Link href={n.href} aria-current={active ? "page" : undefined}
-                    className={cn("group relative flex items-center gap-3 rounded-[10px] px-3 py-[7px] text-[14px] font-medium no-underline transition-colors",
+                    className={cn("group relative flex items-center gap-2.5 rounded-lg px-3 py-[7px] text-[14px] font-medium no-underline transition-colors",
                       dark
                         ? active ? "bg-white/10 text-white hover:text-white" : "text-ink-300 hover:bg-white/5 hover:text-white"
-                        : active ? "bg-ink-900 text-white hover:text-white" : "text-ink-700 hover:bg-ink-100 hover:text-ink-900")}>
-                    {active && dark && <span aria-hidden className="absolute -left-3 top-1.5 bottom-1.5 w-1 rounded-r-full bg-accent-500" />}
-                    <Icon name={n.icon} className={cn("h-[18px] w-[18px] shrink-0", active && dark && "text-accent-400")} />
+                        : active ? "bg-white text-ink-900 shadow-lift ring-1 ring-ink-200/80 hover:text-ink-900" : "text-ink-600 hover:bg-ink-100/80 hover:text-ink-900")}>
+                    <Icon name={n.icon} className={cn("h-[17px] w-[17px] shrink-0", dark ? (active ? "text-white" : "text-ink-400") : active ? "text-ink-900" : "text-ink-400 group-hover:text-ink-600")} />
                     {n.label}
                   </Link>
                 </li>
@@ -149,19 +148,19 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
   );
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[256px_minmax(0,1fr)] print:!block" style={themeVars}>
-      {/* Desktop: a dark rail that frames the work. */}
-      <aside className="hidden bg-ink-950 text-white print:!hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
-        <div className="flex h-16 shrink-0 items-center px-5"><SchoolBrand logoPath={s?.brand_logo_path} name={s?.brand_name} onDark /></div>
-        <div className="flex-1 overflow-y-auto px-3 pb-6 pt-2 [scrollbar-width:thin]">{nav(true)}</div>
-        <div className="border-t border-white/10 p-3">
-          <div className="flex items-center gap-3 rounded-xl px-2 py-2">
-            <Avatar name={me.profile.full_name} className="h-9 w-9" />
+    <div className="min-h-screen lg:grid lg:grid-cols-[240px_minmax(0,1fr)] print:!block" style={themeVars}>
+      {/* Desktop: a quiet rail with a hairline edge; the work is the loudest thing on screen. */}
+      <aside className="hidden border-r border-ink-200/80 bg-ink-50 print:!hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+        <div className="flex h-16 shrink-0 items-center px-5"><SchoolBrand logoPath={s?.brand_logo_path} name={s?.brand_name} /></div>
+        <div className="flex-1 overflow-y-auto px-3 pb-6 pt-1 [scrollbar-width:thin]">{nav(false)}</div>
+        <div className="border-t border-ink-200/80 p-3">
+          <div className="flex items-center gap-3 rounded-xl px-2 py-1.5">
+            <Avatar name={me.profile.full_name} className="h-8 w-8" />
             <div className="min-w-0 flex-1 leading-tight">
-              <p className="truncate text-sm font-semibold text-white">{me.profile.full_name}</p>
-              <p className="truncate text-[12px] text-ink-400">{ROLE_LABEL[role]}</p>
+              <p className="truncate text-[13px] font-semibold text-ink-900">{me.profile.full_name}</p>
+              <p className="truncate text-[12px] text-ink-500">{ROLE_LABEL[role]}</p>
             </div>
-            <button onClick={signOut} className="grid h-9 w-9 place-items-center rounded-lg text-ink-300 transition-colors hover:bg-white/10 hover:text-white" aria-label="Sign out" title="Sign out">
+            <button onClick={signOut} className="grid h-8 w-8 place-items-center rounded-lg text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900" aria-label="Sign out" title="Sign out">
               <LogOut className="h-4 w-4" aria-hidden />
             </button>
           </div>
@@ -169,14 +168,14 @@ export default function AppShell({ me, children }: { me: Me & { profile: NonNull
       </aside>
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 print:hidden items-center justify-between gap-3 border-b border-ink-200 bg-ink-50/85 px-4 backdrop-blur-md sm:px-6 lg:h-16 lg:px-8">
+        <header className="sticky top-0 z-30 flex h-14 print:hidden items-center justify-between gap-3 border-b border-ink-200/80 bg-ink-50/90 px-4 backdrop-blur-md sm:px-6 lg:h-16 lg:px-8">
           <div className="flex min-w-0 items-center gap-1 lg:hidden">
             <button className="btn btn-ghost -ml-2 h-10 w-10 px-0" onClick={() => setMenuOpen(true)} aria-label="Menu" aria-expanded={menuOpen} aria-controls="app-menu">
               <Icon name="menu" className="h-5 w-5" />
             </button>
             <SchoolBrand logoPath={s?.brand_logo_path} name={s?.brand_name} />
           </div>
-          <p className="hidden min-w-0 truncate text-sm font-semibold text-ink-700 lg:block">{schoolName}</p>
+          <p className="hidden min-w-0 truncate text-[13px] font-medium text-ink-500 lg:block">{schoolName}</p>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {quality !== "good" && (
               <span className={cn("badge", quality === "offline" ? "bg-rose-50 text-rose-800 ring-rose-200" : "bg-amber-50 text-amber-900 ring-amber-200")} title="Connection quality">
@@ -302,7 +301,7 @@ function NotificationBell({ userId, initialUnread }: { userId: string; initialUn
     <div className="relative" ref={box}>
       <button className="btn btn-ghost relative h-10 w-10 px-0" onClick={() => setOpen((v) => !v)} aria-label={`Notifications (${unread} unread)`} aria-expanded={open}>
         <Icon name="bell" className="h-5 w-5" />
-        {unread > 0 && <span className="absolute right-1 top-1 min-w-[18px] rounded-full bg-rose-700 px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ring-ink-50">{unread > 9 ? "9+" : unread}</span>}
+        {unread > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-600 ring-2 ring-ink-50" aria-hidden />}
       </button>
       {open && (
         <div className="fixed inset-x-3 top-16 z-40 animate-fade-in overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-overlay sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">

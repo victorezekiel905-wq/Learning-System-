@@ -32,7 +32,8 @@ const PERIODS: { id: Period; label: string }[] = [
 const UNIT_WORD = { day: "day", week: "week", month: "month" } as const;
 
 const fmt = (date: string, o: Intl.DateTimeFormatOptions) => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { timeZone: "UTC", ...o });
-const tone = (p: number | null) => (p === null ? "bg-ink-300" : p >= 75 ? "bg-emerald-500" : p >= 50 ? "bg-amber-400" : "bg-rose-500");
+// Bars stay neutral; only results below half turn red, where attention is needed.
+const tone = (p: number | null) => (p === null ? "bg-ink-200" : p < 50 ? "bg-rose-500" : "bg-ink-800");
 
 function Meter({ value, className }: { value: number | null; className?: string }) {
   return (
@@ -181,17 +182,19 @@ function Trend({ p }: { p: Progress }) {
   const unit = p.unit ?? "day";
   const label = (d: string) => unit === "day" ? fmt(d, { weekday: "short" }) : unit === "week" ? fmt(d, { day: "numeric", month: "short" }) : fmt(d, { month: "short" });
   const anyAnswers = p.trend!.some((t) => t.answers > 0);
+  // One colour: the latest period with answers stands out, earlier ones sit back.
+  const latest = p.trend!.reduce((at, t, i) => (t.accuracy !== null ? i : at), -1);
   return (
     <Card title={`Right answers, ${UNIT_WORD[unit]} by ${UNIT_WORD[unit]}`}>
       {!anyAnswers ? <p className="text-sm text-ink-500">No answers yet in this period.</p> : (
         <div className="-mx-1 overflow-x-auto px-1"><div className="flex h-44 min-w-max items-end gap-1.5 sm:min-w-0 sm:gap-2" role="img"
           aria-label={p.trend!.map((t) => `${label(t.start)}: ${t.accuracy === null ? "no answers" : `${t.accuracy}%`}`).join(", ")}>
-          {p.trend!.map((t) => (
+          {p.trend!.map((t, i) => (
             <div key={t.start} className="flex w-11 shrink-0 flex-col items-center gap-1 sm:w-auto sm:min-w-0 sm:flex-1" title={`${label(t.start)}: ${t.answers} answered${t.accuracy !== null ? `, ${t.accuracy}% right` : ""}`}>
               <div className="flex h-36 w-full flex-col items-center justify-end gap-1">
                 {t.accuracy !== null ? <>
-                  <span className="text-[11px] font-semibold tabular-nums text-ink-700">{t.accuracy}%</span>
-                  <span className={cn("block w-full max-w-10 rounded-t-md", tone(t.accuracy))} style={{ height: `${Math.max(t.accuracy, 3) * 1.12}px` }} />
+                  <span className={cn("text-[11px] tabular-nums", i === latest ? "font-semibold text-ink-900" : "text-ink-500")}>{t.accuracy}%</span>
+                  <span className={cn("block w-full max-w-8 rounded-[5px]", i === latest ? "bg-ink-900" : "bg-ink-200")} style={{ height: `${Math.max(t.accuracy, 3) * 1.12}px` }} />
                 </> : <span className="block h-1 w-full max-w-10 rounded bg-ink-200" />}
               </div>
               <span className="w-full truncate text-center text-[11px] text-ink-500">{label(t.start)}</span>

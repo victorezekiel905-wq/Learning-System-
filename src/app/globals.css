@@ -28,7 +28,7 @@
   :focus-visible { @apply outline-none ring-2 ring-brand-600 ring-offset-2 ring-offset-white; }
   a { @apply text-brand-700 underline-offset-[3px] decoration-1 hover:text-brand-800; }
   /* Links inside running text are underlined, not told apart by colour alone (WCAG 1.4.1). */
-  :where(p, li, label, td, dd, blockquote) a:where(:not(.btn)) { @apply underline; }
+  :where(p, label, dd, blockquote) a:where(:not(.btn)) { @apply underline; }
   .tabular, table { font-variant-numeric: tabular-nums; }
 }
 
@@ -46,7 +46,7 @@
 
   /* Surfaces: flat white on paper, hairline edge. Only overlays get shadows. */
   /* min-w-0: inside grids/flex rows a card shrinks and lets wide content scroll, instead of widening the page. */
-  .card { @apply min-w-0 rounded-2xl border border-ink-200 bg-white; }
+  .card { @apply min-w-0 rounded-[14px] border border-ink-200/90 bg-white; }
   .card-pad { @apply p-5 sm:p-6; }
 
   .input { @apply block h-10 w-full rounded-[10px] border border-ink-300 bg-white px-3 text-[15px] text-ink-900 transition-colors placeholder:text-ink-500 hover:border-ink-400 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-600/15 disabled:bg-ink-100 sm:text-sm; }
@@ -57,15 +57,16 @@
 
   .badge { @apply inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset; }
   .table { @apply w-full text-left text-sm; }
-  .table th { @apply border-b border-ink-200 bg-ink-50/70 px-4 py-2.5 text-[12px] font-semibold text-ink-500; }
+  .table th { @apply border-b border-ink-200 px-4 pb-2.5 pt-3 text-[12px] font-medium text-ink-500; }
   .table td { @apply border-b border-ink-100 px-4 py-3 align-middle; }
   .table tbody tr:last-child td { @apply border-b-0; }
-  .table tbody tr { @apply transition-colors hover:bg-ink-50/60; }
+  .table tbody tr { @apply transition-colors hover:bg-ink-50/70; }
+  .table td a:where(:not(.btn)) { @apply font-medium text-ink-900 no-underline hover:underline; }
 
   .page { @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8; }
-  .page-title { @apply font-display text-[28px] font-extrabold leading-[1.1] tracking-tightest text-ink-900 sm:text-[34px]; }
+  .page-title { @apply font-display text-[26px] font-bold leading-[1.15] tracking-[-0.025em] text-ink-900 sm:text-[30px]; }
   .page-sub { @apply mt-2 max-w-2xl text-[15px] text-ink-600; }
-  .section-title { @apply font-display text-lg font-bold tracking-tight text-ink-900; }
+  .section-title { @apply font-display text-[17px] font-semibold tracking-tight text-ink-900; }
 
   /* The lime "marker" used for emphasis in headlines. */
   .mark { @apply relative whitespace-nowrap; background: linear-gradient(transparent 58%, rgb(var(--accent-400)) 58%, rgb(var(--accent-400)) 92%, transparent 92%); }

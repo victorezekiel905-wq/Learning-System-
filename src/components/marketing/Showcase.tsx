@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * with the product's own pieces. Every name and number is example content.
  */
 
-const tone = (p: number) => (p >= 75 ? "bg-emerald-500" : p >= 50 ? "bg-amber-400" : "bg-rose-500");
+const tone = (p: number) => (p < 50 ? "bg-rose-500" : "bg-ink-800");
 function Meter({ v, className }: { v: number; className?: string }) {
   return <span className={cn("block h-1.5 overflow-hidden rounded-full bg-ink-100", className)}><span className={cn("block h-full rounded-full", tone(v))} style={{ width: `${v}%` }} /></span>;
 }

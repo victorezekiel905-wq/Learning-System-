@@ -27,8 +27,7 @@ const KIND: Record<string, string> = { mcq: "Multiple choice", multi_select: "Ch
   open: "Written answer", short: "Short answer", fill_blank: "Fill in the blank" };
 
 function pctTone(p: number | null) {
-  if (p === null) return "bg-ink-300";
-  return p >= 75 ? "bg-emerald-500" : p >= 50 ? "bg-amber-400" : "bg-rose-500";
+  return p === null ? "bg-ink-200" : p < 50 ? "bg-rose-500" : "bg-ink-800";
 }
 
 function Meter({ value, className }: { value: number | null; className?: string }) {
