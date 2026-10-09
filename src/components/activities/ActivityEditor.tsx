@@ -5,7 +5,8 @@ import { useLoader } from "@/lib/hooks";
 import { errorText, rpc } from "@/lib/rpc";
 import type { ActivityKind, ActivitySettings, PublicQuestion, QuestionKind } from "@/lib/types";
 import { Alert, Badge, Button, Card, Field, Input, Modal, Select, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
-import { blankQuestion, KIND_LABEL, QuestionEditor, saveQuestion, type EditableOption, type EditableQuestion } from "./QuestionEditor";
+import { blankQuestion, KIND_LABEL, QuestionEditor, saveQuestion, saveQuestions, type EditableOption, type EditableQuestion } from "./QuestionEditor";
+import { ImportQuestions } from "./ImportQuestions";
 import { Prompt, QuestionInput } from "./QuestionInput";
 import { StudentQuestions } from "./StudentQuestions";
 
@@ -53,6 +54,7 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
   const [draft, setDraft] = useState<Record<string, EditableQuestion>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [bankOpen, setBankOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [preview, setPreview] = useState(false);
   const allowed = KINDS_FOR[meta.kind];
 
@@ -124,7 +126,8 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
         <Alert>A collaborative board is created for each live session when you open this activity. Students post ideas and you can lock the board or hide posts.</Alert>
       ) : (
         <Card title={`Questions (${list.length})`} actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setImportOpen(true)}>Import questions</Button>
             <Button size="sm" variant="secondary" onClick={() => setBankOpen(true)}>From question bank</Button>
             {allowed.length === 1 ? <Button size="sm" onClick={() => addQuestion(allowed[0]!)}>Add question</Button> : (
               <Select aria-label="Add a question" className="w-auto py-1 text-xs" value="" onChange={(e) => e.target.value && addQuestion(e.target.value as QuestionKind)}>
@@ -133,7 +136,9 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
             )}
           </div>}>
           {questions.error && <Alert tone="error">{questions.error}</Alert>}
-          {!list.length && !newKeys.length && <p className="text-sm text-ink-500">No questions yet.</p>}
+          {!list.length && !newKeys.length && (
+            <p className="text-sm text-ink-500">No questions yet. Add them one by one, or <button type="button" className="font-semibold text-brand-700" onClick={() => setImportOpen(true)}>import a whole list</button> from Word, Excel or pasted text.</p>
+          )}
           <ul className="space-y-3">
             {list.map((q, i) => {
               const key = q.id!;
@@ -172,6 +177,15 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
         toast(`Added ${qs.length} question(s)`, "success");
         void questions.reload();
       }} />}
+      {importOpen && <ImportQuestions allowed={allowed} startAt={list.reduce((m, q) => Math.max(m, q.position + 1), list.length)}
+        onClose={() => setImportOpen(false)} onImport={async (qs) => {
+          try {
+            await saveQuestions(qs, { tenantId: activity.tenant_id, ownerId: activity.owner_id, activityId: activity.id });
+            setImportOpen(false);
+            toast(`Added ${qs.length} question${qs.length === 1 ? "" : "s"}`, "success");
+            await questions.reload();
+          } catch (e) { toast(errorText(e), "error"); }
+        }} />}
       {preview && <PreviewModal activityId={activity.id} onClose={() => setPreview(false)} />}
     </div>
   );

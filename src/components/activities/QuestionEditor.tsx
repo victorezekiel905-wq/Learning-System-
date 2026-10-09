@@ -45,9 +45,10 @@ export function blankQuestion(kind: QuestionKind, position = 0): EditableQuestio
   return base;
 }
 
-/** Persist a question and diff its options so existing answers keep valid option ids. */
-export async function saveQuestion(q: EditableQuestion, ctx: { tenantId: string; ownerId: string; activityId: string | null }): Promise<string> {
-  const sb = createClient();
+type SaveContext = { tenantId: string; ownerId: string; activityId: string | null };
+const OPTION_KINDS: QuestionKind[] = ["mcq", "multi_select", "true_false", "poll"];
+
+function questionRow(q: EditableQuestion, ctx: SaveContext) {
   let config = q.config, key = q.answer_key;
   if (q.kind === "ordering") {
     const items = (q.config.items as Item[]) ?? [];
@@ -57,18 +58,44 @@ export async function saveQuestion(q: EditableQuestion, ctx: { tenantId: string;
     const blanks = (q.answer_key.blanks as string[][] | undefined) ?? [];
     config = { ...config, blanks: (q.prompt.match(/_{3,}/g) ?? []).length || blanks.length };
   }
-  const row = {
+  return {
     tenant_id: ctx.tenantId, owner_id: ctx.ownerId, activity_id: ctx.activityId, kind: q.kind, prompt: q.prompt.trim(),
     points: q.points, explanation: q.explanation || null, config, answer_key: key, tags: q.tags, topic: q.topic?.trim().slice(0, 60) || null, difficulty: q.difficulty,
     bloom_level: q.bloom_level, in_bank: q.in_bank, position: q.position
   };
+}
+
+/** Saves many new questions at once (an import): the questions, then all their options. */
+export async function saveQuestions(qs: EditableQuestion[], ctx: SaveContext): Promise<void> {
+  if (!qs.length) return;
+  const sb = createClient();
+  const { data, error } = await sb.from("questions").insert(qs.map((q) => questionRow(q, ctx))).select("id,position");
+  if (error) throw new Error(error.message);
+  const idAt = new Map((data ?? []).map((r) => [r.position as number, r.id as string]));
+  const options = qs.flatMap((q) => OPTION_KINDS.includes(q.kind)
+    ? q.options.map((o, i) => ({ tenant_id: ctx.tenantId, question_id: idAt.get(q.position)!, label: o.label.trim() || `Option ${i + 1}`,
+      is_correct: q.kind === "poll" ? false : o.is_correct, feedback: o.feedback ?? null, position: i }))
+    : []);
+  if (!options.length) return;
+  const res = await sb.from("question_options").insert(options);
+  if (res.error) {
+    // Don't leave questions without their options behind.
+    await sb.from("questions").delete().in("id", [...idAt.values()]);
+    throw new Error(res.error.message);
+  }
+}
+
+/** Persist a question and diff its options so existing answers keep valid option ids. */
+export async function saveQuestion(q: EditableQuestion, ctx: SaveContext): Promise<string> {
+  const sb = createClient();
+  const row = questionRow(q, ctx);
   const { data, error } = q.id
     ? await sb.from("questions").update(row).eq("id", q.id).select("id").single()
     : await sb.from("questions").insert(row).select("id").single();
   if (error) throw new Error(error.message);
   const qid = (data as { id: string }).id;
 
-  if (["mcq", "multi_select", "true_false", "poll"].includes(q.kind)) {
+  if (OPTION_KINDS.includes(q.kind)) {
     const { data: existing } = await sb.from("question_options").select("id").eq("question_id", qid);
     const keep = new Set(q.options.filter((o) => o.id).map((o) => o.id));
     const drop = (existing ?? []).map((o) => o.id as string).filter((id) => !keep.has(id));
