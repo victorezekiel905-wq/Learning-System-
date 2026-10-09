@@ -144,6 +144,9 @@ writeFileSync("supabase/updates/2026-09-27_RUN_THIS_update.sql", `-- ===========
 -- =============================================================================
 
 ` + RUN_THIS.map(read).join("\n") + `
+-- Tell the API about new and changed functions straight away (otherwise: "Could not find the function ... in the schema cache").
+notify pgrst, 'reload schema';
+
 -- =============================================================================
 -- Done. One row: schema should be 0970 and every other column true.
 -- =============================================================================

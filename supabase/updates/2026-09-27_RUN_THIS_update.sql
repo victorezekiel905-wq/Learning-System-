@@ -6462,6 +6462,9 @@ language sql stable security definer set search_path = '' as $$
   select jsonb_build_object('ok', true, 'db_time', now(), 'schema', '0970')
 $$;
 
+-- Tell the API about new and changed functions straight away (otherwise: "Could not find the function ... in the schema cache").
+notify pgrst, 'reload schema';
+
 -- =============================================================================
 -- Done. One row: schema should be 0970 and every other column true.
 -- =============================================================================
