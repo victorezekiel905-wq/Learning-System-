@@ -2142,3 +2142,51 @@ test("rosters: staff-made logins, editing, password resets, promotion, a student
   await rejects(db.rpc(H, "delete_student_check", { p_student: ada, p_confirm_name: "Ada" }), /exactly/);
   await db.rpc(H, "delete_student_check", { p_student: ada, p_confirm_name: "ada n. obi" });
 });
+
+test("privacy: a student or parent never sees another child's report, answers or dashboard data (0980)", async () => {
+  const L = await lessonWithQuiz("Privacy");
+  await db.admin("update public.tenants set plan_code = 'school' where id = $1", [L.tenant]);
+  await db.as(L.T, "update public.tenant_settings set parent_portal_enabled = true");
+  const [ada, ben] = [await db.signUp("ada@privacy.test", "Ada Obi"), await db.signUp("ben@privacy.test", "Ben Ade")];
+  for (const p of [ada, ben]) await db.rpc(p, "redeem_code", { p_code: L.cls.join_code });
+  const mum = await db.signUp("mum@privacy.test", "Mrs Obi");          // Ada's parent only
+  const codes = await db.rpc(L.T, "parent_codes", { p_class: L.cls.id });
+  await db.rpc(mum, "redeem_code", { p_code: codes.students.find((s) => s.name === "Ada Obi").code, p_as: "parent" });
+
+  // Ada answers in a live lesson, so there is something to protect.
+  await db.rpc(ada, "join_session", { p_code: L.s.join_code });
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "start" });
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "next" });
+  const at = (await db.rpc(ada, "start_attempt", { p_activity: L.act, p_session: L.s.id })).attempt.id;
+  await db.rpc(ada, "submit_answer", { p_attempt: at, p_question: L.q1, p_response: JSON.stringify({ option_id: L.right }) });
+  await db.rpc(ada, "submit_answer", { p_attempt: at, p_question: L.q2, p_response: JSON.stringify({ text: "Ada's private answer" }) });
+  await db.rpc(L.T, "end_session", { p_session: L.s.id });
+
+  // Ben (a classmate) and Ada's mother may not reach each other's child.
+  for (const [who, child] of [[ben, ada], [mum, ben]]) {
+    await rejects(db.rpc(who, "progress_report", { p_student: child, p_period: "week" }), /Report not found/);
+    await rejects(db.rpc(who, "parent_report", { p_student: child, p_period: "week" }), /not found/i);
+    await rejects(db.rpc(who, "session_report", { p_session: L.s.id }), /not found/i);
+    await rejects(db.rpc(who, "activity_results", { p_activity: L.act }), /Not visible/);
+    for (const [table, col] of [["quiz_attempts", "student_id"], ["xp_events", "student_id"], ["student_badges", "student_id"],
+                                ["student_profiles", "user_id"], ["session_participants", "user_id"], ["parent_links", "student_id"]]) {
+      assert.equal((await db.as(who, `select 1 from public.${table} where ${col} = $1`, [child])).length, 0, `${table} of another child`);
+    }
+    assert.equal((await db.as(who, "select 1 from public.users where id = $1", [child])).length, 0, "another child's profile");
+  }
+  assert.equal((await db.as(ben, "select 1 from public.quiz_answers where attempt_id = $1", [at])).length, 0, "Ada's answers");
+  assert.deepEqual((await db.rpc(ben, "my_classes", {})).map((c) => c.name), [L.cls.name], "Ben sees only his own classes");
+
+  // What each may see: Ada her own report; her mother hers; Ben nothing of Ada's even through his own report.
+  assert.equal((await db.rpc(ada, "progress_report", { p_student: ada, p_period: "week" })).summary.answers, 2);
+  assert.equal((await db.rpc(mum, "progress_report", { p_student: ada, p_period: "week" })).summary.answers, 2);
+  assert.equal((await db.rpc(ben, "progress_report", { p_student: ben, p_period: "week" })).summary.answers, 0);
+  assert.deepEqual((await db.rpc(mum, "parent_children", {})).map((k) => k.name), ["Ada Obi"]);
+
+  // A teacher of another class can't open the activity's full results outside their own lessons.
+  const inv = await db.rpc(L.T, "create_invite", { p_role: "teacher" });
+  const other = await db.signUp("other@privacy.test", "Other Teacher");
+  await db.rpc(other, "redeem_code", { p_code: inv.code });
+  await rejects(db.rpc(other, "activity_results", { p_activity: L.act }), /Not visible/);
+  assert.equal((await db.rpc(L.T, "activity_results", { p_activity: L.act })).questions[1].text_responses[0].response.text, "Ada's private answer");
+});
