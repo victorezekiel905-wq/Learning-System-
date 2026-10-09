@@ -14,11 +14,11 @@ No scheduled jobs are needed on Render: hourly maintenance runs inside the datab
 
 ## 1. Prepare the database (Supabase)
 
-1. **Update the database.** SQL Editor → New query → paste all of [`supabase/updates/2026-09-27_RUN_THIS_update.sql`](../supabase/updates/2026-09-27_RUN_THIS_update.sql) → Run. The last row should show `schema = 0990` and every other column `true`. It is safe to run again. (A brand-new project runs [`supabase/setup.sql`](../supabase/setup.sql) instead.)
+1. **Update the database.** SQL Editor → New query → paste all of [`supabase/updates/2026-09-27_RUN_THIS_update.sql`](../supabase/updates/2026-09-27_RUN_THIS_update.sql) → Run. The last row should show `schema = 1000` and every other column `true`. It is safe to run again. (A brand-new project runs [`supabase/setup.sql`](../supabase/setup.sql) instead.)
 2. **Upgrade to Pro** before real schools use it (Settings → Billing). The free tier pauses idle projects, keeps no backups, and allows about 200 live connections. Then turn on **Point-in-time recovery** (Database → Backups).
 3. **Realtime:** Project Settings → Realtime → turn **off** "Allow public access", so only the private, permission-checked channels work.
 4. **Hourly maintenance:** Database → Extensions → enable **pg_cron**, then run the update file from step 1 once more. Check with `select * from cron.job;`.
-5. **Guests:** Authentication → Sign In / Providers → turn on **Allow anonymous sign-ins**. This lets anyone with a live lesson's code join with just a name (like Nearpod and Kahoot). Then go to Authentication → Rate Limits and raise **anonymous sign-ins per hour** (the default is about 30 per IP address): a whole school usually shares one internet address, so a class of guests would otherwise be turned away. Leave CAPTCHA off for now; the join page doesn't show one.
+5. **Guests (optional):** anyone with a live lesson's code joins with just a name (like Nearpod and Kahoot), with no setting needed: when Supabase's anonymous sign-ins are off or busy, the server makes a guest-only account (this needs the service_role key from step 7). To spread the load, you can also turn on Authentication → Sign In / Providers → **Allow anonymous sign-ins**, and raise **Token verifications** under Authentication → Rate Limits to about 300 per 5 minutes, since a whole school usually shares one internet address. Leave CAPTCHA off for now; the join page doesn't show one.
 6. **Email:** Authentication → SMTP → use your provider (Resend, SendGrid, Postmark, Amazon SES or Mailgun). The built-in sender only allows a few emails an hour, and invites, confirmations and password resets all send email.
 7. **Keys:** Project Settings → API. Copy the **Project URL**, the **anon public** key and the **service_role** key. If the service_role key has ever been pasted anywhere (chat, email, a screenshot), generate a new one first. It bypasses all school isolation; it only ever goes into Render's secret settings.
 
@@ -39,7 +39,7 @@ No scheduled jobs are needed on Render: hourly maintenance runs inside the datab
 
    Leave the rest empty for now; features without keys stay off. They are explained in [`.env.example`](../.env.example).
 4. Click **Apply**. The first build takes 3 to 6 minutes. When the service shows **Live**, open its URL: you should see the SwiftCipher home page.
-5. Open `https://YOUR-APP/api/health`. It should show `"ok":true`, `"db":"up"`, `"schema":"0990"` and `"missing_legal_details":[]`.
+5. Open `https://YOUR-APP/api/health`. It should show `"ok":true`, `"db":"up"`, `"schema":"1000"` and `"missing_legal_details":[]`.
 
 Every push to `main` on GitHub now redeploys automatically.
 
@@ -71,7 +71,7 @@ Turn on multi-factor authentication for this account in Supabase Auth.
 
 ## 6. Before inviting schools
 
-- [ ] `/api/health` shows `ok: true`, `schema: 0990`, no missing legal details
+- [ ] `/api/health` shows `ok: true`, `schema: 1000`, no missing legal details
 - [ ] A test sign-up receives its confirmation email
 - [ ] `/terms`, `/privacy` and `/dpa` show your company name and address
 - [ ] A live lesson with two browsers (teacher and student): join with the code, lockdown, the screen strip, a leave alert
@@ -93,7 +93,7 @@ Turn on multi-factor authentication for this account in Supabase Auth.
 | Deploy fails within seconds, right after "Checking out commit" | **Root Directory** is set (e.g. `supabase/`). Clear it: the app is at the top of the repository. |
 | "It looks like you're using Docker" | Choose **Node** as the language, or use **New → Blueprint**, which sets it for you. |
 | `/api/health` shows `db: "down"` | Wrong Supabase URL or key, or the Supabase project is paused (restore it in the dashboard). |
-| `schema` is lower than `0990` | Run the update file in step 1.1. |
+| `schema` is lower than `1000` | Run the update file in step 1.1. |
 | Sign-in links go to localhost | `NEXT_PUBLIC_APP_URL` or the Supabase Site URL still points to localhost; redeploy after changing it. |
 | `/super` says "page not found" | The account isn't the super admin yet (step 4). |
 | Live screens never appear | Realtime public access is on, or the database update wasn't run. |

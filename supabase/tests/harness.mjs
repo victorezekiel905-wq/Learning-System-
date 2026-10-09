@@ -22,6 +22,7 @@ create table auth.users (
   id uuid primary key,
   email text,
   raw_user_meta_data jsonb not null default '{}'::jsonb,
+  raw_app_meta_data jsonb not null default '{}'::jsonb,
   is_anonymous boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -141,6 +142,14 @@ class Db {
   async signInAnonymously() {
     const id = randomUUID();
     await this.admin("insert into auth.users (id, is_anonymous) values ($1, true)", [id]);
+    return id;
+  }
+
+  /** A guest account the server makes (POST /api/live/guest): app_metadata.guest, which only the service key can set. */
+  async serverGuest() {
+    const id = randomUUID();
+    await this.admin("insert into auth.users (id, email, raw_app_meta_data) values ($1, $2, $3)",
+      [id, `guest-${id}@guests.swiftcipher.invalid`, { guest: true }]);
     return id;
   }
 

@@ -8,20 +8,39 @@ import { errorText, rpc } from "@/lib/rpc";
 import { formatJoinCode } from "@/lib/utils";
 
 type GuestJoinResult = { session_id?: string; title?: string; error?: string; code?: string };
+type SupabaseBrowser = ReturnType<typeof createClient>;
 
-/**
- * Guest joining needs "Allow anonymous sign-ins" (Supabase → Authentication →
- * Sign In / Providers), and a raised hourly limit, since a class shares one
- * internet address. Students can't fix either, so they're told what they can do.
- */
+/** A refusal for this code (wrong, closed lesson) rather than a sign-in problem. */
+class CodeRefused extends Error {
+  constructor(message: string, readonly code?: string) { super(message); }
+}
+
 function guestError(message: string): string {
-  if (/disabled|not enabled/i.test(message)) {
-    return "Joining with just a name is switched off on this site. Tell your teacher, or sign in with your school account.";
-  }
   if (/rate limit|too many/i.test(message)) {
     return "Lots of people are joining from this network right now. Wait a minute and try again, or tell your teacher.";
   }
   return message;
+}
+
+/**
+ * Signs this browser in as a guest. Supabase's anonymous sign-in first; when the
+ * site has it switched off, or a school's shared address has used up its hourly
+ * allowance, the server makes a guest-only account for this lesson's code
+ * (/api/live/guest, migration 1000) and the browser signs in with its one-time token.
+ */
+async function signInAsGuest(sb: SupabaseBrowser, code: string) {
+  const anon = await sb.auth.signInAnonymously();
+  if (!anon.error) return;
+  if (!/disabled|not enabled|rate limit|too many/i.test(anon.error.message)) throw new Error(guestError(anon.error.message));
+  const res = await fetch("/api/live/guest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+  const body = (await res.json().catch(() => ({}))) as { token_hash?: string; error?: string; code?: string };
+  if (!res.ok || !body.token_hash) {
+    const message = body.error ?? "Couldn't join that lesson. Try again.";
+    if (res.status === 404 || res.status === 409) throw new CodeRefused(message, body.code);
+    throw new Error(message);
+  }
+  const { error } = await sb.auth.verifyOtp({ type: "magiclink", token_hash: body.token_hash });
+  if (error) throw new Error(guestError(error.message));
 }
 
 /**
@@ -46,21 +65,17 @@ export function GuestJoin({ initialCode = "" }: { initialCode?: string }) {
       const sb = createClient();
       const { data: { session } } = await sb.auth.getSession();
       // A student signed in with their school account joins as themselves.
-      if (session && !session.user.is_anonymous) {
+      if (session && !session.user.is_anonymous && !session.user.app_metadata?.guest) {
         const r = await rpc<{ session_id: string }>("join_session", { p_code: cleanCode });
         router.push(`/student/live/${r.session_id}`);
         return;
       }
-      if (!session) {
-        const { error } = await sb.auth.signInAnonymously();
-        if (error) throw new Error(guestError(error.message));
-      }
+      if (!session) await signInAsGuest(sb, cleanCode);
       let r = await rpc<GuestJoinResult>("join_session_as_guest", { p_code: cleanCode, p_name: name });
       if (r.code === "GUEST_OTHER_SCHOOL") {
         // This browser was a guest at another school: start afresh.
         await sb.auth.signOut();
-        const again = await sb.auth.signInAnonymously();
-        if (again.error) throw new Error(guestError(again.error.message));
+        await signInAsGuest(sb, cleanCode);
         r = await rpc<GuestJoinResult>("join_session_as_guest", { p_code: cleanCode, p_name: name });
       }
       if (r.error || !r.session_id) {
@@ -71,6 +86,12 @@ export function GuestJoin({ initialCode = "" }: { initialCode?: string }) {
       }
       router.push(`/guest/live/${r.session_id}`);
     } catch (e) {
+      if (e instanceof CodeRefused) {
+        setErr(e.message);
+        if (e.code === "P0002") setStep("code");
+        setBusy(false);
+        return;
+      }
       setErr(errorText(e));
       setBusy(false);
     }

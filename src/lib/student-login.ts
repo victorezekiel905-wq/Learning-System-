@@ -5,6 +5,9 @@
  */
 export const STUDENT_LOGIN_DOMAIN = process.env.NEXT_PUBLIC_STUDENT_LOGIN_DOMAIN || "students.swiftcipher.invalid";
 
+/** Guests' accounts made by the server (/api/live/guest), never emailed: guests.swiftcipher.invalid by default. */
+export const GUEST_LOGIN_DOMAIN = `guests.${STUDENT_LOGIN_DOMAIN.replace(/^students\./, "")}`;
+
 /** "Ada.Obi12" -> "ada.obi12@students.swiftcipher.invalid" */
 export const loginEmail = (username: string) => `${username.trim().toLowerCase()}@${STUDENT_LOGIN_DOMAIN}`;
 

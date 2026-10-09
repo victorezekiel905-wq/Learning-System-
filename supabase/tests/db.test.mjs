@@ -1422,6 +1422,39 @@ test("guests join a live lesson with the code and a name, and reach only that le
   assert.equal((await db.admin("select count(*)::int c from public.users where id = $1", [g]))[0].c, 0);
 });
 
+test("guests join even with Supabase's anonymous sign-ins off: the server makes a guest-only account (1000)", async () => {
+  const T = await db.signUp("head@serverguests.test", "Server Head");
+  await db.rpc(T, "bootstrap_school", { p_school_name: "Server Guest School", p_full_name: "Server Head" });
+  const cls = await db.rpc(T, "create_class", { p_name: "Open Class" });
+  const s = await goLive(T, { p_class: cls.id });
+
+  // Joins, plays, and is shown to the teacher as a guest, exactly like an anonymous sign-in.
+  const g = await db.serverGuest();
+  assert.equal((await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Ngozi E" })).session_id, s.id);
+  assert.equal((await db.rpc(g, "session_student_state", { p_session: s.id })).guest, true);
+  assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).roster.find((r) => r.student_id === g).guest, true);
+  assert.equal((await db.as(g, "select 1 from public.classes")).length, 0);
+
+  // The mark only counts in app_metadata (service key only): a user's own metadata doesn't make a guest.
+  const fake = await db.signUp("fake@serverguests.test", "Fake Guest");
+  await db.admin("update auth.users set raw_user_meta_data = '{\"guest\": true}' where id = $1", [fake]);
+  await rejects(db.rpc(fake, "join_session_as_guest", { p_code: s.join_code, p_name: "Fake" }), /guest sign-in/);
+
+  // A guest account can never become a student or start a school.
+  const g2 = await db.serverGuest();
+  await rejects(db.rpc(g2, "redeem_code", { p_code: cls.join_code }), /Create an account/);
+  await rejects(db.rpc(g2, "bootstrap_school", { p_school_name: "Fake School", p_full_name: "Fake" }), /Create an account/);
+
+  // Guest accounts that never joined a lesson are removed after a day; recent ones and real accounts stay.
+  await db.admin("update auth.users set created_at = now() - interval '2 days' where id = $1", [g2]);
+  const fresh = await db.serverGuest();
+  await db.rpc(T, "end_session", { p_session: s.id });
+  await db.admin("update public.class_sessions set ended_at = now() - interval '31 days' where id = $1", [s.id]);
+  await db.admin("select app.purge_guests()");
+  const left = (await db.admin("select id from auth.users where id = any($1)", [[g, g2, fresh, fake]])).map((r) => r.id).sort();
+  assert.deepEqual(left, [fresh, fake].sort());
+});
+
 test("monitoring is an add-on: off for new schools, enforced by the database (0870)", async () => {
   const head = await db.signUp("head@nomon.test", "No Monitor Head");
   const tenant = (await db.rpc(head, "bootstrap_school", { p_school_name: "Calm School", p_full_name: "No Monitor Head" })).tenant_id;
