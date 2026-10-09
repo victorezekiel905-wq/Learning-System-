@@ -17,6 +17,7 @@ export default async function ClassPage(props: { params: Promise<{ id: string }>
   const isAdmin = ["school_admin", "platform_admin"].includes(me.profile.role);
   return (
     <ClassDetail cls={cls} canManage={Boolean((access as { manage?: boolean } | null)?.manage)} isAdmin={isAdmin}
+      canTeach={Boolean((access as { teach?: boolean } | null)?.teach)} mySubjects={(access as { subjects?: string[] } | null)?.subjects ?? []}
       policies={policies ?? []} teachers={teachers ?? []} />
   );
 }

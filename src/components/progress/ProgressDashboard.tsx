@@ -118,7 +118,7 @@ export function ProgressView({ p, error, viewer, isAdmin, period, date, onPeriod
 
       {p && p.summary && (
         <>
-          {p.scope === "teacher" && <p className="rounded-xl bg-ink-100 px-4 py-2.5 text-[13px] text-ink-700 print:hidden">Showing your own subjects and lessons only. School admins see every subject.</p>}
+          {p.scope === "teacher" && <p className="rounded-xl bg-ink-100 px-4 py-2.5 text-[13px] text-ink-700 print:hidden">Showing what you teach: every subject for a class you are class teacher of, your own subject for a class you teach a subject in. School admins see everything.</p>}
           <h2 className="hidden font-display text-xl font-bold print:block">Progress: {p.student.name} · {p.label}</h2>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Big label="Lessons attended" value={p.summary.held ? `${p.summary.attended} of ${p.summary.held}` : p.summary.attended}>

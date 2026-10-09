@@ -16,6 +16,8 @@ type Data = {
   hardest?: (Topic & { subject: string })[];
   pupils_needing_help?: { student_id: string; name: string; answers: number; accuracy: number; classes: string[]; weakest: { subject: string; topic: string; accuracy: number } | null }[];
   feedback?: { total: number; unanswered: number };
+  /** school: an admin; class: the class teacher (every subject); subject: a subject teacher (their own subject). */
+  scope?: "school" | "class" | "subject";
 };
 
 const tone = (p: number | null) => (p === null ? "bg-ink-200" : p < 50 ? "bg-rose-500" : "bg-ink-800");
@@ -25,10 +27,12 @@ const Meter = ({ v, className }: { v: number | null; className?: string }) => (
   </span>
 );
 
-export function SchoolProgress() {
+/** The whole school (admins), or one class: every subject for its class teacher, their own subject for a subject teacher. */
+export function SchoolProgress({ classId }: { classId?: string } = {}) {
   const [period, setPeriod] = useState<Period>("term");
   const [date, setDate] = useState<string | null>(null);
-  const [cls, setCls] = useState("");
+  const [chosen, setCls] = useState("");
+  const cls = classId ?? chosen;
   const r = useRpc<Data>("school_progress", { p_period: period, p_date: date, p_class: cls || null }, [period, date, cls]);
   const d = r.data;
 
@@ -42,9 +46,9 @@ export function SchoolProgress() {
                 className={cn("rounded-lg px-3 py-1.5 text-sm font-semibold capitalize", period === p ? "bg-ink-900 text-white" : "text-ink-700 hover:bg-ink-100")}>{p}</button>
             ))}
           </div>
-          <Select className="!w-auto" value={cls} onChange={(e) => setCls(e.target.value)} aria-label="Class">
+          {!classId && <Select className="!w-auto" value={cls} onChange={(e) => setCls(e.target.value)} aria-label="Class">
             <option value="">Whole school</option>{(d?.classes ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
+          </Select>}
         </div>
         <div className="flex items-center gap-1">
           <button type="button" className="btn btn-ghost btn-sm" aria-label="Earlier" disabled={!d?.prev_date} onClick={() => d?.prev_date && setDate(d.prev_date)}><ChevronLeft className="h-4 w-4" /></button>
@@ -57,6 +61,7 @@ export function SchoolProgress() {
       {!d && !r.error && <div className="flex justify-center py-16"><Spinner /></div>}
       {d?.needs_terms && <Alert title="Term dates aren't set">Add them in <Link href="/admin/settings#terms">Settings</Link> to see progress by term.</Alert>}
 
+      {d?.scope === "subject" && <p className="rounded-xl bg-ink-100 px-4 py-2.5 text-[13px] text-ink-700">Showing your own subject in this class. The class teacher and school admins see every subject.</p>}
       {d?.summary && (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

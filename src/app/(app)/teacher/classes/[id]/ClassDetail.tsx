@@ -10,6 +10,8 @@ import { LevelsPanel } from "./LevelsPanel";
 import { SupportsPanel } from "./SupportsPanel";
 import { AddStudents, LoginCards, printCards, type AddedRow } from "./AddStudents";
 import { Promote } from "./Promote";
+import { SubjectTeachers } from "./SubjectTeachers";
+import { SchoolProgress } from "@/app/(app)/admin/progress/SchoolProgress";
 import { FEATURES } from "@/lib/features";
 import { Icon } from "@/components/Icon";
 import {
@@ -19,10 +21,12 @@ type Cls = { id: string; name: string; subject: string | null; grade_level: stri
 type Member = { user_id: string; role: string; joined_at: string;
   users: { full_name: string; email: string; login_name: string | null; student_profiles: { student_number: string | null } | null } | null };
 
-export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
+export function ClassDetail({ cls, canManage, isAdmin, policies, teachers, canTeach = false, mySubjects = [] }: {
   cls: Cls; canManage: boolean; isAdmin: boolean; policies: { id: string; name: string }[]; teachers: { id: string; full_name: string }[];
+  /** Teaches the class: class teacher, admin or subject teacher (0990). */
+  canTeach?: boolean; mySubjects?: string[];
 }) {
-  const [tab, setTab] = useState<"roster" | "levels" | "supports" | "groups" | "settings">("roster");
+  const [tab, setTab] = useState<"roster" | "analysis" | "levels" | "supports" | "groups" | "settings">("roster");
   const members = useLoader(async () => {
     const { data, error } = await createClient().from("class_members")
       .select("user_id,role,joined_at,users(full_name,email,login_name,student_profiles(student_number))").eq("class_id", cls.id).order("role", { ascending: false });
@@ -34,8 +38,8 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
   return (
     <div className="page">
       <PageHeader eyebrow={<Link href="/teacher/classes">Classes</Link>} title={cls.name}
-        subtitle={[cls.subject, cls.grade_level].filter(Boolean).join(" · ") || undefined}
-        actions={canManage && <>
+        subtitle={!canManage && mySubjects.length ? `You teach ${mySubjects.join(" and ")} in this class.` : [cls.subject, cls.grade_level].filter(Boolean).join(" · ") || undefined}
+        actions={!canManage && canTeach ? <Link href={`/teacher/live/new?class=${cls.id}`} className="btn btn-primary no-underline">Go live</Link> : canManage && <>
           <Link href={`/teacher/insights?class=${cls.id}`} className="btn btn-secondary no-underline">Analytics</Link>
           {FEATURES.parentPortal && <Link href={`/teacher/classes/${cls.id}/parent-codes`} className="btn btn-secondary no-underline">Parent codes</Link>}
           <Link href={`/teacher/live/new?class=${cls.id}`} className="btn btn-primary no-underline">Go live</Link>
@@ -45,12 +49,14 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
 
       <Tabs className="mb-5" value={tab} onChange={setTab} tabs={[
         { id: "roster", label: `Roster (${students.length})` },
+        ...(canTeach || canManage ? [{ id: "analysis" as const, label: "Analysis" }] : []),
         ...(canManage ? [{ id: "levels" as const, label: "Levels & XP" }, { id: "supports" as const, label: "Supports" }] : []),
         { id: "groups", label: "Groups" },
         ...(canManage ? [{ id: "settings" as const, label: "Settings" }] : [])
       ]} />
 
-      {tab === "roster" && <Roster cls={cls} canManage={canManage} isAdmin={isAdmin} members={members.data ?? []} loading={members.loading} reload={members.reload} />}
+      {tab === "roster" && <Roster cls={cls} canManage={canManage} isAdmin={isAdmin} teachers={teachers} members={members.data ?? []} loading={members.loading} reload={members.reload} />}
+      {tab === "analysis" && (canTeach || canManage) && <SchoolProgress classId={cls.id} />}
       {tab === "levels" && canManage && <LevelsPanel classId={cls.id} />}
       {tab === "supports" && canManage && <SupportsPanel classId={cls.id} />}
       {tab === "groups" && <Groups cls={cls} canManage={canManage} students={students} policies={policies} />}
@@ -59,7 +65,9 @@ export function ClassDetail({ cls, canManage, isAdmin, policies, teachers }: {
   );
 }
 
-function Roster({ cls, canManage, isAdmin, members, loading, reload }: { cls: Cls; canManage: boolean; isAdmin: boolean; members: Member[]; loading: boolean; reload: () => Promise<void> }) {
+function Roster({ cls, canManage, isAdmin, teachers, members, loading, reload }: {
+  cls: Cls; canManage: boolean; isAdmin: boolean; teachers: { id: string; full_name: string }[]; members: Member[]; loading: boolean; reload: () => Promise<void>;
+}) {
   const toast = useToast();
   const dialog = useDialog();
   const [addOpen, setAddOpen] = useState(false);
@@ -179,12 +187,15 @@ function Roster({ cls, canManage, isAdmin, members, loading, reload }: { cls: Cl
           </table>
         )}
       </Card>
+      <div className="space-y-6">
+      <SubjectTeachers classId={cls.id} canManage={canManage} teachers={teachers} />
       <Card title="Or let students join with a code">
         <p className="text-sm text-ink-600">Students with their own account join at <strong>/join</strong> with this code:</p>
         <p className="my-4 rounded-2xl bg-accent-500 py-5 text-center font-mono text-4xl font-extrabold tracking-[0.25em] text-accent-ink">{cls.join_code}</p>
         <div className="flex flex-wrap gap-2"><CopyButton value={cls.join_code} label="Copy code" /><CopyButton value={joinUrl} label="Copy join link" /></div>
         <p className="hint mt-3">Students who already have an account enter the code under "Join with code".</p>
       </Card>
+      </div>
 
       {addOpen && <AddStudents classId={cls.id} className={cls.name} onClose={(changed) => { setAddOpen(false); if (changed) void reload(); }} />}
       {promoteOpen && <Promote cls={cls} students={studentRows.map((m) => ({ user_id: m.user_id, name: m.users?.full_name ?? "Student" }))}

@@ -2190,3 +2190,89 @@ test("privacy: a student or parent never sees another child's report, answers or
   await rejects(db.rpc(other, "activity_results", { p_activity: L.act }), /Not visible/);
   assert.equal((await db.rpc(L.T, "activity_results", { p_activity: L.act })).questions[1].text_responses[0].response.text, "Ada's private answer");
 });
+
+test("class teachers see every subject of their class; subject teachers only their own; admins everything (0990)", async () => {
+  const H = await db.signUp("head@subjects.test", "Head");
+  const tenant = (await db.rpc(H, "bootstrap_school", { p_school_name: "Subjects School", p_full_name: "Head" })).tenant_id;
+  await db.admin("update public.tenants set plan_code = 'school' where id = $1", [tenant]);
+  await db.as(H, "update public.tenant_settings set parent_portal_enabled = true");
+  const staff = async (email, name) => {
+    const inv = await db.rpc(H, "create_invite", { p_role: "teacher" });
+    const u = await db.signUp(email, name);
+    await db.rpc(u, "redeem_code", { p_code: inv.code });
+    return u;
+  };
+  const [form, maths, english, outsider] = [await staff("form@subjects.test", "Mrs Form"), await staff("maths@subjects.test", "Mr Maths"),
+    await staff("english@subjects.test", "Ms English"), await staff("out@subjects.test", "Mr Outside")];
+  const cls = await db.rpc(form, "create_class", { p_name: "JSS 2 Gold" });
+  const ada = await db.signUp("ada@subjects.test", "Ada Obi");
+  await db.rpc(ada, "redeem_code", { p_code: cls.join_code });
+
+  // The class teacher assigns subject teachers; nobody else can.
+  await db.rpc(form, "set_class_subject", { p_class: cls.id, p_subject: "Mathematics", p_teacher: maths });
+  const englishRow = await db.rpc(form, "set_class_subject", { p_class: cls.id, p_subject: "English", p_teacher: english });
+  await rejects(db.rpc(maths, "set_class_subject", { p_class: cls.id, p_subject: "Art", p_teacher: maths }), /Class not found/);
+  await rejects(db.rpc(outsider, "set_class_subject", { p_class: cls.id, p_subject: "Art", p_teacher: outsider }), /Class not found/);
+  assert.deepEqual((await db.rpc(form, "class_subject_teachers", { p_class: cls.id })).map((r) => [r.subject, r.teacher]), [["English", "Ms English"], ["Mathematics", "Mr Maths"]]);
+
+  // Subject teachers see the class and its students and teach it live; an outsider doesn't.
+  assert.equal((await db.as(maths, "select 1 from public.classes where id = $1", [cls.id])).length, 1);
+  assert.equal((await db.as(maths, "select 1 from public.class_members where class_id = $1 and user_id = $2", [cls.id, ada])).length, 1);
+  assert.equal((await db.as(outsider, "select 1 from public.classes where id = $1", [cls.id])).length, 0);
+  assert.ok((await db.rpc(maths, "my_teaching_classes", {})).some((c) => c.id === cls.id));
+
+  // Each subject teacher teaches a live lesson (lessons with no subject set: the subject comes from who teaches it).
+  const teach = async (T, right) => {
+    const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title, status) values ($1, $2, 'Lesson', 'published') returning id", [tenant, T]);
+    const [{ id: act }] = await db.admin("insert into public.activities (tenant_id, lesson_id, owner_id, kind, title) values ($1, $2, $3, 'quiz', 'Check') returning id", [tenant, lesson, T]);
+    await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 0, 'activity', $3, '{}')", [tenant, lesson, act]);
+    const [{ id: q }] = await db.admin("insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, position) values ($1, $2, $3, 'mcq', 'Q', 1, 0) returning id", [tenant, act, T]);
+    const [{ id: ok }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'y', true, 0) returning id", [tenant, q]);
+    const [{ id: no }] = await db.admin("insert into public.question_options (tenant_id, question_id, label, is_correct, position) values ($1, $2, 'n', false, 1) returning id", [tenant, q]);
+    const s = await db.rpc(T, "start_session", { p_class: cls.id, p_lesson: lesson });
+    await db.rpc(ada, "join_session", { p_code: s.join_code });
+    await db.rpc(T, "session_control", { p_session: s.id, p_action: "start" });
+    const a = (await db.rpc(ada, "start_attempt", { p_activity: act, p_session: s.id })).attempt.id;
+    await db.rpc(ada, "submit_answer", { p_attempt: a, p_question: q, p_response: JSON.stringify({ option_id: right ? ok : no }) });
+    await db.rpc(T, "end_session", { p_session: s.id });
+  };
+  await teach(maths, true);
+  await teach(english, false);
+  await rejects(db.rpc(outsider, "start_session", { p_class: cls.id, p_lesson: null }), /Not your class/);
+
+  const subjects = async (who) => (await db.rpc(who, "progress_report", { p_student: ada, p_period: "week" })).subjects.map((s) => s.subject).sort();
+  assert.deepEqual(await subjects(maths), ["Mathematics"]);
+  assert.deepEqual(await subjects(english), ["English"]);
+  assert.deepEqual(await subjects(form), ["English", "Mathematics"], "the class teacher sees every subject");
+  assert.deepEqual(await subjects(H), ["English", "Mathematics"], "the admin sees every subject");
+  await rejects(db.rpc(outsider, "progress_report", { p_student: ada, p_period: "week" }), /Report not found/);
+
+  // Class analysis: class teacher all subjects, subject teacher their own, admin anything.
+  const cp = async (who) => db.rpc(who, "school_progress", { p_period: "week", p_class: cls.id });
+  assert.deepEqual([(await cp(form)).scope, (await cp(form)).subjects.map((s) => s.subject).sort()], ["class", ["English", "Mathematics"]]);
+  assert.deepEqual([(await cp(maths)).scope, (await cp(maths)).subjects.map((s) => s.subject)], ["subject", ["Mathematics"]]);
+  assert.equal((await db.rpc(H, "school_progress", { p_period: "week" })).scope, "school");
+  await rejects(db.rpc(maths, "school_progress", { p_period: "week" }), /Only school admins/);
+  await rejects(cp(outsider), /Only school admins/);
+
+  // Accounts and parent codes stay with the class teacher and admins.
+  await rejects(db.rpc(maths, "update_student", { p_student: ada, p_name: "X" }), /Student not found/);
+  await rejects(db.rpc(maths, "parent_codes", { p_class: cls.id }), /Class not found/);
+  await db.rpc(form, "update_student", { p_student: ada, p_name: "Ada Obi" });
+
+  // Parents write to a subject teacher; that teacher and the admins read it, the class teacher doesn't.
+  const codes = await db.rpc(form, "parent_codes", { p_class: cls.id });
+  const mum = await db.signUp("mum@subjects.test", "Mrs Obi");
+  await db.rpc(mum, "redeem_code", { p_code: codes.students[0].code, p_as: "parent" });
+  const targets = await db.rpc(mum, "feedback_targets", { p_student: ada });
+  assert.deepEqual(targets.map((t) => t.teacher).sort(), ["Mr Maths", "Mrs Form", "Ms English"]);
+  await db.rpc(mum, "send_parent_feedback", { p_student: ada, p_class: cls.id, p_body: "Ada enjoys maths now.", p_teacher: maths });
+  await rejects(db.rpc(mum, "send_parent_feedback", { p_student: ada, p_class: cls.id, p_body: "Hello", p_teacher: outsider }), /doesn't teach this class/);
+  assert.deepEqual((await db.rpc(maths, "parent_feedback_list", {})).map((f) => f.subject), ["Mathematics"]);
+  assert.equal((await db.rpc(form, "parent_feedback_list", {})).length, 0);
+  assert.equal((await db.rpc(H, "parent_feedback_list", {})).length, 1);
+
+  // Taking a subject away removes the access.
+  await db.rpc(form, "remove_class_subject", { p_id: englishRow });
+  await rejects(db.rpc(english, "progress_report", { p_student: ada, p_period: "week" }), /Report not found/);
+});

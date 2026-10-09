@@ -20,12 +20,14 @@ export function FeedbackPanel({ studentId, name }: { studentId: string; name: st
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const first = name.split(" ")[0];
-  useEffect(() => { if (!cls && targets.data?.[0]) setCls(targets.data[0].class_id); }, [targets.data, cls]);
+  // A choice is a class and a teacher: the class teacher, or one of its subject teachers.
+  useEffect(() => { if (!cls && targets.data?.[0]) setCls(`${targets.data[0].class_id}|${targets.data[0].teacher_id}`); }, [targets.data, cls]);
 
   async function send() {
     setBusy(true);
     try {
-      await rpc("send_parent_feedback", { p_student: studentId, p_class: cls, p_body: body });
+      const [classId, teacherId] = cls.split("|");
+      await rpc("send_parent_feedback", { p_student: studentId, p_class: classId, p_body: body, p_teacher: teacherId });
       setBody("");
       toast("Sent to the teacher", "success");
       await list.reload();
@@ -40,7 +42,7 @@ export function FeedbackPanel({ studentId, name }: { studentId: string; name: st
         <div className="space-y-3">
           <Field label="Subject" htmlFor="fb-class">
             <Select id="fb-class" value={cls} onChange={(e) => setCls(e.target.value)}>
-              {t.map((x) => <option key={x.class_id} value={x.class_id}>{x.subject} · {x.teacher}</option>)}
+              {t.map((x) => <option key={`${x.class_id}|${x.teacher_id}|${x.subject}`} value={`${x.class_id}|${x.teacher_id}`}>{x.subject} · {x.teacher}</option>)}
             </Select>
           </Field>
           <Field label="Your feedback" hint="Only this teacher and the school's leaders can read it." htmlFor="fb-body">
