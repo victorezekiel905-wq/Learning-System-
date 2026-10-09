@@ -1,13 +1,16 @@
 # syntax=docker/dockerfile:1.7
 # SwiftCipher production image (Next.js standalone output, non-root).
 # Build args are the public values baked into the client bundle.
+# Debian, not Alpine: Alpine's LibreOffice build aborts on many PowerPoint files
+# ("terminate called after throwing ... uno::RuntimeException", code 134). All
+# stages share the base so native modules (@napi-rs/canvas) match the C library.
 
-FROM node:22-alpine AS deps
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:22-alpine AS builder
+FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -30,18 +33,22 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 # LibreOffice turns PowerPoint uploads into PDF, so imported decks keep their design.
 # Liberation and Carlito/Caladea have the same letter widths as Arial, Times and
 # Calibri/Cambria, so text wraps as it does in PowerPoint.
-RUN apk add --no-cache libreoffice-impress ttf-liberation ttf-dejavu fontconfig  && (apk add --no-cache font-carlito font-caladea || true)
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
-RUN addgroup -S app && adduser -S app -G app
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libreoffice-impress fontconfig \
+      fonts-liberation2 fonts-crosextra-carlito fonts-crosextra-caladea fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
+# svp: LibreOffice's headless drawing backend (no X server or desktop libraries needed).
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 SAL_USE_VCLPLUGIN=svp
+RUN groupadd --system app && useradd --system --gid app --create-home app
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=app:app /app/.next/standalone ./
 COPY --from=builder --chown=app:app /app/.next/static ./.next/static
 USER app
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1
+HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
 CMD ["node", "server.js"]

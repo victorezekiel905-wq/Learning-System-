@@ -378,6 +378,15 @@ function officeReason(r: OfficeRun): string {
   }
 }
 
+const CHECK_DECK = `<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+  office:version="1.2" office:mimetype="application/vnd.oasis.opendocument.presentation">
+ <office:body><office:presentation><draw:page draw:name="1">
+  <draw:frame svg:x="2cm" svg:y="2cm" svg:width="20cm" svg:height="3cm"><draw:text-box><text:p>SwiftCipher conversion check</text:p></draw:text-box></draw:frame>
+ </draw:page></office:presentation></office:body>
+</office:document>`;
+
 /**
  * For the platform console: is LibreOffice installed, how fast does it start here,
  * and what does the server have? Converts a one-line document to PDF.
@@ -395,8 +404,9 @@ export async function officeCheck(): Promise<Record<string, unknown>> {
   const dir = await mkdtemp(path.join(os.tmpdir(), "office-check-"));
   try {
     const version = await runOffice(bin, ["--version"], dir, 60_000);
-    const input = path.join(dir, "check.txt");
-    await writeFile(input, "SwiftCipher conversion check");
+    // A one-slide presentation: the same Impress-to-PDF path a real deck takes.
+    const input = path.join(dir, "check.fodp");
+    await writeFile(input, CHECK_DECK);
     const profile = `file://${dir.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "/$1:")}/profile`;
     const args = ["--headless", "--invisible", "--nologo", "--norestore", "--nodefault", "--nolockcheck", `-env:UserInstallation=${profile}`,
       "--convert-to", "pdf", "--outdir", dir, input];
