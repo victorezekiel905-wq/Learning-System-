@@ -1703,6 +1703,41 @@ test("reveal closes the activity and shows the right answers; live answered coun
   await db.rpc(T, "session_control", { p_session: s.id, p_action: "end" });
 });
 
+test("moving to another slide closes the launched activity and hides results (1010)", async () => {
+  const T = await db.signUp("t@slides.test", "Slides Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Slides School", p_full_name: "Slides Teacher" })).tenant_id;
+  const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title, status) values ($1, $2, 'Deck', 'published') returning id", [tenant, T]);
+  const [{ id: q1 }] = await db.admin("insert into public.activities (tenant_id, lesson_id, owner_id, kind, title) values ($1, $2, $3, 'quiz', 'First') returning id", [tenant, lesson, T]);
+  const [{ id: q2 }] = await db.admin("insert into public.activities (tenant_id, lesson_id, owner_id, kind, title) values ($1, $2, $3, 'quiz', 'Second') returning id", [tenant, lesson, T]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 0, 'activity', $3, '{}')", [tenant, lesson, q1]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, content) values ($1, $2, 1, 'title', '{}')", [tenant, lesson]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 2, 'activity', $3, '{}')", [tenant, lesson, q2]);
+  const s = await goLive(T, { p_class: null, p_lesson: lesson });
+  const row = async () => (await db.admin("select current_slide, active_activity_id, responses_visible from public.class_sessions where id = $1", [s.id]))[0];
+
+  // The first question is launched, revealed (which shares results), then the teacher moves on.
+  await db.rpc(T, "set_session_state", { p_session: s.id, p_activity: q1 });
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "reveal" });
+  assert.equal((await row()).responses_visible, true);
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "next" });
+  assert.deepEqual(await row(), { current_slide: 1, active_activity_id: null, responses_visible: false });
+  assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).activity, null, "the plain slide shows, not the old question");
+
+  // The next activity slide shows its own question; going back shows the first again.
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "next" });
+  assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).activity.activity.id, q2);
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "goto", p_args: { slide: 0 } });
+  assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).activity.activity.id, q1);
+
+  // Launching or sharing in the same change as a slide move is kept.
+  await db.rpc(T, "set_session_state", { p_session: s.id, p_slide: 2, p_activity: q2, p_responses_visible: true });
+  assert.deepEqual(await row(), { current_slide: 2, active_activity_id: q2, responses_visible: true });
+  // Settings changes that don't move the slide leave the activity open.
+  await db.rpc(T, "set_session_state", { p_session: s.id, p_group_chat: false });
+  assert.equal((await row()).active_activity_id, q2);
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "end" });
+});
+
 test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {
   const T = await db.signUp("t@canvas.test", "Canvas Teacher");
   const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Canvas School", p_full_name: "Canvas Teacher" })).tenant_id;
