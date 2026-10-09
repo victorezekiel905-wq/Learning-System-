@@ -1,5 +1,4 @@
 "use client";
-import JSZip from "jszip";
 import { MARK, tableToText } from "./question-import";
 import { parseCsv, parseXlsx } from "./roster-file";
 
@@ -50,6 +49,8 @@ function stands(rPr: Element | null): boolean {
  * so a bold or coloured option can be taken as the answer.
  */
 async function docxText(data: ArrayBuffer): Promise<string> {
+  // Loaded only when a file is chosen, so pages that never read one stay light.
+  const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(data);
   const read = async (path: string) => {
     const f = zip.file(path);

@@ -12,7 +12,8 @@ const jakarta = localFont({ src: "./fonts/plus-jakarta-sans-latin-wght-normal.wo
 // "Easy-to-read font" learning support: designed for low vision and dyslexia-friendly letter shapes.
 const readable = localFont({
   src: [{ path: "./fonts/atkinson-hyperlegible-latin-400-normal.woff2", weight: "400" }, { path: "./fonts/atkinson-hyperlegible-latin-700-normal.woff2", weight: "700" }],
-  variable: "--font-readable", display: "swap"
+  // Only students who turn this support on use it, so it is not downloaded up front.
+  variable: "--font-readable", display: "swap", preload: false
 });
 // Join codes and code blocks: unambiguous characters (0/O, 1/I) on every device.
 const mono = localFont({ src: "./fonts/jetbrains-mono-latin-wght-normal.woff2", weight: "100 800", variable: "--font-mono", display: "swap" });

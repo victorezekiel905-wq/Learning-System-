@@ -1,5 +1,4 @@
 "use client";
-import JSZip from "jszip";
 
 /*
  * Reads a class list from a CSV or Excel (.xlsx) file in the browser.
@@ -50,6 +49,8 @@ const colIndex = (ref: string) => {
 
 /** The first worksheet of an .xlsx file, as rows of text. */
 export async function parseXlsx(data: ArrayBuffer): Promise<string[][]> {
+  // Loaded only when a file is chosen, so pages that never read one stay light.
+  const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(data);
   const xml = async (path: string) => {
     const f = zip.file(path);
