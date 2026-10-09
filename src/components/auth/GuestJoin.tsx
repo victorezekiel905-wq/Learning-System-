@@ -10,6 +10,21 @@ import { formatJoinCode } from "@/lib/utils";
 type GuestJoinResult = { session_id?: string; title?: string; error?: string; code?: string };
 
 /**
+ * Guest joining needs "Allow anonymous sign-ins" (Supabase → Authentication →
+ * Sign In / Providers), and a raised hourly limit, since a class shares one
+ * internet address. Students can't fix either, so they're told what they can do.
+ */
+function guestError(message: string): string {
+  if (/disabled|not enabled/i.test(message)) {
+    return "Joining with just a name is switched off on this site. Tell your teacher, or sign in with your school account.";
+  }
+  if (/rate limit|too many/i.test(message)) {
+    return "Lots of people are joining from this network right now. Wait a minute and try again, or tell your teacher.";
+  }
+  return message;
+}
+
+/**
  * Join a live lesson the Nearpod/Kahoot way: the code, then a name. No account.
  * Someone already signed in with a school account joins with that account instead.
  */
@@ -38,16 +53,14 @@ export function GuestJoin({ initialCode = "" }: { initialCode?: string }) {
       }
       if (!session) {
         const { error } = await sb.auth.signInAnonymously();
-        if (error) throw new Error(/disabled|not enabled/i.test(error.message)
-          ? "Joining as a guest isn't switched on for this site yet. Ask the school to turn on guest sign-ins."
-          : error.message);
+        if (error) throw new Error(guestError(error.message));
       }
       let r = await rpc<GuestJoinResult>("join_session_as_guest", { p_code: cleanCode, p_name: name });
       if (r.code === "GUEST_OTHER_SCHOOL") {
         // This browser was a guest at another school: start afresh.
         await sb.auth.signOut();
         const again = await sb.auth.signInAnonymously();
-        if (again.error) throw new Error(again.error.message);
+        if (again.error) throw new Error(guestError(again.error.message));
         r = await rpc<GuestJoinResult>("join_session_as_guest", { p_code: cleanCode, p_name: name });
       }
       if (r.error || !r.session_id) {
