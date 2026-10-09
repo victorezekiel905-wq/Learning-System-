@@ -27,11 +27,11 @@ export type Me = { id: string; tenantId: string; name: string };
 
 const PRESENCE_DOT: Record<string, string> = { online: "bg-emerald-500", idle: "bg-amber-400", offline: "bg-ink-300", not_joined: "bg-ink-200", connecting: "bg-sky-400" };
 
-export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; me: Me; envs: { id: string; name: string }[]; scenes: { id: string; name: string }[] }) {
+export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }: { sessionId: string; me: Me; envs: { id: string; name: string }[]; scenes: { id: string; name: string }[]; initialTab?: Tab }) {
   const router = useRouter();
   const toast = useToast();
   const dialog = useDialog();
-  const [tab, setTab] = useState<Tab>("lesson");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sound, setSound] = useState(true);
   const { quality } = useNetwork();
@@ -229,7 +229,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
               catch (e) { toast(errorText(e), "error"); }
             }}><Icon name="lock" className="h-4 w-4" /> Lockdown {s.session.lockdown ? "on" : "off"}</Button>}
           <CopyButton value={s.session.join_code} label="Copy code" />
-          <Link href={`/present/${sessionId}`} target="_blank" className="btn btn-secondary btn-sm no-underline"><Icon name="monitor" className="h-4 w-4" /> Present</Link>
+          <Link href={`/present/${sessionId}`} className="btn btn-secondary btn-sm no-underline" title="Full-screen view for the projector, with its own controls"><Icon name="monitor" className="h-4 w-4" /> Present</Link>
           <Link href={`/teacher/challenge/new?class=${s.session.class_id}&session=${sessionId}${s.session.active_activity_id ? `&activity=${s.session.active_activity_id}` : ""}`}
             className="btn btn-secondary btn-sm no-underline" title="Kahoot-style quiz game with a live leaderboard"><Icon name="trophy" className="h-4 w-4" /> Game</Link>
           <Button size="sm" variant="danger" onClick={end}>End session</Button>
@@ -251,7 +251,7 @@ export function LiveRoom({ sessionId, me, envs, scenes }: { sessionId: string; m
 
       <div className={cn("grid flex-1 grid-cols-[minmax(0,1fr)]", mon ? "lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_300px]" : "xl:grid-cols-[minmax(0,1fr)_300px]")}>
         {mon && <aside className="min-w-0 border-b border-ink-200 bg-white p-3 lg:sticky lg:top-16 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r" aria-label="Student screens">
-          <ScreenRail state={s} screens={screens} focus={focus} onFocus={setFocus} />
+          <ScreenRail state={s} screens={screens} focus={focus} onFocus={setFocus} onChanged={() => void state.reload()} />
         </aside>}
         <section className="min-w-0 p-4">
           {phase === "lobby" && !focus && <WaitingRoom state={s} onStart={() => control("start")} />}

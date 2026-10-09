@@ -1,13 +1,14 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { Volume2, VolumeX } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye, LayoutGrid, Maximize, Minimize, Pause, Play, Trophy, Volume2, VolumeX } from "lucide-react";
 import { SlideView, type SlideData } from "@/components/slides/SlideView";
 import { BOARD_H, BOARD_W, StrokeLayer } from "@/components/slides/Whiteboard";
 import type { SessionState } from "@/components/live/types";
 import { useAnnotations } from "@/lib/annotations";
 import { useLoader, useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
-import { rpc } from "@/lib/rpc";
+import { errorText, rpc } from "@/lib/rpc";
 import { Icon } from "@/components/Icon";
 import { avatarFor } from "@/components/live/avatars";
 import { Leaderboard } from "@/components/live/Leaderboard";
@@ -67,7 +68,7 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   }, [soundOn, sound, results?.revealed, results?.activity.id, s?.show_leaderboard, s?.leaderboard?.at, s?.phase, here.length]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-ink-900 text-white">
+    <div className="flex min-h-screen flex-col bg-ink-900 pb-20 text-white">
       <header className="flex items-center justify-between px-8 py-4">
         <p className="text-lg font-semibold">{s?.title ?? "SwiftCipher"}</p>
         <div className="flex items-center gap-5">
@@ -151,6 +152,102 @@ export function Presenter({ sessionId }: { sessionId: string }) {
           </div>
         ) : <p className="text-2xl text-ink-400">{s ? "Waiting to start…" : "Loading…"}</p>}
       </main>
+      {state.data && <PresenterControls sessionId={sessionId} state={state.data} slideCount={lesson.data?.slides.length ?? 0} reload={state.reload} />}
+    </div>
+  );
+}
+
+const BAR_BTN = "inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-40";
+
+/**
+ * The teacher's controls on the projector: back to the control room, start, slides,
+ * reveal, pause, leaderboard, screens and full screen. The bar fades while the mouse
+ * is still, so the class sees just the lesson; keys work whether it shows or not:
+ * → next, ← back, S start, R reveal, P pause/resume, L leaderboard, F full screen.
+ */
+function PresenterControls({ sessionId, state, slideCount, reload }: { sessionId: string; state: SessionState; slideCount: number; reload: () => Promise<void> }) {
+  const s = state.session;
+  const phase = s.phase ?? "active";
+  const [shown, setShown] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [full, setFull] = useState(false);
+  const hideAt = useRef<number | undefined>(undefined);
+
+  const act = useCallback(async (action: string, args: Record<string, unknown> = {}) => {
+    setBusy(true); setErr(null);
+    try { await rpc("session_control", { p_session: sessionId, p_action: action, p_args: args }); await reload(); }
+    catch (e) { setErr(errorText(e)); }
+    finally { setBusy(false); }
+  }, [sessionId, reload]);
+  const toggleFull = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    else void document.documentElement.requestFullscreen().catch(() => {});
+  }, []);
+
+  // Show on any movement or key; fade after 3 s of stillness (never in the lobby).
+  useEffect(() => {
+    const wake = () => {
+      setShown(true);
+      window.clearTimeout(hideAt.current);
+      hideAt.current = window.setTimeout(() => setShown(false), 3000);
+    };
+    wake();
+    const onFull = () => setFull(!!document.fullscreenElement);
+    window.addEventListener("pointermove", wake);
+    window.addEventListener("keydown", wake);
+    window.addEventListener("touchstart", wake);
+    document.addEventListener("fullscreenchange", onFull);
+    return () => {
+      window.clearTimeout(hideAt.current);
+      window.removeEventListener("pointermove", wake);
+      window.removeEventListener("keydown", wake);
+      window.removeEventListener("touchstart", wake);
+      document.removeEventListener("fullscreenchange", onFull);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (e.key === "ArrowRight" && phase === "active") { e.preventDefault(); void act("next"); }
+      else if (e.key === "ArrowLeft" && phase === "active") { e.preventDefault(); void act("prev"); }
+      else if (k === "s" && phase === "lobby") void act("start");
+      else if (k === "p" && (phase === "active" || phase === "paused")) void act(phase === "active" ? "pause" : "resume");
+      else if (k === "l" && phase !== "lobby") void act("leaderboard", { show: !s.show_leaderboard });
+      else if (k === "r" && phase === "active" && state.activity && !state.activity.revealed) void act("reveal");
+      else if (k === "f") toggleFull();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, s.show_leaderboard, state.activity, act, toggleFull]);
+
+  const visible = shown || phase === "lobby" || !!err;
+  const ghost = `${BAR_BTN} bg-white/10 text-white no-underline hover:bg-white/20`;
+  const accent = `${BAR_BTN} bg-accent-400 text-ink-950 hover:bg-accent-300`;
+  const mon = state.settings.monitoring_enabled !== false;
+
+  return (
+    <div className={`fixed inset-x-0 bottom-0 z-20 transition-opacity duration-300 focus-within:opacity-100 ${visible ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      onPointerEnter={() => window.clearTimeout(hideAt.current)}>
+      {err && <p role="alert" className="mx-auto mb-2 w-fit rounded-full bg-rose-600 px-4 py-2 text-sm font-medium">{err}</p>}
+      <nav aria-label="Presenter controls" className="flex flex-wrap items-center justify-center gap-2 bg-ink-950/90 px-4 py-3 backdrop-blur">
+        <Link href={`/teacher/live/${sessionId}`} className={ghost} title="Back to the control room"><ArrowLeft className="h-4 w-4" /> Control room</Link>
+        {phase === "lobby" && <button type="button" className={accent} disabled={busy} onClick={() => void act("start")} title="Start the lesson (S)"><Play className="h-4 w-4" /> Start lesson</button>}
+        {phase === "active" && <>
+          <button type="button" className={ghost} disabled={busy || s.current_slide <= 0} onClick={() => void act("prev")} title="Previous slide (←)"><ChevronLeft className="h-5 w-5" /> Back</button>
+          {slideCount > 0 && <span className="px-1 text-sm tabular-nums text-ink-300">{s.current_slide + 1} / {slideCount}</span>}
+          <button type="button" className={accent} disabled={busy || (slideCount > 0 && s.current_slide >= slideCount - 1)} onClick={() => void act("next")} title="Next slide (→)">Next <ChevronRight className="h-5 w-5" /></button>
+          {state.activity && !state.activity.revealed && <button type="button" className={ghost} disabled={busy} onClick={() => void act("reveal")} title="Show the right answers (R)"><Eye className="h-4 w-4" /> Reveal</button>}
+          <button type="button" className={ghost} disabled={busy} onClick={() => void act("pause")} title="Students see “Eyes on your teacher” (P)"><Pause className="h-4 w-4" /> Pause</button>
+        </>}
+        {phase === "paused" && <button type="button" className={accent} disabled={busy} onClick={() => void act("resume")} title="Carry on (P)"><Play className="h-4 w-4" /> Resume</button>}
+        {phase !== "lobby" && state.ranking && <button type="button" className={s.show_leaderboard ? accent : ghost} aria-pressed={!!s.show_leaderboard} disabled={busy}
+          onClick={() => void act("leaderboard", { show: !s.show_leaderboard })} title="Leaderboard (L)"><Trophy className="h-4 w-4" /> {s.show_leaderboard ? "Hide leaderboard" : "Leaderboard"}</button>}
+        {mon && <Link href={`/teacher/live/${sessionId}?tab=screens`} className={ghost} title="Students’ screens, in the control room (never on the projector)"><LayoutGrid className="h-4 w-4" /> Screens</Link>}
+        <button type="button" className={ghost} onClick={toggleFull} title="Full screen (F)">{full ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}{full ? "Exit full screen" : "Full screen"}</button>
+      </nav>
     </div>
   );
 }

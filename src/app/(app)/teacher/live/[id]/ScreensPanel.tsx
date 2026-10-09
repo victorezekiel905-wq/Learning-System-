@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Alert, Badge, Button, Field, Input, Modal, Toggle, useToast } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import type { SessionState } from "@/components/live/types";
-import { screenLive, type Screen } from "@/components/live/ScreenRail";
+import { screenLive, WhyNoScreens, type Screen } from "@/components/live/ScreenRail";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -43,6 +43,7 @@ export function ScreensPanel({ state, sessionId, selected, setSelected, reload, 
   return (
     <div className="space-y-4">
       {!state.settings.allow_screen_capture && <Alert tone="warn">Screen thumbnails are turned off by your school's policy. Tab and focus commands still work.</Alert>}
+      <WhyNoScreens state={state} screens={byStudent} onChanged={() => void reload()} />
 
       <div className="sticky top-16 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-ink-200 bg-white p-2 shadow-sm">
         <span className="px-2 text-sm font-medium">{targets.length ? `${targets.length} selected` : "Select students"}</span>

@@ -20,8 +20,10 @@ export function screenLive(r: RosterEntry) {
   return !!(r.device?.online || r.web?.sharing);
 }
 
-function placeholder(r: RosterEntry, captureOn = true) {
-  if (!captureOn) return "Screen capture is turned off by your school.";
+function placeholder(r: RosterEntry, state: SessionState) {
+  if (!state.settings.allow_screen_capture) return "Screen capture is turned off by your school.";
+  if (r.guest && !state.session.guest_monitoring) return "Guest: not monitored";
+  if (!state.session.lockdown) return "Lockdown is off";
   if (r.web?.away_since) return r.web.away_reason ?? "Away from the lesson";
   if (r.device && !r.device.online) return "Connection lost";
   if (r.web?.unsupported) return "This device can't share its screen";
@@ -49,13 +51,55 @@ export function EvidenceButton({ eventId, student }: { eventId: string; student:
 }
 
 /**
+ * Why screens aren't coming through, with the one-click fix: students share only
+ * under lockdown, and guests only when the teacher monitors guests.
+ */
+export function WhyNoScreens({ state, screens, onChanged }: { state: SessionState; screens: Record<string, Screen>; onChanged?: () => void }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const here = state.roster.filter((r) => r.presence === "online" || r.presence === "idle");
+  if (here.length === 0) return null;
+  if (!state.settings.allow_screen_capture) {
+    return <Alert tone="warn">Screen capture is off in your school&apos;s settings. A school admin can turn it on.</Alert>;
+  }
+  const sharing = here.some((r) => screenLive(r) && !!screens[r.student_id]);
+  const guests = here.filter((r) => r.guest).length;
+  const fix = async (fn: string, args: Record<string, unknown>, done: string) => {
+    setBusy(true);
+    try { await rpc(fn, { p_session: state.session.id, ...args }); toast(done, "success"); onChanged?.(); }
+    catch (e) { toast(errorText(e), "error"); }
+    finally { setBusy(false); }
+  };
+  if (!state.session.lockdown) {
+    return (
+      <Alert tone="warn">
+        Students share their screens only while Lockdown is on.
+        <span className="mt-2 block"><Button size="sm" loading={busy} onClick={() => void fix("set_session_lockdown", { p_on: true }, "Lockdown on: students are asked to share their screen")}>Turn on Lockdown</Button></span>
+      </Alert>
+    );
+  }
+  if (guests > 0 && !state.session.guest_monitoring) {
+    return (
+      <Alert tone="warn">
+        {guests === 1 ? "1 guest isn't" : `${guests} guests aren't`} monitored, so {guests === 1 ? "their screen isn't" : "their screens aren't"} shared.
+        <span className="mt-2 block"><Button size="sm" loading={busy} onClick={() => void fix("set_session_guests", { p_monitor: true }, "Guests are monitored: they're asked to share their screen")}>Monitor guests</Button></span>
+      </Alert>
+    );
+  }
+  if (!sharing) {
+    return <p className="text-xs text-ink-500">Each student&apos;s lesson asks them to share their entire screen; it appears here once they accept. Phones and iPads can&apos;t share a screen.</p>;
+  }
+  return null;
+}
+
+/**
  * Left-hand strip on the teacher's live screen (§3.4 screen wall): every
  * student appears as soon as they join; a tile turns red the moment they
  * leave the class environment. Clicking a tile opens it large for the teacher
  * only; nothing changes on students' screens.
  */
-export function ScreenRail({ state, screens, focus, onFocus }: {
-  state: SessionState; screens: Record<string, Screen>; focus: string | null; onFocus: (id: string) => void;
+export function ScreenRail({ state, screens, focus, onFocus, onChanged }: {
+  state: SessionState; screens: Record<string, Screen>; focus: string | null; onFocus: (id: string) => void; onChanged?: () => void;
 }) {
   const here = (r: RosterEntry) => r.presence === "online" || r.presence === "idle";
   // Someone who left (closed the lesson, switched away, or has an open "left" alert)
@@ -80,7 +124,7 @@ export function ScreenRail({ state, screens, focus, onFocus }: {
             focus === r.student_id ? "border-brand-500 ring-2 ring-brand-200" : left || stepping ? "border-rose-500 ring-2 ring-rose-200" : alert ? "border-amber-400" : "border-ink-200")}>
           <div className="relative aspect-video bg-ink-100">
             {live ? <img src={sc.image} alt={`${r.name}'s screen`} className="h-full w-full object-cover" />
-              : <span className="grid h-full place-items-center px-1 text-center text-[10px] text-ink-500">{placeholder(r, state.settings.allow_screen_capture)}</span>}
+              : <span className="grid h-full place-items-center px-1 text-center text-[10px] text-ink-500">{placeholder(r, state)}</span>}
             {left && <span className="absolute inset-x-0 bottom-0 animate-pulse2 bg-rose-600 px-1 py-0.5 text-center text-[10px] font-bold text-white">LEFT CLASS</span>}
             {stepping && <span className="absolute inset-x-0 bottom-0 animate-pulse2 bg-rose-600 px-1 py-0.5 text-center text-[10px] font-bold text-white">LEFT LESSON</span>}
             {live && <span className="absolute left-1 top-1 rounded bg-rose-600 px-1 text-[9px] font-bold text-white">LIVE</span>}
@@ -102,6 +146,7 @@ export function ScreenRail({ state, screens, focus, onFocus }: {
         <span>Screens</span><span>{joined.filter(here).length} in class</span>
       </p>
       {joined.length === 0 && <p className="text-xs text-ink-500">Students appear here as soon as they join with the code.</p>}
+      <WhyNoScreens state={state} screens={screens} onChanged={onChanged} />
       {/* Phones/tablets: a swipeable row above the lesson; laptops: a column on the left. */}
       <ul className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 lg:mx-0 lg:block lg:space-y-2 lg:overflow-visible lg:px-0 lg:pb-0 [&>li]:w-40 [&>li]:shrink-0 [&>li]:snap-start lg:[&>li]:w-auto">{joined.map(tile)}</ul>
       {away.length > 0 && (
