@@ -93,7 +93,7 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
           <div className="flex gap-2">
             {launched ? <Button variant="secondary" onClick={() => update({ p_clear_activity: true })}>Close activity</Button>
               : <Button onClick={() => update({ p_activity: slide.activity!.id })}>Launch activity</Button>}
-            {(slide.activity!.kind === "quiz" || slide.activity!.kind === "multiple_choice") && (
+            {s.class_id && (slide.activity!.kind === "quiz" || slide.activity!.kind === "multiple_choice") && (
               <Link className="btn btn-accent no-underline" href={`/teacher/challenge/new?class=${s.class_id}&activity=${slide.activity!.id}&session=${s.id}`}>Play as Challenge</Link>
             )}
           </div>

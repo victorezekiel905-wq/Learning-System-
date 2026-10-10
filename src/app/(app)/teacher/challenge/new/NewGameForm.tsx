@@ -26,7 +26,9 @@ export function NewGameForm({ classes, activities, defaults }: { classes: { id: 
   const router = useRouter();
   // Setting up a game from a live lesson keeps that lesson open.
   useTeacherPresence(defaults.sessionId);
-  const [cls, setCls] = useState(defaults.classId ?? classes[0]?.id ?? "");
+  // From a live lesson: its class, if it is one of yours (a lesson without a class has none).
+  const lessonClass = classes.some((c) => c.id === defaults.classId) ? defaults.classId : undefined;
+  const [cls, setCls] = useState(lessonClass ?? classes[0]?.id ?? "");
   const [act, setAct] = useState(defaults.activityId ?? activities[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [style, setStyle] = useState("think");
@@ -40,6 +42,8 @@ export function NewGameForm({ classes, activities, defaults }: { classes: { id: 
   const patch = (p: Partial<GameSettings>) => setSet({ ...set, ...p });
 
   if (!classes.length) return <Alert>Create a class first.</Alert>;
+  const chosen = activities.find((a) => a.id === act);
+  const empty = !!chosen && (chosen.questions[0]?.count ?? 0) === 0;
   if (!activities.length) return <Alert>Create a quiz or multiple-choice activity in a <Link href="/teacher/lessons">lesson</Link> first.</Alert>;
 
   return (
@@ -112,11 +116,12 @@ export function NewGameForm({ classes, activities, defaults }: { classes: { id: 
           </div>
         </fieldset>
 
+        {empty && <Alert tone="warn">“{chosen!.title}” has no questions yet. Add multiple-choice or true/false questions to it in its <Link href="/teacher/lessons">lesson</Link>, or choose another quiz.</Alert>}
         {err && <Alert tone="error">{err}</Alert>}
-        <Button size="lg" loading={busy} onClick={async () => {
+        <Button size="lg" loading={busy} disabled={empty} onClick={async () => {
           setBusy(true); setErr(null);
           try {
-            const g = await rpc<{ id: string }>("create_game", { p_class: cls, p_activity: act, p_settings: set, p_session: defaults.sessionId ?? null, p_title: title || null });
+            const g = await rpc<{ id: string }>("create_game", { p_class: cls, p_activity: act, p_settings: set, p_session: lessonClass && cls === lessonClass ? defaults.sessionId ?? null : null, p_title: title || null });
             router.push(`/teacher/challenge/${g.id}`);
           } catch (e) { setErr(errorText(e)); setBusy(false); }
         }}>Open lobby</Button>
