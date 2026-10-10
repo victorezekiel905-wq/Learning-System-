@@ -5,8 +5,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Alert, Card, Select, Spinner } from "@/components/ui";
 import { useRpc } from "@/lib/hooks";
 import { cn, plural } from "@/lib/utils";
+import { DownloadMenu } from "@/components/progress/DownloadMenu";
+import { downloadCsv, pct, type CsvSection } from "@/lib/download";
 
-type Period = "week" | "month" | "term" | "year";
+type Period = "day" | "week" | "month" | "term" | "year";
+const PERIOD_LABEL: Record<Period, string> = { day: "Day", week: "Week", month: "Month", term: "Term", year: "Session" };
 type Topic = { topic: string; answers: number; accuracy: number | null; pupils: number; struggling: number };
 type Data = {
   period: Period; needs_terms: boolean; label?: string; prev_date?: string; next_date?: string | null;
@@ -41,9 +44,9 @@ export function SchoolProgress({ classId }: { classId?: string } = {}) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <div role="tablist" aria-label="Period" className="inline-flex rounded-xl border border-ink-200 bg-white p-1">
-            {(["week", "month", "term", "year"] as Period[]).map((p) => (
+            {(["day", "week", "month", "term", "year"] as Period[]).map((p) => (
               <button key={p} type="button" role="tab" aria-selected={period === p} onClick={() => { setPeriod(p); setDate(null); }}
-                className={cn("rounded-lg px-3 py-1.5 text-sm font-semibold capitalize", period === p ? "bg-ink-900 text-white" : "text-ink-700 hover:bg-ink-100")}>{p}</button>
+                className={cn("rounded-lg px-3 py-1.5 text-sm font-semibold capitalize", period === p ? "bg-ink-900 text-white" : "text-ink-700 hover:bg-ink-100")}>{PERIOD_LABEL[p]}</button>
             ))}
           </div>
           {!classId && <Select className="!w-auto" value={cls} onChange={(e) => setCls(e.target.value)} aria-label="Class">
@@ -54,6 +57,7 @@ export function SchoolProgress({ classId }: { classId?: string } = {}) {
           <button type="button" className="btn btn-ghost btn-sm" aria-label="Earlier" disabled={!d?.prev_date} onClick={() => d?.prev_date && setDate(d.prev_date)}><ChevronLeft className="h-4 w-4" /></button>
           <span className="min-w-[11rem] text-center text-sm font-semibold">{d?.label ?? "…"}</span>
           <button type="button" className="btn btn-ghost btn-sm" aria-label="Later" disabled={!d?.next_date} onClick={() => d?.next_date && setDate(d.next_date)}><ChevronRight className="h-4 w-4" /></button>
+          <DownloadMenu disabled={!d?.summary} onCsv={() => d && downloadCsv(`Class analysis - ${(d.classes ?? []).find((c) => c.id === cls)?.name ?? "Whole school"} - ${d.label ?? period}`, schoolCsv(d, cls))} />
         </div>
       </div>
 
@@ -134,4 +138,19 @@ function Stat({ label, value, sub }: { label: string; value: React.ReactNode; su
       {sub && <p className="mt-1 text-[12px] font-semibold">{sub}</p>}
     </div>
   );
+}
+
+function schoolCsv(d: Data, cls: string): CsvSection[] {
+  const s = d.summary!;
+  return [
+    { title: "Summary", rows: [{ Class: (d.classes ?? []).find((c) => c.id === cls)?.name ?? "Whole school", Period: d.label ?? d.period,
+      "Pupils taking part": s.active, Pupils: s.pupils, "Questions answered": s.answers, "Right answers": pct(s.accuracy),
+      "Parent feedback": d.feedback?.total ?? 0, "Waiting for a reply": d.feedback?.unanswered ?? 0 }] },
+    { title: "Subjects", rows: (d.subjects ?? []).map((x) => ({ Subject: x.subject, Pupils: x.pupils, "Questions answered": x.answers, "Right answers": pct(x.accuracy) })) },
+    { title: "Topics", rows: (d.subjects ?? []).flatMap((x) => x.topics.map((t) => ({ Subject: x.subject, Topic: t.topic, Pupils: t.pupils,
+      "Questions answered": t.answers, "Right answers": pct(t.accuracy), "Pupils below 50%": t.struggling }))) },
+    { title: "Hardest topics", rows: (d.hardest ?? []).map((t) => ({ Subject: t.subject, Topic: t.topic, "Right answers": pct(t.accuracy), "Pupils below 50%": t.struggling })) },
+    { title: "Pupils who need help", rows: (d.pupils_needing_help ?? []).map((p) => ({ Pupil: p.name, Classes: p.classes.join("; "), "Questions answered": p.answers,
+      "Right answers": pct(p.accuracy), "Weakest topic": p.weakest ? `${p.weakest.subject}: ${p.weakest.topic} (${p.weakest.accuracy}%)` : "" })) }
+  ];
 }

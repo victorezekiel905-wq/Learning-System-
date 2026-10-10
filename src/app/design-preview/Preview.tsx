@@ -17,6 +17,23 @@ import { useState } from "react";
 import { HomeworkBoard } from "@/app/(app)/teacher/homework/HomeworkBoard";
 import { HomeworkList } from "@/app/(app)/student/HomeworkList";
 import { LibraryGrid } from "@/app/(app)/teacher/lessons/LibraryGrid";
+import { ProgressView, type Progress } from "@/components/progress/ProgressDashboard";
+
+const PROGRESS: Progress = {
+  student: { id: "s1", name: "Ada Obi" }, period: "term", date: "2026-10-10", today: "2026-10-10", needs_terms: false, terms: [],
+  from: "2026-09-08", to: "2026-12-12", label: "First term 2026/2027", unit: "week", prev_date: "2026-09-07", next_date: null,
+  summary: { held: 24, attended: 22, answers: 186, correct: 130, accuracy: 70, points: 48210, prev_held: 20, prev_attended: 18, prev_answers: 150, prev_accuracy: 64 },
+  trend: [{ start: "2026-09-08", answers: 30, accuracy: 62, held: 4, attended: 4 }, { start: "2026-09-15", answers: 41, accuracy: 68, held: 5, attended: 5 }, { start: "2026-09-22", answers: 52, accuracy: 74, held: 5, attended: 4 }],
+  subjects: [{ subject: "Mathematics", held: 12, attended: 11, answers: 98, accuracy: 64, prev_accuracy: 58, topics: [{ topic: "Decimals", answers: 30, accuracy: 39 }, { topic: "Fractions", answers: 40, accuracy: 87 }] },
+             { subject: "Basic Science", held: 12, attended: 11, answers: 88, accuracy: 79, prev_accuracy: 74, topics: [{ topic: "Light", answers: 44, accuracy: 67 }] }],
+  strengths: [{ subject: "Mathematics", topic: "Fractions", answers: 40, accuracy: 87 }], needs_help: [{ subject: "Mathematics", topic: "Decimals", answers: 30, accuracy: 39 }],
+  lessons: [{ session_id: "x1", title: "Place value", subject: "Mathematics", started_at: "2026-10-08T09:00:00Z", attended: true, points: 4860, answers: 5, accuracy: 80 },
+            { session_id: "x2", title: "Light: where it comes from", subject: "Basic Science", started_at: "2026-10-07T09:00:00Z", attended: false, points: 0, answers: 0, accuracy: null }]
+};
+function ProgressPreview() {
+  const [period, setPeriod] = useState<"day" | "week" | "month" | "term" | "year">("term");
+  return <ProgressView p={{ ...PROGRESS, period }} viewer="parent" period={period} date={null} onPeriod={setPeriod} onDate={() => {}} />;
+}
 
 const WORDS = [["sunlight", 9], ["chlorophyll", 7], ["food", 5], ["green", 4], ["oxygen", 4], ["leaves", 3], ["energy", 3], ["glucose", 2], ["water", 2], ["carbon dioxide", 2], ["plants", 1], ["light", 1]]
   .map(([word, count]) => ({ word: word as string, count: count as number }));
@@ -76,6 +93,7 @@ export function Preview() {
         <div className="relative mx-auto mt-8 max-w-2xl"><Leaderboard entries={BOARD.slice(3)} size="lg" /></div>
       </section>
 
+      <section id="progress" className="bg-ink-50 p-5"><ProgressPreview /></section>
       <section id="hwteacher" className="bg-ink-50 p-5"><HomeworkBoard classes={[{ id: "c1", name: "JSS 1 Gold" }]} lessons={[{ id: "l1", title: "Place value", mine: true }]}
         rows={[{ id: "h1", title: "Place value", class: "JSS 1 Gold", class_id: "c1", due_at: "2026-10-14T17:00:00Z", open: true, students: 32, started: 21, finished: 14 },
                { id: "h2", title: "Equivalent fractions", class: "JSS 1 Gold", class_id: "c1", due_at: "2026-10-03T17:00:00Z", open: false, students: 32, started: 30, finished: 27 }]} /></section>

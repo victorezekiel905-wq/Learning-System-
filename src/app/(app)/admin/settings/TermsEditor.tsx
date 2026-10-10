@@ -4,9 +4,10 @@ import { Button, Card, Input, useDialog, useToast } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
 import { errorText, must } from "@/lib/rpc";
+import { LOCALE } from "@/lib/utils";
 
 type Term = { id: string; school_year: string; name: string; starts_on: string; ends_on: string };
-const fmt = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
+const fmt = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString(LOCALE, { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
 
 /** The school year and its terms: progress reports for students and parents use them. */
 export function TermsEditor({ tenantId }: { tenantId: string }) {

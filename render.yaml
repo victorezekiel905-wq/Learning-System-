@@ -42,6 +42,9 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SUPPORT_PHONE
         sync: false
+      # ---- Optional: time zone for dates and times (default Africa/Lagos) ----
+      - key: NEXT_PUBLIC_TIMEZONE
+        sync: false
       # ---- Optional: "Write with AI" in Import questions (console.anthropic.com → API keys) ----
       - key: ANTHROPIC_API_KEY
         sync: false

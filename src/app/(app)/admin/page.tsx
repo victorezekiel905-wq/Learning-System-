@@ -3,6 +3,7 @@ import { requireRole, ADMINS } from "@/lib/session";
 import { Card, PageHeader, Stat } from "@/components/ui";
 import { Bars } from "@/components/charts";
 import { Icon } from "@/components/Icon";
+import { LOCALE } from "@/lib/utils";
 
 export const metadata = { title: "School admin" };
 
@@ -16,7 +17,7 @@ function lastTwelveWeeks(rows: Overview["weekly"]) {
   const monday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7));
   return Array.from({ length: 12 }, (_, i) => {
     const d = new Date(monday - (11 - i) * 7 * 86_400_000);
-    return { label: d.toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" }), value: byWeek.get(d.toISOString().slice(0, 10)) ?? 0 };
+    return { label: d.toLocaleDateString(LOCALE, { day: "numeric", month: "short", timeZone: "UTC" }), value: byWeek.get(d.toISOString().slice(0, 10)) ?? 0 };
   });
 }
 

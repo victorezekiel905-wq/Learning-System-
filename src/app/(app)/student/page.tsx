@@ -5,6 +5,7 @@ import { firstName } from "@/lib/utils";
 import { ProgressPanel } from "./ProgressPanel";
 import { MyClasses, type MyClass } from "./MyClasses";
 import { HomeworkList, type StudentHomework } from "./HomeworkList";
+import { RejoinLessons } from "@/components/auth/RejoinLessons";
 import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "Home" };
@@ -62,6 +63,7 @@ export default async function StudentHome() {
         <div className="mb-4"><Alert>A managed class session is active. While it runs, your teacher can see the site you're on and a low-resolution picture of your screen. <Link href="/student/device">What's shared?</Link></Alert></div>
       )}
 
+      <RejoinLessons className="mb-2" exclude={h.live.map((x) => x.id)} />
       <HomeworkList items={h.homework ?? []} now={Date.now()} />
 
       {myClasses.length > 0 ? <MyClasses classes={myClasses} /> : (

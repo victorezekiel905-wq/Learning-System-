@@ -3,6 +3,7 @@ import { requireRole, TEACHERS } from "@/lib/session";
 import { Alert, Badge, Card, Empty, PageHeader, Stat } from "@/components/ui";
 import { pct, plural } from "@/lib/utils";
 import { Bars } from "@/components/charts";
+import { InsightsDownload } from "./InsightsDownload";
 
 export const metadata = { title: "Analytics" };
 
@@ -34,7 +35,9 @@ export default async function InsightsPage(props: { searchParams: Promise<{ clas
             <select name="class" defaultValue={classId} className="input w-64">{list.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
             <select name="days" defaultValue={String(days)} className="input w-40"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option></select>
             <button className="btn btn-secondary">Update</button>
+            {a && <span className="ml-auto"><InsightsDownload a={a} days={days} className={list.find((c) => c.id === classId)?.name ?? "Class"} /></span>}
           </form>
+          <p className="-mt-2 mb-5 text-[13px] text-ink-600">For one lesson, including guests who joined with a code, open it in <Link href="/teacher/reports">Reports</Link> and export it. Click a student for their own analysis by day, week, month, term or session.</p>
           {a && (
             <div className="space-y-6">
               <section>
@@ -75,7 +78,7 @@ export default async function InsightsPage(props: { searchParams: Promise<{ clas
               <Card title="Students" pad={false}>
                 <table className="table"><thead><tr><th>Student</th><th>Sessions joined</th><th>Accuracy</th><th>Submissions</th><th>Focus alerts</th></tr></thead>
                   <tbody>{a.per_student.map((s) => (
-                    <tr key={s.student_id}><td className="font-medium">{s.name}</td><td>{s.sessions_joined}</td><td>{pct(s.accuracy)}</td><td>{s.submissions}</td><td>{s.alerts}</td></tr>
+                    <tr key={s.student_id}><td className="font-medium"><Link href={`/teacher/students/${s.student_id}`}>{s.name}</Link></td><td>{s.sessions_joined}</td><td>{pct(s.accuracy)}</td><td>{s.submissions}</td><td>{s.alerts}</td></tr>
                   ))}</tbody></table>
               </Card>
             </div>

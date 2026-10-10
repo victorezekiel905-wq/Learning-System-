@@ -1969,6 +1969,48 @@ test("word clouds, labelled diagrams and teams in live lessons (1090)", async ()
   await db.rpc(T, "end_session", { p_session: s.id });
 });
 
+test("rejoining after a lost device, open lessons, deleting lessons (1110)", async () => {
+  const T = await db.signUp("t@rejoin.test", "Rejoin Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Rejoin School", p_full_name: "Rejoin Teacher" })).tenant_id;
+  const lib = (await db.rpc(T, "library_list", { p_query: "States of matter" }))[0];
+  const lesson = await db.rpc(T, "library_copy", { p_item: lib.id });
+  const s = await goLive(T, { p_class: null, p_lesson: lesson });
+
+  // Ada joins and earns points; her phone dies.
+  const phone = await db.signInAnonymously();
+  await db.rpc(phone, "join_session_as_guest", { p_code: s.join_code, p_name: "Ada Obi" });
+  await db.admin("update public.session_participants set total_score = 1200 where user_id = $1", [phone]);
+  assert.deepEqual((await db.rpc(phone, "my_open_lessons", {})).map((x) => [x.id, x.guest, x.name]), [[s.id, true, "Ada Obi"]]);
+
+  // While her phone is still connected, the name is taken.
+  const tablet = await db.signInAnonymously();
+  await rejects(db.rpc(tablet, "join_session_as_guest", { p_code: s.join_code, p_name: "ada obi" }), /already uses that name/);
+  // Once it has gone quiet, the tablet takes over her place and points.
+  await db.admin("update public.session_participants set last_seen_at = now() - interval '5 minutes' where user_id = $1", [phone]);
+  const back = await db.rpc(tablet, "join_session_as_guest", { p_code: s.join_code, p_name: "ada obi" });
+  assert.equal(back.rejoined, true);
+  const rows = await db.admin("select user_id, total_score from public.session_participants where session_id = $1 and user_id <> $2", [s.id, T]);
+  assert.deepEqual(rows, [{ user_id: tablet, total_score: 1200 }]);
+  assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).roster.filter((r) => r.guest).length, 1);
+  assert.deepEqual(await db.rpc(phone, "my_open_lessons", {}), []);
+
+  // Deleting: not while live; a taught lesson moves to Deleted and can be restored; an untaught one is gone.
+  await rejects(db.rpc(T, "delete_lesson", { p_lesson: lesson }), /End it first/);
+  await db.rpc(T, "end_session", { p_session: s.id });
+  assert.deepEqual(await db.rpc(T, "delete_lesson", { p_lesson: lesson }), { deleted: false, archived: true });
+  assert.equal((await db.admin("select status from public.lessons where id = $1", [lesson]))[0].status, "archived");
+  await db.rpc(T, "restore_lesson", { p_lesson: lesson });
+  assert.equal((await db.admin("select status from public.lessons where id = $1", [lesson]))[0].status, "draft");
+  const fresh = await db.rpc(T, "library_copy", { p_item: lib.id });
+  assert.deepEqual(await db.rpc(T, "delete_lesson", { p_lesson: fresh }), { deleted: true, archived: false });
+  assert.equal((await db.admin("select count(*)::int n from public.lessons where id = $1", [fresh]))[0].n, 0);
+  // Not someone else's lesson.
+  const other = await db.signUp("o@rejoin.test", "Other Teacher");
+  await db.rpc(other, "bootstrap_school", { p_school_name: "Other Rejoin", p_full_name: "Other Teacher" });
+  await rejects(db.rpc(other, "delete_lesson", { p_lesson: lesson }), /not found/);
+  void tenant;
+});
+
 test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {
   const T = await db.signUp("t@canvas.test", "Canvas Teacher");
   const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Canvas School", p_full_name: "Canvas Teacher" })).tenant_id;

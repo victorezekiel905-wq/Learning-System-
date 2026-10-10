@@ -1,10 +1,12 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, Printer } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { Alert, Badge, Card, Spinner } from "@/components/ui";
 import { useRpc } from "@/lib/hooks";
-import { cn, plural } from "@/lib/utils";
+import { cn, plural, LOCALE, TIME_ZONE } from "@/lib/utils";
+import { DownloadMenu } from "./DownloadMenu";
+import { downloadCsv, pct, type CsvSection } from "@/lib/download";
 
 /** public.progress_report (migration 0930). */
 export type Progress = {
@@ -27,11 +29,11 @@ type Topic = { subject: string; topic: string; answers: number; accuracy: number
 export type Period = "day" | "week" | "month" | "term" | "year";
 
 const PERIODS: { id: Period; label: string }[] = [
-  { id: "day", label: "Day" }, { id: "week", label: "Week" }, { id: "month", label: "Month" }, { id: "term", label: "Term" }, { id: "year", label: "Year" }
+  { id: "day", label: "Day" }, { id: "week", label: "Week" }, { id: "month", label: "Month" }, { id: "term", label: "Term" }, { id: "year", label: "Session" }
 ];
 const UNIT_WORD = { day: "day", week: "week", month: "month" } as const;
 
-const fmt = (date: string, o: Intl.DateTimeFormatOptions) => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { timeZone: "UTC", ...o });
+const fmt = (date: string, o: Intl.DateTimeFormatOptions) => new Date(`${date}T12:00:00Z`).toLocaleDateString(LOCALE, { timeZone: "UTC", ...o });
 // Bars stay neutral; only results below half turn red, where attention is needed.
 const tone = (p: number | null) => (p === null ? "bg-ink-200" : p < 50 ? "bg-rose-500" : "bg-ink-800");
 
@@ -86,7 +88,7 @@ export function ProgressView({ p, error, viewer, isAdmin, period, date, onPeriod
   const r = { error };
   const first = p?.student.name.split(" ")[0] ?? "";
   const you = viewer === "student";
-  const word = period === "term" ? "term" : period === "year" ? "year" : period;
+  const word = period === "term" ? "term" : period === "year" ? "session" : period;
 
   return (
     <div className="space-y-5">
@@ -104,7 +106,7 @@ export function ProgressView({ p, error, viewer, isAdmin, period, date, onPeriod
           <button type="button" className="btn btn-ghost btn-sm" aria-label={`Next ${word}`} disabled={!p?.next_date} onClick={() => p?.next_date && setDate(p.next_date)}>
             <ChevronRight className="h-4 w-4" /></button>
           {date && <button type="button" className="btn btn-secondary btn-sm" onClick={() => setDate(null)}>{period === "day" ? "Today" : `This ${word}`}</button>}
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => window.print()} aria-label="Print"><Printer className="h-4 w-4" /></button>
+          <DownloadMenu disabled={!p?.summary} onCsv={() => p && downloadCsv(`Progress - ${p.student.name} - ${p.label ?? period}`, progressCsv(p))} />
         </div>
       </div>
 
@@ -160,7 +162,7 @@ export function ProgressView({ p, error, viewer, isAdmin, period, date, onPeriod
                   <thead><tr><th>Date</th><th>Lesson</th><th>Subject</th><th>Took part</th><th className="text-right">Answered</th><th className="w-36">Right</th><th className="text-right">Points</th></tr></thead>
                   <tbody>{p.lessons!.map((l) => (
                     <tr key={l.session_id}>
-                      <td className="whitespace-nowrap">{new Date(l.started_at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</td>
+                      <td className="whitespace-nowrap">{new Date(l.started_at).toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "short", timeZone: TIME_ZONE })}</td>
                       <td>{l.title}</td><td className="text-ink-600">{l.subject}</td>
                       <td>{l.attended ? "Yes" : <Badge tone="red">Missed</Badge>}</td>
                       <td className="text-right tabular-nums">{l.attended ? l.answers : ""}</td>
@@ -251,4 +253,21 @@ function SubjectCard({ s, word }: { s: NonNullable<Progress["subjects"]>[number]
       {s.topics.length > 5 && <button type="button" className="mt-2 text-[13px] font-semibold text-brand-700 print:hidden" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${s.topics.length} topics`}</button>}
     </Card>
   );
+}
+
+/** The report as spreadsheet tables: summary, subjects, topics, each lesson, and the trend. */
+function progressCsv(p: Progress): CsvSection[] {
+  const s = p.summary!;
+  return [
+    { title: "Summary", rows: [{ Student: p.student.name, Period: p.label ?? p.period, From: p.from ?? "", To: p.to ?? "",
+      "Lessons held": s.held, "Lessons attended": s.attended, "Questions answered": s.answers, "Right answers": pct(s.accuracy),
+      "Right answers (previous period)": pct(s.prev_accuracy), Points: s.points }] },
+    { title: "Subjects", rows: (p.subjects ?? []).map((x) => ({ Subject: x.subject, "Lessons held": x.held, Attended: x.attended,
+      "Questions answered": x.answers, "Right answers": pct(x.accuracy), "Previous period": pct(x.prev_accuracy) })) },
+    { title: "Topics", rows: (p.subjects ?? []).flatMap((x) => x.topics.map((t) => ({ Subject: x.subject, Topic: t.topic, "Questions answered": t.answers, "Right answers": pct(t.accuracy) }))) },
+    { title: "Needs more practice", rows: (p.needs_help ?? []).map((t) => ({ Subject: t.subject, Topic: t.topic, "Right answers": pct(t.accuracy) })) },
+    { title: "Lessons", rows: (p.lessons ?? []).map((l) => ({ Date: l.started_at.slice(0, 10), Lesson: l.title, Subject: l.subject,
+      Attended: l.attended ? "Yes" : "No", Points: l.points, "Questions answered": l.answers, "Right answers": pct(l.accuracy) })) },
+    { title: "Over time", rows: (p.trend ?? []).map((t) => ({ From: t.start, "Lessons held": t.held, Attended: t.attended, "Questions answered": t.answers, "Right answers": pct(t.accuracy) })) }
+  ];
 }

@@ -15,17 +15,25 @@ export function timeAgo(iso: string | null | undefined, now = Date.now()): strin
   const h = Math.round(m / 60);
   if (h < 24) return `${h}h ago`;
   const d = Math.round(h / 24);
-  return d < 30 ? `${d}d ago` : new Date(iso).toLocaleDateString();
+  return d < 30 ? `${d}d ago` : new Date(iso).toLocaleDateString(LOCALE, { timeZone: TIME_ZONE });
 }
+
+/**
+ * Dates are written one way everywhere, so a page drawn on the server (which runs on
+ * UTC) matches the same page in the browser, and times show in the schools' own zone:
+ * day before month, and NEXT_PUBLIC_TIMEZONE (Nigeria by default).
+ */
+export const LOCALE = "en-GB";
+export const TIME_ZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Africa/Lagos";
 
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(iso).toLocaleString(LOCALE, { dateStyle: "medium", timeStyle: "short", timeZone: TIME_ZONE });
 }
 
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+  return new Date(iso).toLocaleDateString(LOCALE, { dateStyle: "medium", timeZone: TIME_ZONE });
 }
 
 export function pct(value: number | null | undefined): string {

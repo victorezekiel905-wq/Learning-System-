@@ -7,7 +7,7 @@ import { Alert, Badge, Button, Empty, Modal, Spinner, Tabs, useToast } from "@/c
 import { useRpc } from "@/lib/hooks";
 import { BADGE_LABEL } from "@/lib/progress";
 import { errorText, rpc } from "@/lib/rpc";
-import { cn, plural } from "@/lib/utils";
+import { cn, plural, LOCALE } from "@/lib/utils";
 
 type Stats = {
   sessions_held: number; sessions_attended: number; minutes: number; answers: number; accuracy: number | null; reasoned: number;
@@ -44,10 +44,10 @@ function participationLabel(p: number | null) {
 const shift = (date: string, days: number) => {
   const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10);
 };
-const fmtDay = (date: string, opts: Intl.DateTimeFormatOptions) => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { timeZone: "UTC", ...opts });
+const fmtDay = (date: string, opts: Intl.DateTimeFormatOptions) => new Date(`${date}T12:00:00Z`).toLocaleDateString(LOCALE, { timeZone: "UTC", ...opts });
 /** 212 -> "3 h 32 min"; 45 -> "45 min". */
 const fmtMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`);
-const fmtTime = (iso: string, tz: string) => new Date(iso).toLocaleString(undefined, { timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit" });
+const fmtTime = (iso: string, tz: string) => new Date(iso).toLocaleString(LOCALE, { timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit" });
 
 function Change({ now, before, unit = "" }: { now: number | null; before: number | null; unit?: string }) {
   if (now === null || before === null || now === before) return <span className="inline-flex items-center gap-0.5 text-[12px] text-ink-500"><Minus className="h-3 w-3" aria-hidden />same as before</span>;

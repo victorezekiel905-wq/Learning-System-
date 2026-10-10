@@ -84,28 +84,41 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
     }
   };
 
-  // INSTANT: the moment a student's lesson leaves the screen (tab/app switch, game,
-  // minimise, full screen exited, share stopped), pop up, beep and mark the tile red.
-  // The formal alert (bell, log, screenshot) follows after the school's grace period.
-  const awaySeen = useRef<Map<string, string | null> | null>(null);
+  // Leaving and coming back, for students and guests alike:
+  //  * closed the lesson or the browser: instant (the page says so as it closes);
+  //  * switched away under lockdown: instant, with the reason;
+  //  * went quiet (device off, battery, no internet): once the presence window passes.
+  // Each rings the alarm (unless sound is off), pops up, and stays in the "Left" list
+  // until they are back; coming back, or rejoining on another device, is announced too.
+  const seen = useRef<Map<string, { here: boolean; away: string | null; name: string }> | null>(null);
   useEffect(() => {
     if (!s) return;
-    const first = awaySeen.current === null;
-    const prev = awaySeen.current ?? new Map<string, string | null>();
+    const first = seen.current === null;
+    const prev = seen.current ?? new Map<string, { here: boolean; away: string | null; name: string }>();
+    const next = new Map<string, { here: boolean; away: string | null; name: string }>();
+    const alarm = (title: string, why: string) => {
+      toast(`${title}: ${why}`, "error");
+      beep(880); window.setTimeout(() => beep(660), 380);
+      osNotify(title, why);
+    };
     for (const r of s.roster) {
-      const now = r.web?.away_since ?? null;
-      const before = prev.get(r.student_id) ?? null;
-      if (!first && now && !before) {
-        const why = r.web?.away_reason ?? "Left the lesson";
-        toast(`${r.name} left the lesson: ${why}`, "error");
-        beep(880);
-        osNotify(`${r.name} left the lesson`, why);
-      } else if (!first && !now && before) {
+      const here = r.presence === "online" || r.presence === "idle";
+      const away = r.web?.away_since ?? null;
+      next.set(r.student_id, { here, away, name: r.name });
+      if (first) continue;
+      const before = prev.get(r.student_id);
+      if (away && !before?.away) {
+        alarm(`${r.name} left the lesson`, r.web?.away_reason ?? "Left the lesson");
+      } else if (before?.here && !here && !away) {
+        alarm(`${r.name} lost connection`, "Their device went off or lost the internet. They can rejoin with the same code.");
+      } else if (before && (!before.here || before.away) && here && !away) {
         toast(`${r.name} is back in the lesson`, "success");
+      } else if (!before && here) {
+        const earlier = [...prev.entries()].find(([id, v]) => id !== r.student_id && v.name.toLowerCase() === r.name.toLowerCase());
+        if (earlier) toast(`${r.name} rejoined on another device`, "success");
       }
-      prev.set(r.student_id, now);
     }
-    awaySeen.current = prev;
+    seen.current = next;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s]);
 
@@ -198,6 +211,8 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
           try { await rpc("set_session_lockdown", { p_session: sessionId, p_on: !s.session.lockdown }); void state.reload(); toast(s.session.lockdown ? "Lockdown off" : "Lockdown on", "info"); }
           catch (e) { toast(errorText(e), "error"); }
         }} />
+
+      <LeftList state={s} />
 
       {openAlerts.filter((a) => a.kind !== "connection_lost").length > 0 && (
         <div className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-900" role="alert">
@@ -399,6 +414,23 @@ function TeamsCard({ sessionId, state, onChanged }: { sessionId: string; state: 
       </div>
       {count >= 2 ? <TeamStandings teams={teams.data ?? []} light />
         : <p className="text-[12px] text-ink-500">Everyone is put in a team, balanced automatically; team scores show with the leaderboard.</p>}
+    </div>
+  );
+}
+
+/** Everyone who joined and has since gone (closed it, switched away under lockdown, or went quiet), until they're back. */
+function LeftList({ state }: { state: SessionState }) {
+  const gone = state.roster.filter((r) => r.presence === "offline" || !!r.web?.away_since);
+  if (!gone.length) return null;
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-900">
+      <strong>{gone.length === 1 ? "1 has" : `${gone.length} have`} left the lesson:</strong>
+      {gone.map((r) => (
+        <span key={r.student_id} className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-0.5 ring-1 ring-rose-200">
+          <span className="font-semibold">{r.name}</span>{r.guest && <span className="text-[11px] text-rose-700">guest</span>}
+          <span className="text-[12px] text-rose-800">{r.web?.away_since ? (r.web.away_reason ?? "left") : "lost connection"}, {timeAgo(r.web?.away_since ?? r.last_seen_at)}</span>
+        </span>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GuestJoin } from "@/components/auth/GuestJoin";
 import { GlyphField } from "@/components/game/Celebrate";
+import { RejoinLessons } from "@/components/auth/RejoinLessons";
 
 export const metadata = { title: "Join a lesson" };
 
@@ -18,7 +19,8 @@ export default async function JoinPage(props: { searchParams: Promise<{ code?: s
         <p className="mx-auto mt-3 max-w-md text-center text-[15px] text-ink-600">
           Type the code from your teacher&apos;s screen, then your name. No account needed.
         </p>
-        <div className="mt-8">
+        <div className="mx-auto mt-8 w-full max-w-md"><RejoinLessons /></div>
+        <div className="mt-2">
           <GuestJoin initialCode={initial} />
         </div>
         <p className="mx-auto mt-8 max-w-md text-center text-sm text-ink-600">
