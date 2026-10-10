@@ -8,7 +8,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <header className="sticky top-0 z-30 border-b border-ink-200/70 bg-ink-50">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-2 px-5 sm:px-8">
           <div className="flex items-center gap-10">
-            <Logo />
+            {/* 360px phones: the mark alone, so "Join a lesson" and "Sign in" fit without sideways scrolling. */}
+            <Logo wordmarkClassName="hidden min-[400px]:inline" />
             <nav className="hidden items-center gap-7 text-[14px] font-medium lg:flex" aria-label="Sections">
               {[["/#lesson", "How it works"], ["/#parents", "Parents"], ["/#schools", "School leaders"], ["/#faq", "Questions"]].map(([h, l]) => (
                 <Link key={h} href={h} className="text-ink-600 no-underline hover:text-ink-900">{l}</Link>
