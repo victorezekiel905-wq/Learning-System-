@@ -1,6 +1,6 @@
 import { fail, ok, readJson, requireProfile, withErrorLog } from "@/lib/api";
 import { AI_KINDS, AiUnavailable, draftQuestions } from "@/lib/ai-questions";
-import { allow } from "@/lib/rate-limit";
+import { allowShared } from "@/lib/rate-limit";
 import { TEACHERS } from "@/lib/session";
 
 // Long PDFs take a while to read.
@@ -17,7 +17,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
   const { me, response } = await requireProfile(TEACHERS);
   if (response) return response;
   // Each draft costs money: a few a minute per teacher, and a ceiling per school.
-  if (!allow(`ai-q:${me.id}`, 4) || !allow(`ai-q-school:${me.tenant_id}`, 30)) {
+  if (!(await allowShared(`ai-q:${me.id}`, 4)) || !(await allowShared(`ai-q-school:${me.tenant_id}`, 30))) {
     return fail(429, "You've asked for a lot of questions in a short time. Wait a minute and try again.");
   }
   const body = await readJson<{ topic?: string; text?: string; pdf?: string; level?: string; subject?: string; count?: number; kinds?: string[] }>(req, 17_000_000);

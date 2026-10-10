@@ -1,7 +1,7 @@
 import { createClient as createBase, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { logServerError } from "@/lib/api";
-import { allow, clientIp } from "@/lib/rate-limit";
+import { allowShared, clientIp } from "@/lib/rate-limit";
 import { messageForError, statusForError, type RpcError } from "@/lib/errors";
 import { createClient as cookieClient } from "@/lib/supabase/server";
 
@@ -52,7 +52,7 @@ const ROUTES: [string, string, Handler][] = [
     // Every login reaches Supabase from this server's address, so limit per caller here:
     // otherwise one client could guess passwords, or use up the shared allowance for everyone.
     const email = String(body.email ?? "").toLowerCase();
-    if (!allow(`v1-login-ip:${clientIp(req)}`, 10) || !allow(`v1-login-email:${email}`, 5)) {
+    if (!(await allowShared(`v1-login-ip:${clientIp(req)}`, 10)) || !(await allowShared(`v1-login-email:${email}`, 5))) {
       return json({ error: "Too many sign-in attempts. Wait a minute and try again." }, 429);
     }
     const sb = createBase(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
@@ -62,7 +62,7 @@ const ROUTES: [string, string, Handler][] = [
   }],
   ["POST", "auth/logout", async ({ sb }) => { await sb.auth.signOut(); return json({ ok: true }); }],
   ["POST", "auth/refresh", async ({ body, req }) => {
-    if (!allow(`v1-refresh-ip:${clientIp(req)}`, 30)) return json({ error: "Too many requests." }, 429);
+    if (!(await allowShared(`v1-refresh-ip:${clientIp(req)}`, 30))) return json({ error: "Too many requests." }, 429);
     const sb = createBase(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
     const { data, error } = await sb.auth.refreshSession({ refresh_token: String(body.refresh_token ?? "") });
     if (error || !data.session) return json({ error: error?.message ?? "Invalid refresh token" }, 401);

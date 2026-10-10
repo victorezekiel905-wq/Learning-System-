@@ -1848,6 +1848,16 @@ test("lesson library: teachers browse and copy ready-made lessons into their sch
   await rejects(db.as(T, "select * from public.library_lessons"), /permission denied/);
 });
 
+test("shared rate limits: a token bucket per key, for the app server only (1070)", async () => {
+  const hit = async () => (await db.admin("select public.rate_allow('test:key', 3) as ok"))[0].ok;
+  assert.deepEqual([await hit(), await hit(), await hit(), await hit()], [true, true, true, false]);
+  await db.admin("update public.rate_buckets set at = now() - interval '1 minute' where key = 'test:key'");
+  assert.equal(await hit(), true, "refilled after a minute");
+  const u = await db.signUp("u@rate.test", "Rate User");
+  await rejects(db.as(u, "select public.rate_allow('x', 100)"), /permission denied/);
+  await rejects(db.as(u, "select * from public.rate_buckets"), /permission denied/);
+});
+
 test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {
   const T = await db.signUp("t@canvas.test", "Canvas Teacher");
   const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Canvas School", p_full_name: "Canvas Teacher" })).tenant_id;

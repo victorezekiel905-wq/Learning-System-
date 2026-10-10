@@ -49,6 +49,7 @@ export async function deviceCall(
   const ip = clientIp(req);
   const key = opts.requireDevice === false ? `ip:${ip}` : `dev:${String(body.device_id ?? ip)}`;
   if (opts.requireDevice !== false && !UUID.test(String(body.device_id ?? ""))) return reply({ error: "device_id required." }, 400);
+  // In memory on purpose: heartbeats are frequent and devices authenticate by secret (see rate-limit.ts).
   if (!allow(`${opts.fn}:${key}`, opts.perMinute)) return reply({ error: "Too many requests." }, 429);
 
   const { data, error } = await createAnonClient().rpc(opts.fn, opts.map(body));

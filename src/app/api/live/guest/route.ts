@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { fail, ok, readJson, withErrorLog } from "@/lib/api";
-import { allow, clientIp } from "@/lib/rate-limit";
+import { allowShared, clientIp } from "@/lib/rate-limit";
 import { GUEST_LOGIN_DOMAIN } from "@/lib/student-login";
 import { createServiceClient, explainServiceError, hasServiceRole } from "@/lib/supabase/service";
 
@@ -15,7 +15,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
   if (!hasServiceRole()) return fail(503, "Joining with just a name isn't set up on this site yet. Tell your teacher, or sign in with your school account.");
   const ip = clientIp(req);
   // A school shares one address, so a whole class can join at once.
-  if (!allow(`guest-ip:${ip}`, 120) || !allow("guest-all", 1200)) {
+  if (!(await allowShared(`guest-ip:${ip}`, 120)) || !(await allowShared("guest-all", 1200))) {
     return fail(429, "Lots of people are joining from this network right now. Wait a minute and try again, or tell your teacher.");
   }
   const body = await readJson<{ code?: string }>(req, 1_000);
@@ -29,7 +29,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
   const school = s && (await admin.from("tenants").select("status").eq("id", s.tenant_id).maybeSingle()).data;
   if (!s || school?.status !== "active") {
     // Wrong codes are limited harder, so codes can't be guessed through here.
-    if (!allow(`guest-miss:${ip}`, 10)) return fail(429, "Too many wrong codes. Wait a minute, then check the code with your teacher.");
+    if (!(await allowShared(`guest-miss:${ip}`, 10))) return fail(429, "Too many wrong codes. Wait a minute, then check the code with your teacher.");
     return fail(404, "No live lesson has that code. Check it with your teacher.", { code: "P0002" });
   }
   if (s.guests_closed) return fail(409, "This lesson isn't taking new guests. Ask your teacher.");
