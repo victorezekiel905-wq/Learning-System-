@@ -16,10 +16,12 @@ import { JoinQr } from "@/components/live/JoinQr";
 import { formatJoinCode } from "@/lib/utils";
 import { AnswerBars, AnswerTiles, TimerRing } from "@/components/game/LiveGame";
 import { getSound } from "@/lib/sound";
+import { useTeacherPresence } from "@/lib/teacher-presence";
 
 const TILE_KINDS = ["mcq", "true_false", "poll", "multi_select"];
 
 export function Presenter({ sessionId }: { sessionId: string }) {
+  useTeacherPresence(sessionId);
   const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: 15000 });
   const lesson = useLoader(() => rpc<{ slides: SlideData[] }>("session_lesson", { p_session: sessionId }), [sessionId]);
   const spot = useRpc<{ student: string; image: string | null; stale: boolean } | null>("spotlight_view", { p_session: sessionId }, [sessionId], { intervalMs: 3000, enabled: !!state.data?.spotlight?.show_to_class });

@@ -8,11 +8,14 @@ import { BADGE, OPTION_COLORS, type GameState, type Leaderboard } from "@/compon
 import { RichText } from "@/components/RichText";
 import { Alert, Badge, Button, Card, useToast, useDialog } from "@/components/ui";
 import { useRpc } from "@/lib/hooks";
+import { useTeacherPresence } from "@/lib/teacher-presence";
 import { useSignal } from "@/lib/realtime";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn } from "@/lib/utils";
 
-export function GameHost({ gameId, school }: { gameId: string; school: string }) {
+export function GameHost({ gameId, school, sessionId }: { gameId: string; school: string; sessionId?: string | null }) {
+  // A game run from a live lesson keeps that lesson open while the teacher hosts it.
+  useTeacherPresence(sessionId);
   const toast = useToast();
   const dialog = useDialog();
   const [fetchedAt, setFetchedAt] = useState(Date.now());

@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useNetwork, useNow, useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
 import { useScreenFeed } from "@/lib/screen-feed";
+import { useTeacherPresence } from "@/lib/teacher-presence";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, formatJoinCode, timeAgo } from "@/lib/utils";
 import { avatarFor } from "@/components/live/avatars";
@@ -32,6 +33,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
   const toast = useToast();
   const dialog = useDialog();
   const [tab, setTab] = useState<Tab>(initialTab);
+  useTeacherPresence(sessionId);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sound, setSound] = useState(true);
   const { quality } = useNetwork();

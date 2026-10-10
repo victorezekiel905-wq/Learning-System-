@@ -737,7 +737,9 @@ test("operations: thumbnails deleted at session end, error log, health, maintena
   await db.admin("update public.class_sessions set started_at = now() - interval '13 hours' where id = $1", [stale.id]);
   await db.admin("update public.session_participants set last_seen_at = now() - interval '3 hours' where session_id = $1", [stale.id]);
   const m = (await db.admin("select app.run_maintenance() r"))[0].r;
-  assert.equal(m.sessions_auto_ended, 1);
+  assert.equal(m.ok, true);
+  // Ended either by maintenance or already, since its teacher hasn't been seen (1020).
+  assert.equal((await db.admin("select status from public.class_sessions where id = $1", [stale.id]))[0].status, "ended");
 
   // Terms of service acceptance is recorded.
   await db.rpc(S.teacherA, "accept_notice", { p_kind: "terms_of_service" });
@@ -1736,6 +1738,55 @@ test("moving to another slide closes the launched activity and hides results (10
   await db.rpc(T, "set_session_state", { p_session: s.id, p_group_chat: false });
   assert.equal((await row()).active_activity_id, q2);
   await db.rpc(T, "session_control", { p_session: s.id, p_action: "end" });
+});
+
+test("a lesson ends when the teacher closes it, without End session (1020)", async () => {
+  const T = await db.signUp("t@closes.test", "Closing Teacher");
+  await db.rpc(T, "bootstrap_school", { p_school_name: "Closing School", p_full_name: "Closing Teacher" });
+  const s = await goLive(T, { p_class: null });
+  const g = await db.signInAnonymously();
+  await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Uche" });
+  const status = async (id) => (await db.admin("select status from public.class_sessions where id = $1", [id]))[0].status;
+  const tick = async () => {
+    await db.admin("update public.session_participants set last_seen_at = now() - interval '1 minute' where user_id = $1", [g]);
+    await db.rpc(g, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: false, p_sharing: false });
+  };
+
+  // Only the lesson's teacher reports their presence.
+  await rejects(db.rpc(g, "teacher_here", { p_session: s.id }), /not found/);
+  await db.rpc(T, "teacher_here", { p_session: s.id });
+
+  // Closing the tab, then a refresh coming back: the lesson carries on.
+  await db.rpc(T, "teacher_here", { p_session: s.id, p_here: false });
+  await tick();
+  assert.equal(await status(s.id), "live", "within the 45-second grace");
+  await db.rpc(T, "teacher_here", { p_session: s.id });
+  await db.admin("update public.class_sessions set teacher_left_at = null, teacher_seen_at = now() - interval '2 minutes' where id = $1", [s.id]);
+  await tick();
+  assert.equal(await status(s.id), "live");
+
+  // Closed for good: the next student tick ends it for everyone, with a report the teacher sees.
+  await db.rpc(T, "teacher_here", { p_session: s.id, p_here: false });
+  await db.admin("update public.class_sessions set teacher_left_at = now() - interval '1 minute' where id = $1", [s.id]);
+  await tick();
+  assert.equal(await status(s.id), "ended");
+  assert.equal((await db.rpc(g, "session_student_state", { p_session: s.id })).session.status, "ended");
+  const reports = await db.as(T, "select id from public.reports where scope_id = $1", [s.id]);
+  assert.equal(reports.length, 1);
+  assert.equal((await db.rpc(T, "session_report", { p_session: s.id })).version, 2);
+
+  // The teacher's page went silent (no internet, laptop shut) and nobody is in it: the minute job ends it.
+  const quiet = await goLive(T, { p_class: null });
+  const busy = await goLive(T, { p_class: null });
+  await db.rpc(T, "teacher_here", { p_session: busy.id });
+  await db.admin("update public.class_sessions set teacher_seen_at = now() - interval '4 minutes' where id = $1", [quiet.id]);
+  await db.admin("select app.end_teacherless_sessions()");
+  assert.deepEqual([await status(quiet.id), await status(busy.id)], ["ended", "live"]);
+
+  // End session still ends at once, with the full report.
+  const ended = await db.rpc(T, "end_session", { p_session: busy.id });
+  assert.ok(ended.report_id);
+  assert.equal((await db.admin("select payload ->> 'version' v from public.reports where id = $1", [ended.report_id]))[0].v, "2");
 });
 
 test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {

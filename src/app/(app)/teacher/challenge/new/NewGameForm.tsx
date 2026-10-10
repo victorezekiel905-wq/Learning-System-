@@ -7,6 +7,7 @@ import { Icon, type IconName } from "@/components/Icon";
 import { cn } from "@/lib/utils";
 import { errorText, rpc } from "@/lib/rpc";
 import type { GameSettings } from "@/lib/types";
+import { useTeacherPresence } from "@/lib/teacher-presence";
 
 // Game styles. Kahoot-style speed races suit some lessons, but reward fast guessing and
 // stress careful thinkers, so "Think it through" (no timer, no speed points) is the default.
@@ -23,6 +24,8 @@ type Act = { id: string; title: string; kind: string; lessons: { title: string }
 
 export function NewGameForm({ classes, activities, defaults }: { classes: { id: string; name: string }[]; activities: Act[]; defaults: { classId?: string; activityId?: string; sessionId?: string } }) {
   const router = useRouter();
+  // Setting up a game from a live lesson keeps that lesson open.
+  useTeacherPresence(defaults.sessionId);
   const [cls, setCls] = useState(defaults.classId ?? classes[0]?.id ?? "");
   const [act, setAct] = useState(defaults.activityId ?? activities[0]?.id ?? "");
   const [title, setTitle] = useState("");
