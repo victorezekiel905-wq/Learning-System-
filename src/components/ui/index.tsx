@@ -430,7 +430,11 @@ export function Avatar({ name, className }: { name: string; className?: string }
 // ---------------------------------------------------------------------------
 export type MenuItem = { label: string; onSelect: () => unknown; tone?: "danger"; icon?: ReactNode };
 
-export function Menu({ items, label = "More actions" }: { items: MenuItem[]; label?: string }) {
+export function Menu({ items, label = "More actions", trigger, triggerClassName }: {
+  items: MenuItem[]; label?: string;
+  /** Visible content of the button (default: a "…" icon), and its classes (e.g. on a dark bar). */
+  trigger?: ReactNode; triggerClassName?: string;
+}) {
   const toast = useContext(ToastCtx);
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -463,9 +467,9 @@ export function Menu({ items, label = "More actions" }: { items: MenuItem[]; lab
 
   return (
     <>
-      <button ref={btn} type="button" onClick={toggle} aria-label={label} aria-haspopup="menu" aria-expanded={!!pos}
-        className="btn btn-ghost btn-sm h-8 w-8 px-0">
-        <MoreHorizontal className="h-4 w-4" aria-hidden />
+      <button ref={btn} type="button" onClick={toggle} aria-label={trigger ? undefined : label} aria-haspopup="menu" aria-expanded={!!pos}
+        className={triggerClassName ?? "btn btn-ghost btn-sm h-8 w-8 px-0"}>
+        {trigger ?? <MoreHorizontal className="h-4 w-4" aria-hidden />}
       </button>
       {pos && (
         <div ref={list} role="menu" aria-label={label} style={{ top: pos.top, right: pos.right }}

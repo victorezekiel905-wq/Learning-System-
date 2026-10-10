@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import { avatarFor } from "@/components/live/avatars";
+import { Critter } from "@/components/live/Critter";
+import { Crown } from "lucide-react";
 import { OptionShape } from "./Shape";
 
 /*
@@ -13,6 +14,7 @@ const GLYPH_TEXT = ["text-tile-bolt", "text-tile-star", "text-tile-hex", "text-t
 // Fixed spots (no randomness, so server and browser draw the same picture).
 const FIELD = [
   // Edges only, so the shapes never sit on text: left and right bands, top and bottom corners.
+  // On phones the side bands are hidden (content runs edge to edge there).
   { x: 4, y: 10, s: 36, r: -14, d: 0 }, { x: 91, y: 7, s: 30, r: 18, d: 1.2 }, { x: 92, y: 78, s: 40, r: -8, d: 2.1 },
   { x: 5, y: 82, s: 32, r: 22, d: 0.6 }, { x: 2, y: 46, s: 26, r: 12, d: 2.6 }, { x: 95, y: 44, s: 26, r: -20, d: 1.7 },
   { x: 20, y: 3, s: 22, r: 10, d: 3 }, { x: 76, y: 92, s: 24, r: -16, d: 0.9 }
@@ -23,7 +25,7 @@ export function GlyphField({ className, count = FIELD.length, opacity = 0.9 }: {
   return (
     <div aria-hidden className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)} style={{ opacity }}>
       {FIELD.slice(0, count).map((g, i) => (
-        <span key={i} className={cn("absolute animate-float", GLYPH_TEXT[i % GLYPH_TEXT.length])}
+        <span key={i} className={cn("absolute animate-float", GLYPH_TEXT[i % GLYPH_TEXT.length], g.y > 15 && g.y < 85 && "hidden sm:block")}
           style={{ left: `${g.x}%`, top: `${g.y}%`, width: g.s, height: g.s, ["--r" as string]: `${g.r}deg`, animationDelay: `${-g.d}s`, transform: `rotate(${g.r}deg)` }}>
           <OptionShape i={i} className="h-full w-full" />
         </span>
@@ -52,6 +54,17 @@ export function Burst({ className, delay = 0 }: { className?: string; delay?: nu
   );
 }
 
+const RANK_BG = { 1: "bg-tile-star text-ink-950", 2: "bg-tile-bolt text-white", 3: "bg-tile-hex text-white" } as const;
+
+/** A medal for places 1 to 3, in the podium's colours. */
+export function RankBadge({ rank, className }: { rank: number; className?: string }) {
+  if (rank < 1 || rank > 3) return null;
+  return (
+    <span className={cn("grid h-8 w-8 place-items-center rounded-full font-display text-sm font-extrabold ring-2 ring-ink-950", RANK_BG[rank as 1 | 2 | 3], className)}
+      aria-label={["1st", "2nd", "3rd"][rank - 1] + " place"}>{rank}</span>
+  );
+}
+
 export type PodiumEntry = { name: string; avatar: string | null; score: number; rank: number };
 
 const STEP = {
@@ -76,8 +89,10 @@ export function Podium({ entries, size = "lg", highlight }: { entries: PodiumEnt
           <li key={`${e.rank}-${e.name}`} className="flex w-1/3 max-w-[13rem] flex-col items-center" aria-label={`${st.label}: ${e.name}, ${e.score.toLocaleString()} points`}>
             <div className="relative flex flex-col items-center animate-pop" style={{ animationDelay: `calc(${st.delay} + .35s)` }}>
               {e.rank === 1 && <Burst delay={1300} />}
-              <span aria-hidden className={cn("grid place-items-center rounded-2xl bg-white/10", lg ? "h-20 w-20 text-5xl" : "h-14 w-14 text-3xl",
-                e.name === highlight && "ring-4 ring-accent-400")}>{avatarFor(e.avatar) ?? "🙂"}</span>
+              {e.rank === 1 && <Crown aria-hidden className={cn("absolute -top-7 animate-pop text-tile-star [animation-delay:1.25s]", lg ? "h-9 w-9" : "h-7 w-7")} fill="currentColor" strokeWidth={1.5} />}
+              <span aria-hidden className={cn("relative grid place-items-center rounded-2xl bg-white/10", lg ? "h-20 w-20 text-5xl" : "h-14 w-14 text-3xl",
+                e.name === highlight && "ring-4 ring-accent-400")}><Critter name={e.avatar} className="h-[78%] w-[78%]" />
+                {e.rank > 1 && <RankBadge rank={e.rank} className="absolute -right-2.5 -top-2.5" />}</span>
               <span className={cn("mt-2 max-w-full truncate font-display font-extrabold", lg ? "text-2xl" : "text-base")}>{e.name}</span>
               <span className={cn("font-display font-bold tabular-nums text-white/70", lg ? "text-lg" : "text-sm")}>{e.score.toLocaleString()}</span>
             </div>

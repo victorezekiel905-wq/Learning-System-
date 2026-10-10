@@ -10,7 +10,7 @@ import { useLoader, useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
 import { errorText, rpc } from "@/lib/rpc";
 import { Icon } from "@/components/Icon";
-import { avatarFor } from "@/components/live/avatars";
+import { Critter } from "@/components/live/Critter";
 import { Leaderboard } from "@/components/live/Leaderboard";
 import { GlyphField, Podium } from "@/components/game/Celebrate";
 import { JoinQr } from "@/components/live/JoinQr";
@@ -93,7 +93,7 @@ export function Presenter({ sessionId }: { sessionId: string }) {
             </div>
             <p className="mt-8 text-2xl text-ink-300">{here.length === 0 ? "Waiting for players…" : `${here.length} joined`}</p>
             <ul className="mx-auto mt-4 flex max-w-5xl flex-wrap justify-center gap-3">
-              {here.map((r, i) => <li key={r.student_id} className="animate-pop rounded-full bg-white/10 px-4 py-2 text-xl" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}><span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span> {r.name}</li>)}
+              {here.map((r, i) => <li key={r.student_id} className="animate-pop rounded-full bg-white/10 px-4 py-2 text-xl" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}><Critter name={r.avatar} className="mr-1.5 h-8 w-8 align-[-0.35em]" /> {r.name}</li>)}
             </ul>
           </div>
         ) : s?.show_leaderboard && s.leaderboard && s.settings?.leaderboard !== false ? (

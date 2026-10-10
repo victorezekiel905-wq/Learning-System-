@@ -3,15 +3,19 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui";
 import { errorText, rpc } from "@/lib/rpc";
+import { useRpc } from "@/lib/hooks";
 import { cn, formatJoinCode } from "@/lib/utils";
 import { AVATARS, avatarFor } from "./avatars";
+import { Critter } from "./Critter";
 import { Leaderboard, type BoardEntry } from "./Leaderboard";
-import { Burst, GlyphField, Podium } from "@/components/game/Celebrate";
+import { Burst, GlyphField, Podium, RankBadge } from "@/components/game/Celebrate";
 
 /** Before the teacher starts: who you are, your avatar, and how many have joined. */
-export function Lobby({ sessionId, title, teacher, name, avatar, participants, code, onAvatar }: {
+export function Lobby({ sessionId, title, teacher, name, avatar, participants, code, onAvatar, players }: {
   sessionId: string; title: string; teacher: string; name: string; avatar: string | null;
   participants: number; code: string; onAvatar: () => void;
+  /** Who else is here (migration 1030); fetched when not given. */
+  players?: LobbyPlayer[];
 }) {
   const toast = useToast();
   const [picked, setPicked] = useState<string | null>(avatar);
@@ -23,7 +27,7 @@ export function Lobby({ sessionId, title, teacher, name, avatar, participants, c
       <p className="relative mt-1 text-ink-300">with {teacher}</p>
 
       <div className="relative mt-8 flex items-center gap-4 rounded-2xl bg-white/10 px-5 py-4 backdrop-blur-sm">
-        <span key={picked ?? "none"} className="grid h-16 w-16 animate-pop place-items-center rounded-2xl bg-accent-400 text-4xl text-ink-950" aria-hidden>{avatarFor(picked) ?? name.slice(0, 1).toUpperCase()}</span>
+        <span key={picked ?? "none"} className="grid h-16 w-16 animate-pop place-items-center rounded-2xl bg-white/10" aria-hidden><Critter name={avatarFor(picked)} className="h-12 w-12" /></span>
         <div>
           <p className="text-xl font-bold">{name}</p>
           <p className="text-sm text-ink-300">{participants} {participants === 1 ? "person has" : "people have"} joined</p>
@@ -33,19 +37,21 @@ export function Lobby({ sessionId, title, teacher, name, avatar, participants, c
       <fieldset className="relative mt-6 w-full max-w-sm">
         <legend className="mb-2 text-center text-sm text-ink-300">Pick your avatar</legend>
         <div className="grid grid-cols-6 gap-2">
-          {Object.entries(AVATARS).map(([key, emoji]) => (
-            <button key={key} type="button" aria-label={key} aria-pressed={picked === key}
+          {Object.entries(AVATARS).map(([key, label]) => (
+            <button key={key} type="button" aria-label={label} title={label} aria-pressed={picked === key}
               onClick={async () => {
                 setPicked(key);
                 try { await rpc("set_avatar", { p_session: sessionId, p_avatar: key }); onAvatar(); }
                 catch (e) { toast(errorText(e), "error"); }
               }}
-              className={cn("grid aspect-square place-items-center rounded-xl text-2xl transition", picked === key ? "scale-110 bg-accent-500 ring-4 ring-accent-400/40" : "bg-white/10 hover:scale-105 hover:bg-white/20")}>
-              <span aria-hidden>{emoji}</span>
+              className={cn("grid aspect-square place-items-center rounded-xl text-2xl transition", picked === key ? "scale-110 bg-white/25 ring-4 ring-accent-400" : "bg-white/10 hover:scale-105 hover:bg-white/20")}>
+              <Critter name={key} className="h-[78%] w-[78%]" />
             </button>
           ))}
         </div>
       </fieldset>
+
+      <LobbyPlayers sessionId={sessionId} participants={participants} given={players} />
 
       <p className="relative mt-10 flex items-center gap-2 text-ink-200">
         <span className="h-2 w-2 animate-pulse2 rounded-full bg-accent-400" aria-hidden />
@@ -53,6 +59,29 @@ export function Lobby({ sessionId, title, teacher, name, avatar, participants, c
       </p>
       <p className="relative mt-2 text-xs text-ink-400">Code <span className="font-mono font-bold tracking-widest text-ink-200">{formatJoinCode(code)}</span></p>
     </div>
+  );
+}
+
+export type LobbyPlayer = { name: string | null; avatar: string | null; me: boolean };
+
+/** The others in the lobby, popping in as they join (first name and initial, or avatars only). */
+function LobbyPlayers({ sessionId, participants, given }: { sessionId: string; participants: number; given?: LobbyPlayer[] }) {
+  const fetched = useRpc<LobbyPlayer[]>("session_lobby", { p_session: sessionId }, [sessionId, participants], { intervalMs: 10000, enabled: !given });
+  const all = (given ?? fetched.data ?? []).filter((p) => !p.me);
+  if (!all.length) return null;
+  const shown = all.slice(0, 24);
+  return (
+    <section className="relative mt-8 w-full max-w-xl" aria-label="Who else is here">
+      <p className="mb-3 text-center text-sm text-ink-300">Also here</p>
+      <ul className="flex flex-wrap justify-center gap-2">
+        {shown.map((p, i) => (
+          <li key={`${p.name}-${i}`} className="flex animate-pop items-center gap-1.5 rounded-full bg-white/10 py-1 pl-1 pr-3 text-sm font-semibold" style={{ animationDelay: `${Math.min(i, 10) * 35}ms` }}>
+            <Critter name={avatarFor(p.avatar)} className="h-7 w-7" />{p.name ?? <span className="sr-only">A player</span>}
+          </li>
+        ))}
+        {all.length > shown.length && <li className="rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold text-ink-200">+{all.length - shown.length} more</li>}
+      </ul>
+    </section>
   );
 }
 
@@ -80,15 +109,15 @@ export function EndScreen({ name, avatar, summary, guest, score = null }: {
   return (
     <div className="relative flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-center overflow-hidden bg-ink-950 px-4 py-10 text-center text-white">
       <GlyphField opacity={0.45} />
-      <span className="relative grid h-20 w-20 animate-pop place-items-center rounded-3xl bg-accent-400 text-5xl" aria-hidden>
-        {avatarFor(avatar) ?? "🎉"}{score && score.score > 0 && score.rank <= 3 && <Burst delay={300} />}
+      <span className="relative grid h-20 w-20 animate-pop place-items-center rounded-3xl bg-white/10" aria-hidden>
+        <Critter name={avatarFor(avatar)} className="h-16 w-16" />{score && score.score > 0 && score.rank <= 3 && <Burst delay={300} />}
       </span>
       <h1 className="relative mt-5 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">Well done, {name}!</h1>
       <p className="relative mt-1 text-ink-300">The lesson has ended.</p>
       {score && score.score > 0 && (
         <p className="relative mt-6 font-display text-5xl font-extrabold text-accent-400">{score.score.toLocaleString()}<span className="ml-2 text-xl text-ink-300">points</span></p>
       )}
-      {score && score.score > 0 && <p className="relative mt-1 text-lg text-ink-200">{score.rank <= 3 ? ["🥇", "🥈", "🥉"][score.rank - 1] + " " : ""}#{score.rank} of {score.of}</p>}
+      {score && score.score > 0 && <p className="relative mt-2 flex items-center justify-center gap-2 text-lg text-ink-200"><RankBadge rank={score.rank} />#{score.rank} of {score.of}</p>}
       <dl className="relative mt-8 grid w-full max-w-sm grid-cols-2 gap-3">
         <div className="rounded-2xl bg-white/5 p-4"><dt className="text-sm text-ink-300">Answered</dt><dd className="font-display text-4xl font-extrabold">{answered}</dd></div>
         <div className="rounded-2xl bg-white/5 p-4"><dt className="text-sm text-ink-300">Correct</dt><dd className="font-display text-4xl font-extrabold text-accent-400">{correct}</dd></div>

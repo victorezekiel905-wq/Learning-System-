@@ -1789,6 +1789,29 @@ test("a lesson ends when the teacher closes it, without End session (1020)", asy
   assert.equal((await db.admin("select payload ->> 'version' v from public.reports where id = $1", [ended.report_id]))[0].v, "2");
 });
 
+test("the lobby shows who has joined, to people in the lesson only (1030)", async () => {
+  const T = await db.signUp("t@lobby.test", "Lobby Teacher");
+  await db.rpc(T, "bootstrap_school", { p_school_name: "Lobby School", p_full_name: "Lobby Teacher" });
+  const s = await db.rpc(T, "start_session", { p_class: null });   // in the lobby until Start
+  const [a, b] = [await db.signInAnonymously(), await db.signInAnonymously()];
+  await db.rpc(a, "join_session_as_guest", { p_code: s.join_code, p_name: "Amaka Obi" });
+  await db.rpc(b, "join_session_as_guest", { p_code: s.join_code, p_name: "Bayo" });
+  await db.rpc(a, "set_avatar", { p_session: s.id, p_avatar: "owl" });
+
+  const seen = await db.rpc(b, "session_lobby", { p_session: s.id });
+  assert.deepEqual(seen.map((p) => [p.name, p.avatar, p.me]), [["Amaka O.", "owl", false], ["Bayo", null, true]]);
+  // Not to someone outside the lesson.
+  const outsider = await db.signInAnonymously();
+  await rejects(db.rpc(outsider, "session_lobby", { p_session: s.id }), /not found/);
+  // Anonymous names: avatars only.
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "settings", p_args: { anonymous_names: true } });
+  assert.deepEqual((await db.rpc(a, "session_lobby", { p_session: s.id })).map((p) => p.name), [null, null]);
+  // Once the lesson starts, the list is gone.
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "start" });
+  assert.deepEqual(await db.rpc(a, "session_lobby", { p_session: s.id }), []);
+  await db.rpc(T, "end_session", { p_session: s.id });
+});
+
 test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {
   const T = await db.signUp("t@canvas.test", "Canvas Teacher");
   const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Canvas School", p_full_name: "Canvas Teacher" })).tenant_id;

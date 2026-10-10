@@ -10,7 +10,12 @@ import { cn } from "@/lib/utils";
  * with the product's own pieces. Every name and number is example content.
  */
 
-const tone = (p: number) => (p < 50 ? "bg-rose-500" : "bg-ink-800");
+// Charts use the tile palette: teal (moon) when strong, orange (heart) where help is needed, cobalt (bolt) otherwise.
+const tone = (p: number) => (p < 50 ? "bg-tile-heart" : p >= 80 ? "bg-tile-moon" : "bg-tile-bolt");
+const SUBJECT_DOT: Record<string, string> = { Mathematics: "bg-tile-bolt", "Basic Science": "bg-tile-moon", English: "bg-tile-hex", "Social Studies": "bg-tile-heart" };
+function Dot({ subject }: { subject: string }) {
+  return <span className={cn("inline-block h-2 w-2 shrink-0 rounded-full", SUBJECT_DOT[subject] ?? "bg-ink-400")} aria-hidden />;
+}
 function Meter({ v, className }: { v: number; className?: string }) {
   return <span className={cn("block h-1.5 overflow-hidden rounded-full bg-ink-100", className)}><span className={cn("block h-full rounded-full", tone(v))} style={{ width: `${v}%` }} /></span>;
 }
@@ -93,7 +98,7 @@ export function AnswerMini() {
 
 /** The report after the lesson: one question in detail. */
 export function ReviewMini() {
-  const rows: [string, number, boolean][] = [["The Sun", 19, true], ["The Moon", 4, false], ["A mirror", 2, false], ["A window", 1, false]];
+  const rows: [string, number, boolean, number][] = [["The Sun", 19, true, 1], ["The Moon", 4, false, 0], ["A mirror", 2, false, 2], ["A window", 1, false, 3]];
   return (
     <div className="p-4">
       <div className="flex items-baseline justify-between">
@@ -102,12 +107,12 @@ export function ReviewMini() {
       </div>
       <p className="mt-1 text-[13px] font-semibold text-ink-900">Which of these gives out its own light?</p>
       <ul className="mt-3 space-y-1.5">
-        {rows.map(([l, n, ok], i) => (
+        {rows.map(([l, n, ok, t], i) => (
           <li key={l} className="grid grid-cols-[5.5rem_1fr_1.25rem] items-center gap-2 text-[11px]">
-            <span className={cn("truncate", ok && "font-semibold text-emerald-700")}>{ok ? "✓ " : ""}{l}</span>
-            <span className="block h-3 overflow-hidden rounded bg-ink-100"><span className={cn("block h-full rounded", ok ? "bg-emerald-500" : "bg-ink-400")} style={{ width: `${(n / 19) * 100}%` }} /></span>
+            <span className={cn("flex min-w-0 items-center gap-1", ok && "font-semibold text-ink-900")}><OptionShape i={t} className={cn("h-3 w-3 shrink-0", ["text-tile-bolt", "text-[#7E9A12]", "text-tile-hex", "text-tile-moon"][t])} /><span className="truncate">{l}</span>{ok && <Check className="h-3 w-3 shrink-0" strokeWidth={3} />}</span>
+            <span className="block h-3 overflow-hidden rounded bg-ink-100"><span className={cn("block h-full rounded", OPTION_COLORS[t], !ok && "opacity-45")} style={{ width: `${(n / 19) * 100}%` }} /></span>
             <span className="text-right tabular-nums text-ink-600">{n}</span>
-            {i === 1 && <span className="col-span-3 -mt-0.5 text-[10px] font-semibold text-amber-700">Most common wrong answer</span>}
+            {i === 1 && <span className="col-span-3 -mt-0.5 text-[10px] font-semibold text-tile-heart">Most common wrong answer</span>}
           </li>
         ))}
       </ul>
@@ -142,19 +147,19 @@ export function ParentMini() {
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <div className="rounded-xl bg-white p-3 ring-1 ring-ink-200">
           <p className="text-[11px] font-semibold text-ink-900">Strong in</p>
-          <p className="mt-1.5 flex justify-between text-[11px]"><span>Fractions · Mathematics</span><span className="font-semibold text-emerald-700">87%</span></p>
-          <p className="mt-1 flex justify-between text-[11px]"><span>Living things · Basic Science</span><span className="font-semibold text-emerald-700">85%</span></p>
+          <p className="mt-1.5 flex justify-between text-[11px]"><span>Fractions · Mathematics</span><span className="font-semibold text-tile-moon">87%</span></p>
+          <p className="mt-1 flex justify-between text-[11px]"><span>Living things · Basic Science</span><span className="font-semibold text-tile-moon">85%</span></p>
         </div>
         <div className="rounded-xl bg-white p-3 ring-1 ring-ink-200">
           <p className="text-[11px] font-semibold text-ink-900">Needs more practice</p>
-          <p className="mt-1.5 flex justify-between text-[11px]"><span>Decimals · Mathematics</span><span className="font-semibold text-rose-700">39%</span></p>
-          <p className="mt-1 flex justify-between text-[11px]"><span>Ratio · Mathematics</span><span className="font-semibold text-rose-700">58%</span></p>
+          <p className="mt-1.5 flex justify-between text-[11px]"><span>Decimals · Mathematics</span><span className="font-semibold text-tile-heart">39%</span></p>
+          <p className="mt-1 flex justify-between text-[11px]"><span>Ratio · Mathematics</span><span className="font-semibold text-tile-heart">58%</span></p>
         </div>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {subjects.map(([s, v, topics]) => (
           <div key={s} className="rounded-xl bg-white p-3 ring-1 ring-ink-200">
-            <p className="flex justify-between text-[12px] font-semibold text-ink-900"><span>{s}</span><span>{v}%</span></p>
+            <p className="flex justify-between text-[12px] font-semibold text-ink-900"><span className="flex items-center gap-1.5"><Dot subject={s} />{s}</span><span>{v}%</span></p>
             <Meter v={v} className="mt-1.5" />
             <ul className="mt-2 space-y-1">{topics.map(([t, p]) => (
               <li key={t} className="grid grid-cols-[1fr_3rem_2rem] items-center gap-2 text-[10px] text-ink-700"><span>{t}</span><Meter v={p} /><span className="text-right tabular-nums">{p}%</span></li>
@@ -184,7 +189,7 @@ export function SchoolMini() {
       <ul className="mt-2 space-y-2.5">
         {topics.map(([t, s, p, n]) => (
           <li key={t} className="grid grid-cols-[minmax(0,1fr)_5rem_2.25rem] items-center gap-3">
-            <span className="min-w-0"><span className="block truncate text-[12px] font-semibold text-ink-900">{t} <span className="font-normal text-ink-500">· {s}</span></span>
+            <span className="min-w-0"><span className="flex items-center gap-1.5 truncate text-[12px] font-semibold text-ink-900"><Dot subject={s} />{t} <span className="font-normal text-ink-500">· {s}</span></span>
               <span className="text-[10px] text-ink-500">{n} pupils below 50%</span></span>
             <Meter v={p} /><span className="text-right text-[12px] font-semibold tabular-nums">{p}%</span>
           </li>

@@ -4,6 +4,11 @@ import { ArrowRight } from "lucide-react";
 import { getMe, homeFor } from "@/lib/session";
 import { LEGAL } from "@/lib/legal";
 import { LiveDemo } from "@/components/marketing/LiveDemo";
+import { OptionShape } from "@/components/game/Shape";
+import { cn } from "@/lib/utils";
+
+// The tile shapes as markers, in their own colours (the star's lime darkened to read on white).
+const SHAPE_TEXT = ["text-tile-bolt", "text-[#7E9A12]", "text-tile-hex", "text-tile-moon", "text-tile-heart", "text-tile-cloud"];
 import { AnswerMini, DesignMini, Frame, ParentMini, ReviewMini, RevealMini, SchoolMini, TeachMini } from "@/components/marketing/Showcase";
 
 export const metadata = {
@@ -151,9 +156,11 @@ export default async function Landing() {
         <div className="mx-auto max-w-6xl px-5 py-24 sm:px-8 lg:py-28">
           <h2 className="max-w-2xl font-display text-[30px] font-bold leading-[1.12] tracking-[-0.02em] text-ink-900 sm:text-[38px]">Made for real classrooms.</h2>
           <dl className="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-            {CLASSROOM.map(([t, d]) => (
+            {CLASSROOM.map(([t, d], i) => (
               <div key={t} className="border-t border-ink-200 pt-5">
-                <dt className="text-[15px] font-semibold text-ink-900">{t}</dt>
+                <dt className="flex items-center gap-2.5 text-[15px] font-semibold text-ink-900">
+                  <OptionShape i={i} className={cn("h-[18px] w-[18px] shrink-0", SHAPE_TEXT[i % SHAPE_TEXT.length])} />{t}
+                </dt>
                 <dd className="mt-2 text-[15px] leading-relaxed text-ink-600">{d}</dd>
               </div>
             ))}

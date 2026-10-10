@@ -3,6 +3,27 @@ import { AnswerBars, AnswerResult, AnswerTiles, StreakChip } from "@/components/
 import { GlyphField, Podium } from "@/components/game/Celebrate";
 import { Leaderboard } from "@/components/live/Leaderboard";
 import { EndScreen, Lobby } from "@/components/live/StudentPhases";
+import { Critter } from "@/components/live/Critter";
+import { AVATARS } from "@/components/live/avatars";
+import type { SessionState } from "@/components/live/types";
+import { ControlBar } from "@/app/(app)/teacher/live/[id]/ControlBar";
+
+/** A control room state in one phase, with or without an open question. */
+function bar(phase: "lobby" | "active" | "paused", question: "open" | "revealed" | "none"): SessionState {
+  const activity = question === "none" ? null : { activity: { id: "q", title: "Check", kind: "quiz" }, revealed: question === "revealed", answered: 17, joined: 24, questions: [] };
+  return {
+    session: { id: "s", title: "Equivalent fractions", status: "live", mode: "live_participation", join_code: "DV644Y", class_id: "c", lesson_id: "l",
+      current_slide: 3, active_activity_id: null, environment_id: null, environment_active: false, group_chat_enabled: false, responses_visible: false,
+      class_name: "Year 8 Mathematics", lesson_title: "Fractions", environment_name: null, tenant_id: "t", started_at: "", lockdown: true, phase, show_leaderboard: false },
+    ranking: [{ user_id: "a", name: "Ada", avatar: "fox", score: 4860, rank: 1, streak: 3 }],
+    settings: { monitoring_enabled: true, allow_spotlight: true, allow_group_chat: false, allow_screen_capture: true, thumbnail_interval_seconds: 10 },
+    server_now: new Date().toISOString(), roster: Array.from({ length: 26 }, () => ({}) as SessionState["roster"][number]), alerts: [], hands: [], commands: [], spotlight: null,
+    activity: activity as SessionState["activity"],
+    timer: question === "open" ? { activity_id: "q", started_at: new Date().toISOString(), seconds: 20, ends_at: new Date(Date.now() + 14_000).toISOString() } : null
+  };
+}
+const PLAYERS = [["Tobi B.", "panda"], ["Kemi E.", "owl"], ["Femi A.", "lion"], ["Zara M.", "frog"], ["Uche N.", "tiger"], ["Bisi K.", "rabbit"], ["Dayo P.", null], ["Ife O.", "penguin"]]
+  .map(([name, avatar]) => ({ name, avatar, me: false }));
 
 const OPTIONS = [{ id: "a", label: "The Moon" }, { id: "b", label: "The Sun" }, { id: "c", label: "A mirror" }, { id: "d", label: "A window" }];
 const BOARD = [
@@ -40,7 +61,21 @@ export function Preview() {
         <div className="relative mx-auto mt-8 max-w-2xl"><Leaderboard entries={BOARD.slice(3)} size="lg" /></div>
       </section>
 
-      <section id="lobby"><Lobby sessionId="preview" title="Equivalent fractions" teacher="Mrs. Nwosu" name="Ada" avatar="fox" participants={23} code="DV644Y" onAvatar={() => {}} /></section>
+      <section id="control" className="space-y-px bg-ink-200">
+        {([["lobby", "none"], ["active", "open"], ["active", "revealed"], ["paused", "none"]] as const).map(([ph, q]) => (
+          <ControlBar key={ph + q} state={bar(ph, q)} sessionId="s" joined={24} timer={bar(ph, q).timer ?? null} skew={0} monitoring onControl={() => {}} onLockdown={() => {}} onEnd={() => {}} />
+        ))}
+      </section>
+
+      <section id="critters" className="grid grid-cols-4 gap-4 bg-ink-950 p-6 sm:grid-cols-7">
+        {[...Object.keys(AVATARS), null].map((k) => (
+          <figure key={k ?? "default"} className="flex flex-col items-center gap-2 rounded-2xl bg-white/10 p-3 text-white">
+            <Critter name={k} className="h-16 w-16" /><figcaption className="text-xs">{k ? AVATARS[k] : "No pick yet"}</figcaption>
+          </figure>
+        ))}
+      </section>
+
+      <section id="lobby"><Lobby sessionId="preview" title="Equivalent fractions" teacher="Mrs. Nwosu" name="Ada" avatar="fox" participants={23} code="DV644Y" onAvatar={() => {}} players={PLAYERS} /></section>
       <section id="end"><EndScreen name="Ada" avatar="fox" guest summary={{ answered: 8, correct: 7 }} score={{ score: 4860, rank: 1, of: 26 }} /></section>
     </div>
   );

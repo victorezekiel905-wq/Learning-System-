@@ -1,9 +1,8 @@
 "use client";
-import { TimerRing, useSecondsLeft } from "@/components/game/LiveGame";
-import Link from "next/link";
+import { useSecondsLeft } from "@/components/game/LiveGame";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Avatar, Badge, Button, CopyButton, Tabs, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
+import { Alert, Avatar, Badge, Button, Tabs, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL, type SessionState } from "@/components/live/types";
 import { createClient } from "@/lib/supabase/client";
@@ -13,9 +12,10 @@ import { useScreenFeed } from "@/lib/screen-feed";
 import { useTeacherPresence } from "@/lib/teacher-presence";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, formatJoinCode, timeAgo } from "@/lib/utils";
-import { avatarFor } from "@/components/live/avatars";
+import { Critter } from "@/components/live/Critter";
 import { JoinQr } from "@/components/live/JoinQr";
 import { FEATURES } from "@/lib/features";
+import { ControlBar } from "./ControlBar";
 import { LessonPanel } from "./LessonPanel";
 import { ResponsesPanel } from "./ResponsesPanel";
 import { ScreensPanel } from "./ScreensPanel";
@@ -191,53 +191,12 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] lg:min-h-[calc(100dvh-4rem)] flex-col">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 bg-ink-950 px-4 py-3 text-white sm:px-6">
-        <div className="min-w-0 flex-1 basis-60">
-          <p className="truncate text-[13px] text-ink-400">{s.session.class_name}{s.session.lesson_title && ` · ${s.session.lesson_title}`}</p>
-          <h1 className="flex items-center gap-2.5 text-lg font-bold text-white sm:text-xl">
-            {phase === "lobby" ? <span className="inline-flex shrink-0 items-center rounded-md bg-accent-500 px-1.5 py-1 text-[11px] font-bold leading-none text-accent-ink">LOBBY</span>
-              : phase === "paused" ? <span className="inline-flex shrink-0 items-center rounded-md bg-amber-400 px-1.5 py-1 text-[11px] font-bold leading-none text-ink-950">PAUSED</span>
-              : <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-rose-600 px-1.5 py-1 text-[11px] font-bold leading-none text-white">
-              <span className="h-1.5 w-1.5 animate-pulse2 rounded-full bg-white" aria-hidden />LIVE</span>}
-            <span className="truncate">{s.session.title}</span>
-          </h1>
-        </div>
-        <div className="flex items-stretch gap-2.5">
-          <div className="rounded-xl bg-accent-500 px-3.5 py-1.5 text-accent-ink">
-            <p className="text-[11px] font-semibold leading-tight">Join code</p>
-            <p className="font-mono text-xl font-extrabold leading-tight tracking-[0.18em] sm:text-2xl">{formatJoinCode(s.session.join_code)}</p>
-          </div>
-          <div className="rounded-xl border border-white/15 px-3.5 py-1.5">
-            <p className="text-[11px] font-semibold leading-tight text-ink-400">Joined</p>
-            <p className="font-display text-xl font-extrabold leading-tight tabular-nums sm:text-2xl">{joined}{s.session.class_id && <span className="text-ink-400">/{s.roster.length}</span>}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 [&_.btn-secondary:hover]:bg-white/15 [&_.btn-secondary]:border-white/20 [&_.btn-secondary]:bg-white/5 [&_.btn-secondary]:text-white">
-          {phase === "lobby" && <Button size="sm" variant="accent" onClick={() => control("start")}>Start lesson</Button>}
-          {phase === "active" && s.activity && !s.activity.revealed && timer && <TimerRing timer={timer} skew={skew} size={36} className="text-white" />}
-          {phase === "active" && s.activity && <span className="rounded-lg border border-white/20 px-2.5 py-1 text-[13px] font-semibold tabular-nums" title="Students who have answered the activity on screen">
-            {s.activity.answered ?? 0}/{s.activity.joined ?? joined} answered</span>}
-          {phase === "active" && s.activity && !s.activity.revealed && <Button size="sm" variant="secondary" onClick={() => control("reveal")} title="Close the activity and show the right answers (R)">Reveal answers</Button>}
-          {phase === "active" && <Button size="sm" variant="secondary" onClick={() => control("pause")} title="Students see 'Eyes on your teacher' until you resume">Pause</Button>}
-          {phase === "paused" && <Button size="sm" variant="accent" onClick={() => control("resume")}>Resume</Button>}
-          {phase !== "lobby" && s.ranking && <Button size="sm" variant={s.session.show_leaderboard ? "accent" : "secondary"} aria-pressed={!!s.session.show_leaderboard}
-            title={s.session.settings?.leaderboard === false ? "The class leaderboard is off for this lesson; only you see the scores" : "Show the top 5 on every screen"}
-            onClick={() => control("leaderboard", { show: !s.session.show_leaderboard })}>
-            <Icon name="trophy" className="h-4 w-4" /> {s.session.show_leaderboard ? "Hide leaderboard" : "Leaderboard"}</Button>}
-          {mon && <Button size="sm" variant={s.session.lockdown ? "accent" : "secondary"} aria-pressed={s.session.lockdown}
-            title={s.session.lockdown ? "Students must share their screen and stay in the full-screen lesson; leaving alerts you." : "Students can leave the lesson without an alert."}
-            onClick={async () => {
-              try { await rpc("set_session_lockdown", { p_session: sessionId, p_on: !s.session.lockdown }); void state.reload(); toast(s.session.lockdown ? "Lockdown off" : "Lockdown on", "info"); }
-              catch (e) { toast(errorText(e), "error"); }
-            }}><Icon name="lock" className="h-4 w-4" /> Lockdown {s.session.lockdown ? "on" : "off"}</Button>}
-          <CopyButton value={s.session.join_code} label="Copy code" />
-          <Link href={`/present/${sessionId}`} className="btn btn-secondary btn-sm no-underline" title="Full-screen view for the projector, with its own controls"><Icon name="monitor" className="h-4 w-4" /> Present</Link>
-          {/* Challenges are for one class's students; a lesson without a class plays its question slides as the game. */}
-          {s.session.class_id && <Link href={`/teacher/challenge/new?class=${s.session.class_id}&session=${sessionId}${s.session.active_activity_id ? `&activity=${s.session.active_activity_id}` : ""}`}
-            className="btn btn-secondary btn-sm no-underline" title="A quiz game with a live leaderboard"><Icon name="trophy" className="h-4 w-4" /> Game</Link>}
-          <Button size="sm" variant="danger" onClick={end}>End session</Button>
-        </div>
-      </div>
+      <ControlBar state={s} sessionId={sessionId} joined={joined} timer={timer} skew={skew} monitoring={mon}
+        onControl={(a, args) => void control(a, args)} onEnd={() => void end()}
+        onLockdown={async () => {
+          try { await rpc("set_session_lockdown", { p_session: sessionId, p_on: !s.session.lockdown }); void state.reload(); toast(s.session.lockdown ? "Lockdown off" : "Lockdown on", "info"); }
+          catch (e) { toast(errorText(e), "error"); }
+        }} />
 
       {openAlerts.filter((a) => a.kind !== "connection_lost").length > 0 && (
         <div className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-900" role="alert">
@@ -318,7 +277,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
               <ol className="space-y-1 text-sm">{s.ranking.map((r) => (
                 <li key={r.user_id} className="flex items-center gap-2">
                   <span className="w-5 text-right text-xs font-bold text-ink-500">{r.rank}</span>
-                  <span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span>
+                  <Critter name={r.avatar} className="h-5 w-5" />
                   <span className="min-w-0 flex-1 truncate">{r.name}</span>
                   {r.streak >= 2 && <span className="text-xs" title={`${r.streak} in a row`}>🔥{r.streak}</span>}
                   <span className="font-semibold tabular-nums">{r.score.toLocaleString()}</span>
@@ -409,7 +368,7 @@ function WaitingRoom({ state, onStart }: { state: SessionState; onStart: () => v
       <ul className="mt-3 flex flex-wrap gap-2">
         {here.map((r) => (
           <li key={r.student_id} className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-sm">
-            <span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span>{r.name}
+            <Critter name={r.avatar} className="h-5 w-5" />{r.name}
           </li>
         ))}
       </ul>

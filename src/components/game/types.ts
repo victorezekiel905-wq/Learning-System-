@@ -25,8 +25,9 @@ export const BADGE: Record<string, string> = {
 
 // SwiftCipher's answer tiles: bolt, star, hexagon, moon, heart, cloud, each with its own colour
 // (tailwind "tile"). Each class sets the text colour too (ink on the lime star), so put it after
-// any text colour in cn(). Every answer has a shape, so colour is never the only cue.
-export const OPTION_COLORS = ["bg-tile-bolt text-white", "bg-tile-star text-ink-950", "bg-tile-hex text-white", "bg-tile-moon text-white", "bg-tile-heart text-white", "bg-tile-cloud text-white"];
+// any text colour in cn(). The lime star has a darker edge so it holds up on white.
+// Every answer has a shape, so colour is never the only cue.
+export const OPTION_COLORS = ["bg-tile-bolt text-white", "bg-tile-star text-ink-950 border border-[#9DBB22]", "bg-tile-hex text-white", "bg-tile-moon text-white", "bg-tile-heart text-white", "bg-tile-cloud text-white"];
 export const OPTION_SHAPES = ["bolt", "star", "hexagon", "moon", "heart", "cloud"] as const;
 
 export type GameGoal = { enabled: boolean; correct: number; target: number; possible_so_far: number; goal_percent: number };

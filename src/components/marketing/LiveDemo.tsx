@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 import { OptionShape } from "@/components/game/Shape";
 import { OPTION_COLORS } from "@/components/game/types";
 import { cn } from "@/lib/utils";
+import { Critter } from "@/components/live/Critter";
 
 /*
  * The landing page's live lesson: a projector and two phones playing one
@@ -20,12 +21,22 @@ const QUESTIONS: Q[] = [
 const CLASS = 26;
 const SECONDS = 20;
 const TICK = 330;          // one countdown second, sped up for the page
-const REVEAL_MS = 4600;
+const REVEAL_MS = 3800;
+const BOARD_MS = 4200;     // the leaderboard after each question
+
+// Example standings after each question (Ada answers right; Tunde, the second phone, doesn't).
+const BOARD = [
+  { name: "Ada", avatar: "fox", points: ["4,860", "6,140", "7,390"], move: "▲1" },
+  { name: "Tobi", avatar: "panda", points: ["4,410", "5,520", "6,700"], move: "▼1" },
+  { name: "Kemi", avatar: "owl", points: ["3,990", "5,180", "6,250"], move: "" },
+  { name: "Tunde", avatar: "lion", points: ["3,580", "3,580", "4,710"], move: "" }
+];
 
 export function LiveDemo() {
   const [qi, setQi] = useState(0);
   const [left, setLeft] = useState(SECONDS);
   const [still, setStill] = useState(false);
+  const [board, setBoard] = useState(false);
 
   useEffect(() => {
     let reduce = false;
@@ -34,7 +45,10 @@ export function LiveDemo() {
     let t: number;
     const run = (n: number) => {
       if (n > 0) { t = window.setTimeout(() => { setLeft(n - 1); run(n - 1); }, TICK); return; }
-      t = window.setTimeout(() => { setQi((i) => (i + 1) % QUESTIONS.length); setLeft(SECONDS); run(SECONDS); }, REVEAL_MS);
+      t = window.setTimeout(() => {
+        setBoard(true);
+        t = window.setTimeout(() => { setBoard(false); setQi((i) => (i + 1) % QUESTIONS.length); setLeft(SECONDS); run(SECONDS); }, BOARD_MS);
+      }, REVEAL_MS);
     };
     run(SECONDS);
     return () => window.clearTimeout(t);
@@ -51,11 +65,30 @@ export function LiveDemo() {
 
   return (
     <div className="pb-[200px] sm:pb-[236px]" role="img"
-      aria-label={`Example of a live lesson: the class screen asks "${q.prompt}" with four coloured answers and a countdown; students answer on their phones, then the right answer is revealed.`}>
+      aria-label={`Example of a live lesson: the class screen asks "${q.prompt}" with four coloured answers and a countdown; students answer on their phones, then the right answer is revealed and the leaderboard shown.`}>
       <div className="relative">
       {/* The class screen */}
       <div aria-hidden className="relative rounded-[22px] bg-ink-950 p-2.5 shadow-[0_40px_80px_-40px_rgb(0_0_0/0.55)] ring-1 ring-black/5">
-        <div className="rounded-[14px] bg-[#16161a] px-5 pb-5 pt-4 text-white sm:px-8 sm:pb-8 sm:pt-6">
+        <div className="relative rounded-[14px] bg-[#16161a] px-5 pb-5 pt-4 text-white sm:px-8 sm:pb-8 sm:pt-6">
+          {board && (
+            <div className="absolute inset-0 z-10 flex flex-col rounded-[14px] bg-[#16161a] px-5 pb-5 pt-4 sm:px-8 sm:pb-7 sm:pt-6">
+              <p className="text-[11px] text-white/55 sm:text-[13px]">{q.subject} · after {q.n.replace(/ of \d+/, "").toLowerCase()}</p>
+              <p className="mt-1 font-display text-[19px] font-bold sm:text-[28px]">Leaderboard</p>
+              <ol className="mt-2 flex flex-1 flex-col justify-center gap-1.5 sm:mt-3 sm:gap-2">
+                {BOARD.map((b, i) => (
+                  <li key={b.name} className="flex animate-pop items-center gap-2.5 rounded-xl bg-white/[0.07] px-3 py-1.5 text-[13px] font-semibold ring-1 ring-inset ring-white/10 sm:gap-3 sm:py-2.5 sm:text-lg"
+                    style={{ animationDelay: `${i * 90}ms` }}>
+                    <span className={cn("grid h-6 w-6 shrink-0 place-items-center rounded-full font-display text-[11px] font-extrabold sm:h-8 sm:w-8 sm:text-sm",
+                      ["bg-tile-star text-ink-950", "bg-tile-bolt text-white", "bg-tile-hex text-white"][i] ?? "bg-white/15")}>{i + 1}</span>
+                    <Critter name={b.avatar} className="h-6 w-6 sm:h-8 sm:w-8" />
+                    <span className="flex-1">{b.name}</span>
+                    {b.move && <span className={cn("text-[10px] font-bold sm:text-xs", b.move.startsWith("▲") ? "text-accent-400" : "text-rose-300")}>{b.move}</span>}
+                    <span className="font-display font-bold tabular-nums">{b.points[qi]}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
           <div className="flex items-center justify-between text-[11px] text-white/55 sm:text-[13px]">
             <span>{q.subject} · {q.n}</span>
             <span className="hidden sm:inline">Code <span className="font-mono tracking-widest text-white/80">DV6-44Y</span></span>
