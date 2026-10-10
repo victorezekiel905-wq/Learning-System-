@@ -21,7 +21,7 @@ const mono = localFont({ src: "./fonts/jetbrains-mono-latin-wght-normal.woff2", 
 export const metadata: Metadata = {
   title: { default: "SwiftCipher", template: "%s · SwiftCipher" },
   description: "Interactive lessons, live assessment and classroom focus in one school workspace.",
-  icons: { icon: "/icon.svg" }
+  icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" }
 };
 
 export const viewport: Viewport = { themeColor: "#F6F5F1", width: "device-width", initialScale: 1 };

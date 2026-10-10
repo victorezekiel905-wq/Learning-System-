@@ -34,7 +34,7 @@ const body = ["20260901000740_web_screens.sql", "20260901000750_operations.sql",
               "20260901000840_teacher_not_monitored.sql",
               "20260901000850_super_admin_settings.sql", "20260901000860_guests.sql",
               "20260901000870_monitoring_addon.sql", "20260901000880_live_engine_core.sql",
-              "20260901000890_scoring.sql", "20260901000900_reveal.sql", "20260901000910_canvas_slides.sql", "20260901000920_session_report.sql", "20260901000930_progress.sql", "20260901000940_game_timer.sql", "20260901000950_roles_progress.sql", "20260901000960_signup_support.sql", "20260901000970_rosters.sql", "20260901000980_results_privacy.sql", "20260901000990_subject_teachers.sql", "20260901001000_guest_accounts.sql", "20260901001010_slide_moves_on.sql", "20260901001020_teacher_closes_lesson.sql", "20260901001030_lobby_players.sql", "20260901001040_teacher_away_grace.sql"].map(read).join("\n");
+              "20260901000890_scoring.sql", "20260901000900_reveal.sql", "20260901000910_canvas_slides.sql", "20260901000920_session_report.sql", "20260901000930_progress.sql", "20260901000940_game_timer.sql", "20260901000950_roles_progress.sql", "20260901000960_signup_support.sql", "20260901000970_rosters.sql", "20260901000980_results_privacy.sql", "20260901000990_subject_teachers.sql", "20260901001000_guest_accounts.sql", "20260901001010_slide_moves_on.sql", "20260901001020_teacher_closes_lesson.sql", "20260901001030_lobby_players.sql", "20260901001040_teacher_away_grace.sql", "20260901001050_student_paced_stays.sql"].map(read).join("\n");
 writeFileSync("supabase/updates/2026-09-24_production_release.sql", header + body + footer);
 console.log("supabase/updates/2026-09-24_production_release.sql written");
 
@@ -62,19 +62,19 @@ writeFileSync("supabase/updates/2026-09-25_classroom_update.sql",
   "\n-- Done. Should return 0790:\nselect public.health() ->> 'schema' as schema;\n");
 console.log("supabase/updates/2026-09-25_classroom_update.sql written");
 
-// THE script to run now, for databases at 0790 (ran 2026-09-25): 0800–1040. Safe to re-run.
+// THE script to run now, for databases at 0790 (ran 2026-09-25): 0800–1050. Safe to re-run.
 const RUN_THIS = ["20260901000800_fair_play.sql", "20260901000810_audit_fixes.sql", "20260901000820_parent_reports.sql", "20260901000830_pentest_fixes.sql",
                   "20260901000840_teacher_not_monitored.sql", "20260901000850_super_admin_settings.sql",
                   "20260901000860_guests.sql", "20260901000870_monitoring_addon.sql",
                   "20260901000880_live_engine_core.sql", "20260901000890_scoring.sql",
-                  "20260901000900_reveal.sql", "20260901000910_canvas_slides.sql", "20260901000920_session_report.sql", "20260901000930_progress.sql", "20260901000940_game_timer.sql", "20260901000950_roles_progress.sql", "20260901000960_signup_support.sql", "20260901000970_rosters.sql", "20260901000980_results_privacy.sql", "20260901000990_subject_teachers.sql", "20260901001000_guest_accounts.sql", "20260901001010_slide_moves_on.sql", "20260901001020_teacher_closes_lesson.sql", "20260901001030_lobby_players.sql", "20260901001040_teacher_away_grace.sql"];
+                  "20260901000900_reveal.sql", "20260901000910_canvas_slides.sql", "20260901000920_session_report.sql", "20260901000930_progress.sql", "20260901000940_game_timer.sql", "20260901000950_roles_progress.sql", "20260901000960_signup_support.sql", "20260901000970_rosters.sql", "20260901000980_results_privacy.sql", "20260901000990_subject_teachers.sql", "20260901001000_guest_accounts.sql", "20260901001010_slide_moves_on.sql", "20260901001020_teacher_closes_lesson.sql", "20260901001030_lobby_players.sql", "20260901001040_teacher_away_grace.sql", "20260901001050_student_paced_stays.sql"];
 writeFileSync("supabase/updates/2026-09-27_RUN_THIS_update.sql", `-- =============================================================================
--- SwiftCipher update 2026-09-27  (database 0790 or later -> 1040)
+-- SwiftCipher update 2026-09-27  (database 0790 or later -> 1050)
 --
 -- HOW TO RUN
 --   1. Supabase dashboard -> SQL Editor -> New query.
 --   2. Paste this whole file and click Run (about 10 seconds).
---   3. The last result should show schema = 1040 and every check = true.
+--   3. The last result should show schema = 1050 and every check = true.
 --   Safe to run more than once. It changes structure and code only. The one
 --   thing it deletes is false "left the class" alerts raised about teachers.
 --
@@ -150,11 +150,13 @@ writeFileSync("supabase/updates/2026-09-27_RUN_THIS_update.sql", `-- ===========
 --     * Students see who else has joined while they wait for the teacher.
 --   Teacher away (1040)
 --     * A closed lesson ends after 1 minute; a silent teacher page after 10 (iPads pause pages in other apps).
+--   Student-paced lessons (1050)
+--     * Stay open when the teacher leaves; maintenance ends them after 12 hours.
 --
 -- For a database that already ran supabase/updates/2026-09-25_classroom_update.sql (0790),
--- with or without the earlier 2026-09-26 update (0810) or an earlier copy of this file (0830 to 1030).
+-- with or without the earlier 2026-09-26 update (0810) or an earlier copy of this file (0830 to 1040).
 -- Check first:
---   select public.health() ->> 'schema';   -- 0790 or later before, 1040 after.
+--   select public.health() ->> 'schema';   -- 0790 or later before, 1050 after.
 -- Generated by scripts/build-update-sql.mjs; do not edit by hand.
 -- =============================================================================
 
@@ -163,7 +165,7 @@ writeFileSync("supabase/updates/2026-09-27_RUN_THIS_update.sql", `-- ===========
 notify pgrst, 'reload schema';
 
 -- =============================================================================
--- Done. One row: schema should be 1040 and every other column true.
+-- Done. One row: schema should be 1050 and every other column true.
 -- =============================================================================
 select public.health() ->> 'schema' as schema,
        exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'student_supports') as fair_play_ready,

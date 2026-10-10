@@ -1784,6 +1784,13 @@ test("a lesson ends when the teacher closes it, without End session (1020, timin
   await db.admin("select app.end_teacherless_sessions()");
   assert.deepEqual([await status(quiet.id), await status(busy.id)], ["ended", "live"]);
 
+  // A student-paced lesson stays open when the teacher leaves (1050).
+  const paced = await goLive(T, { p_class: null, p_mode: "student_paced" });
+  await db.admin("update public.class_sessions set teacher_seen_at = now() - interval '2 hours', teacher_left_at = now() - interval '2 hours' where id = $1", [paced.id]);
+  await db.admin("select app.end_teacherless_sessions()");
+  assert.equal(await status(paced.id), "live");
+  await db.rpc(T, "end_session", { p_session: paced.id });
+
   // End session still ends at once, with the full report.
   const ended = await db.rpc(T, "end_session", { p_session: busy.id });
   assert.ok(ended.report_id);
