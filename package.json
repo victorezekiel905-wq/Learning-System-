@@ -10,7 +10,7 @@
     "type-check": "tsc --noEmit",
     "test": "node --test \"supabase/tests/*.test.mjs\" \"tests/*.test.mjs\"",
     "test:db": "node --test \"supabase/tests/*.test.mjs\"",
-    "build:sql": "node scripts/build-setup-sql.mjs && node scripts/build-update-sql.mjs",
+    "build:sql": "node scripts/build-library-sql.mjs && node scripts/build-setup-sql.mjs && node scripts/build-update-sql.mjs",
     "build:e2e": "cross-env-shell NEXT_DIST_DIR=.next-prod next build",
     "start:e2e": "cross-env-shell NEXT_DIST_DIR=.next-prod next start -p 3100",
     "test:e2e": "playwright test",

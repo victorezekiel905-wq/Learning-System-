@@ -1820,6 +1820,34 @@ test("the lobby shows who has joined, to people in the lesson only (1030)", asyn
   await db.rpc(T, "end_session", { p_session: s.id });
 });
 
+test("lesson library: teachers browse and copy ready-made lessons into their school (1060)", async () => {
+  const T = await db.signUp("t@library.test", "Library Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Library School", p_full_name: "Library Teacher" })).tenant_id;
+  const list = await db.rpc(T, "library_list", {});
+  assert.ok(list.length >= 8, "starter lessons are there");
+  const fractions = list.find((l) => l.title === "Equivalent fractions");
+  assert.deepEqual([fractions.subject, fractions.level, fractions.questions], ["Mathematics", "JSS 1", 5]);
+  assert.equal((await db.rpc(T, "library_list", { p_subject: "Biology" })).length, 1);
+  assert.equal((await db.rpc(T, "library_list", { p_query: "photosynth" })).length, 1);
+
+  // Copy: an ordinary lesson in the teacher's school, slides in order, quiz with right answers.
+  const lesson = await db.rpc(T, "library_copy", { p_item: fractions.id });
+  const [l] = await db.admin("select tenant_id, owner_id, title, subject, grade_level from public.lessons where id = $1", [lesson]);
+  assert.deepEqual(l, { tenant_id: tenant, owner_id: T, title: "Equivalent fractions", subject: "Mathematics", grade_level: "JSS 1" });
+  const slides = await db.as(T, "select kind, activity_id from public.lesson_slides where lesson_id = $1 order by position", [lesson]);
+  assert.deepEqual(slides.map((x) => x.kind), ["title", "text", "text", "activity"]);
+  const qs = await db.as(T, "select q.prompt, (select label from public.question_options o where o.question_id = q.id and o.is_correct) as answer from public.questions q where q.activity_id = $1 order by q.position", [slides[3].activity_id]);
+  assert.equal(qs.length, 5);
+  assert.deepEqual(qs[1], { prompt: "Simplify 6/8.", answer: "3/4" });
+  assert.equal((await db.rpc(T, "library_list", { p_query: "Equivalent" }))[0].uses, 1);
+
+  // Only teachers copy; only the platform owner publishes.
+  const pupil = await db.signInAnonymously();
+  await rejects(db.rpc(pupil, "library_copy", { p_item: fractions.id }), /Only teachers|profile/);
+  await rejects(db.rpc(T, "library_publish", { p_lesson: lesson, p_subject: "Mathematics", p_level: "JSS 1" }), /platform owner/);
+  await rejects(db.as(T, "select * from public.library_lessons"), /permission denied/);
+});
+
 test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {
   const T = await db.signUp("t@canvas.test", "Canvas Teacher");
   const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Canvas School", p_full_name: "Canvas Teacher" })).tenant_id;

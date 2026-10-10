@@ -3,6 +3,7 @@ import { requireRole, TEACHERS } from "@/lib/session";
 import { Badge, Empty, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { NewLessonButton } from "./NewLessonButton";
+import { LibraryGrid, type LibraryItem } from "./LibraryGrid";
 
 export const metadata = { title: "Lessons" };
 
@@ -23,6 +24,8 @@ export default async function LessonsPage(
   const { data } = await query;
   const lessons = (data ?? []) as unknown as Lesson[];
   const { data: templates } = await sb.from("lessons").select("id,title").eq("is_template", true).limit(50);
+  // The SwiftCipher library: ready-made lessons from every school's shared collection (1060).
+  const library = tab === "library" ? ((await sb.rpc("library_list", { p_query: searchParams.q ?? null })).data ?? []) as LibraryItem[] : [];
 
   return (
     <div className="page">
@@ -30,15 +33,15 @@ export default async function LessonsPage(
         actions={<NewLessonButton openInitially={searchParams.new === "1"} templates={templates ?? []} />} />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <nav className="flex gap-1 text-sm">
-          {[["mine", "My lessons"], ["school", "Shared in school"], ["templates", "Templates"]].map(([id, label]) => (
+          {[["mine", "My lessons"], ["school", "Shared in school"], ["templates", "Templates"], ["library", "Library"]].map(([id, label]) => (
             <Link key={id} href={`/teacher/lessons?tab=${id}`} className={`rounded-lg px-3 py-1.5 no-underline ${tab === id ? "bg-brand-600 text-white" : "text-ink-600 hover:bg-ink-100"}`}>{label}</Link>
           ))}
         </nav>
         <form className="flex gap-2"><input type="hidden" name="tab" value={tab} /><input name="q" defaultValue={searchParams.q} placeholder="Search lessons" className="input w-56" /></form>
       </div>
-      {lessons.length === 0 ? (
+      {tab === "library" ? <LibraryGrid items={library} /> : lessons.length === 0 ? (
         <Empty title={tab === "mine" ? "No lessons yet" : "Nothing here yet"}>
-          {tab === "mine" ? "Create a lesson from scratch, start from a template, or import a PowerPoint, PDF or Word document." : "Published lessons from other teachers and templates appear here."}
+          {tab === "mine" ? <>Create a lesson from scratch, import a PowerPoint, PDF or Word document, or <Link href="/teacher/lessons?tab=library">start from the library</Link>.</> : "Published lessons from other teachers and templates appear here."}
         </Empty>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
