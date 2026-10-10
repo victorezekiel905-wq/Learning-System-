@@ -3,6 +3,7 @@ import { ArrowRight, Plus, Radio } from "lucide-react";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { cn, dayPart, firstName, formatDateTime, formatJoinCode, timeAgo } from "@/lib/utils";
+import { StartGuide, type GuideProgress } from "./StartGuide";
 
 export type TeacherHomeData = {
   school: string | null; timezone?: string; name: string; welcome: string | null;
@@ -13,6 +14,8 @@ export type TeacherHomeData = {
   /** Lessons the teacher has made, parent feedback waiting for their reply, and whether the school has monitoring. */
   lessonCount?: number; feedbackWaiting?: number; monitoring?: boolean;
   recent: { id: string; title: string; ended_at: string }[];
+  /** The start guide's four steps, done or not. */
+  guide?: GuideProgress;
 };
 
 /** The teacher's home page, drawn from plain data (the page loads it). */
@@ -42,6 +45,8 @@ export function TeacherHomeView({ d }: { d: TeacherHomeData }) {
           <Link href="/teacher/challenge/new" className="btn btn-secondary no-underline"><Icon name="trophy" className="h-4 w-4" />New challenge</Link>
           <Link href="/teacher/live/new" className="btn btn-primary no-underline"><Radio className="h-4 w-4" aria-hidden />Start live class</Link>
         </>} />
+
+      {d.guide && <StartGuide done={d.guide} />}
 
       {me.settings?.welcome_message && <div className="mb-6 rounded-2xl border border-ink-200 bg-white px-5 py-4 text-[15px] text-ink-800"><span className="mr-2 font-semibold">From your school:</span>{me.settings.welcome_message}</div>}
 

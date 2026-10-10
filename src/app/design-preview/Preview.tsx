@@ -8,6 +8,7 @@ import { AVATARS } from "@/components/live/avatars";
 import type { SessionState } from "@/components/live/types";
 import { ControlBar } from "@/app/(app)/teacher/live/[id]/ControlBar";
 import { ImportQuestions } from "@/components/activities/ImportQuestions";
+import { StartGuide } from "@/app/(app)/teacher/StartGuide";
 
 /** A control room state in one phase, with or without an open question. */
 function bar(phase: "lobby" | "active" | "paused", question: "open" | "revealed" | "none"): SessionState {
@@ -61,6 +62,8 @@ export function Preview() {
         <div className="relative"><Podium entries={BOARD.slice(0, 3)} /></div>
         <div className="relative mx-auto mt-8 max-w-2xl"><Leaderboard entries={BOARD.slice(3)} size="lg" /></div>
       </section>
+
+      <section id="guide" className="bg-ink-50 p-5"><StartGuide done={{ classes: true, lessons: false, taught: false, report: false }} /></section>
 
       <section id="control" className="space-y-px bg-ink-200">
         {([["lobby", "none"], ["active", "open"], ["active", "revealed"], ["paused", "none"]] as const).map(([ph, q]) => (
