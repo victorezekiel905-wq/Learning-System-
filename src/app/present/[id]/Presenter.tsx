@@ -12,6 +12,7 @@ import { errorText, rpc } from "@/lib/rpc";
 import { Icon } from "@/components/Icon";
 import { avatarFor } from "@/components/live/avatars";
 import { Leaderboard } from "@/components/live/Leaderboard";
+import { GlyphField, Podium } from "@/components/game/Celebrate";
 import { JoinQr } from "@/components/live/JoinQr";
 import { formatJoinCode } from "@/lib/utils";
 import { AnswerBars, AnswerTiles, TimerRing } from "@/components/game/LiveGame";
@@ -81,9 +82,10 @@ export function Presenter({ sessionId }: { sessionId: string }) {
           </button>
         </div>
       </header>
-      <main className="flex flex-1 items-center justify-center p-6">
+      <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
+        {s?.phase === "lobby" && <GlyphField opacity={0.4} />}
         {s?.phase === "lobby" ? (
-          <div className="text-center">
+          <div className="relative text-center">
             <p className="text-2xl text-ink-300">Join at <strong className="text-white">{host}/join</strong></p>
             <div className="mt-4 flex items-center justify-center gap-10">
               <p className="font-mono text-[9rem] font-extrabold leading-none tracking-[0.15em] text-accent-400">{formatJoinCode(s.join_code)}</p>
@@ -91,13 +93,14 @@ export function Presenter({ sessionId }: { sessionId: string }) {
             </div>
             <p className="mt-8 text-2xl text-ink-300">{here.length === 0 ? "Waiting for players…" : `${here.length} joined`}</p>
             <ul className="mx-auto mt-4 flex max-w-5xl flex-wrap justify-center gap-3">
-              {here.map((r) => <li key={r.student_id} className="rounded-full bg-white/10 px-4 py-2 text-xl"><span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span> {r.name}</li>)}
+              {here.map((r, i) => <li key={r.student_id} className="animate-pop rounded-full bg-white/10 px-4 py-2 text-xl" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}><span aria-hidden>{avatarFor(r.avatar) ?? "🙂"}</span> {r.name}</li>)}
             </ul>
           </div>
         ) : s?.show_leaderboard && s.leaderboard && s.settings?.leaderboard !== false ? (
-          <div className="w-full max-w-4xl">
-            <h2 className="mb-8 text-center font-display text-6xl font-extrabold">Leaderboard</h2>
-            <Leaderboard entries={s.leaderboard.top.slice(0, 5)} size="lg" />
+          <div className="w-full max-w-4xl" key={s.leaderboard.at ?? "board"}>
+            <h2 className="mb-10 text-center font-display text-6xl font-extrabold">Leaderboard</h2>
+            <Podium entries={s.leaderboard.top.slice(0, 3)} />
+            {s.leaderboard.top.length > 3 && <div className="mx-auto mt-8 max-w-2xl"><Leaderboard entries={s.leaderboard.top.slice(3, 5)} size="lg" /></div>}
           </div>
         ) : s?.phase === "paused" ? (
           <p className="text-center font-display text-6xl font-extrabold">👀 Eyes on me</p>

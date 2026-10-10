@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useRef } from "react";
-import { Check } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Flame, X } from "lucide-react";
 import { useNow } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+import { Burst } from "./Celebrate";
 import { OptionShape } from "./Shape";
 import { OPTION_COLORS } from "./types";
 
@@ -84,7 +85,7 @@ export function AnswerTiles({ options, onPick, picked = [], disabled, correct, c
   );
 }
 
-/** After the reveal on the projector: a column per answer, Kahoot style. */
+/** After the reveal on the projector: a column per answer, game-show style. */
 export function AnswerBars({ options, counts, correct }: { options: Option[]; counts: Record<string, number>; correct: string[] }) {
   const most = Math.max(1, ...options.map((o) => counts[o.id] ?? 0));
   return (
@@ -100,6 +101,72 @@ export function AnswerBars({ options, counts, correct }: { options: Option[]; co
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Counts up to a number (points), unless the device asks for reduced motion. */
+export function useCountUp(target: number, ms = 900) {
+  const [shown, setShown] = useState(target);
+  useEffect(() => {
+    let reduce = false;
+    try { reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* old browsers */ }
+    if (reduce || target <= 0) { setShown(target); return; }
+    let raf = 0;
+    const t0 = performance.now();
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / ms);
+      setShown(Math.round(target * (1 - (1 - k) ** 3)));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    setShown(0);
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return shown;
+}
+
+/** "🔥 3 in a row": flickers once a streak is going. */
+export function StreakChip({ streak, className }: { streak: number; className?: string }) {
+  if (streak < 2) return null;
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full bg-tile-heart px-3 py-1 text-sm font-bold text-white", className)} aria-label={`${streak} in a row`}>
+      <Flame className={cn("h-4 w-4", streak >= 3 && "animate-flicker")} fill="currentColor" strokeWidth={0} aria-hidden />
+      {streak} in a row
+    </span>
+  );
+}
+
+/**
+ * Right or wrong, the moment after an answer: a burst and points counting up for a
+ * right answer; a shake and the right answer (with its tile) for a wrong one.
+ */
+export function AnswerResult({ correct, title, points, extras, streak = 0, answer, explanation, className }: {
+  correct: boolean; title?: string; points?: number | null; extras?: string;
+  streak?: number; answer?: { label: string; index: number } | null; explanation?: string | null; className?: string;
+}) {
+  const shown = useCountUp(points ?? 0);
+  return (
+    <div role="status" className={cn("relative overflow-hidden rounded-3xl p-7 text-center text-white",
+      correct ? "animate-pop bg-emerald-600" : "animate-shake bg-rose-600", className)}>
+      {correct && <Burst />}
+      <span className="relative mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/20" aria-hidden>
+        {correct ? <Check className="h-9 w-9" strokeWidth={3.5} /> : <X className="h-9 w-9" strokeWidth={3.5} />}
+      </span>
+      <p className="relative mt-3 font-display text-4xl font-extrabold tracking-tight">{title ?? (correct ? "Correct!" : "Not quite")}</p>
+      {points != null && points > 0 && <p className="relative mt-1 font-display text-3xl font-extrabold tabular-nums">+{shown.toLocaleString()}</p>}
+      {extras && <p className="relative mt-1 text-sm font-semibold text-white/85">{extras}</p>}
+      {streak >= 2 && <StreakChip streak={streak} className="relative mt-3 bg-white/20" />}
+      {!correct && answer && (
+        <div className="relative mt-4">
+          <p className="text-sm font-semibold text-white/85">The answer</p>
+          <span className={cn("mt-1.5 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-lg font-bold", OPTION_COLORS[answer.index % OPTION_COLORS.length])}>
+            <OptionShape i={answer.index} className="h-5 w-5" />{answer.label}
+          </span>
+        </div>
+      )}
+      {!correct && !answer && <p className="relative mt-1 text-white/85">Watch the screen for the answer. The next one could be yours.</p>}
+      {explanation && <p className="relative mx-auto mt-4 max-w-md text-[15px] text-white/90">{explanation}</p>}
     </div>
   );
 }

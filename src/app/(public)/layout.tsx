@@ -5,7 +5,7 @@ import { LEGAL, phoneHref } from "@/lib/legal";
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-ink-50">
-      <header className="sticky top-0 z-30 border-b border-ink-200/70 bg-ink-50/85 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-ink-200/70 bg-ink-50">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-2 px-5 sm:px-8">
           <div className="flex items-center gap-10">
             <Logo />
@@ -18,7 +18,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           <nav className="flex shrink-0 items-center gap-1 sm:gap-2" aria-label="Site">
             <Link href="/join" className="btn btn-ghost no-underline">Join a lesson</Link>
             <Link href="/login" className="btn btn-secondary no-underline">Sign in</Link>
-            <Link href="/signup" className="btn btn-ink hidden no-underline md:inline-flex">Create your school</Link>
+            <Link href="/signup" className="btn btn-primary hidden no-underline md:inline-flex">Create your school</Link>
           </nav>
         </div>
       </header>
@@ -29,6 +29,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <Logo onDark />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-400">
               Live lessons your whole class plays together, and progress every family can follow.
+            </p>
+            <p className="mt-3 text-sm text-ink-400">
+              Made by <a className="font-semibold text-ink-200 no-underline hover:text-white" href={`https://${LEGAL.domain}`}>{LEGAL.company}</a>.
             </p>
           </div>
           <FooterCol title="Product" links={[["/signup", "Create your school"], ["/join", "Join with a code"], ["/login", "Sign in"], ["/security", "Security"]]} />
@@ -44,7 +47,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </div>
         <div className="border-t border-white/10">
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-5 text-[13px] text-ink-400 sm:px-8">
-            <p>© {new Date().getFullYear()} {LEGAL.entity || "SwiftCipher"}. Hosted in {LEGAL.hostingRegion.replace(/^European Union: /, "")}.</p>
+            <p>© {new Date().getFullYear()} {LEGAL.entity || LEGAL.company}. Hosted in {LEGAL.hostingRegion.replace(/^European Union: /, "")}.</p>
             <p>Screen monitoring is an optional add-on and runs only during a live class.</p>
           </div>
         </div>

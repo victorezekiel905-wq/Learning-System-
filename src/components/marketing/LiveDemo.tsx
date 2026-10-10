@@ -90,7 +90,7 @@ export function LiveDemo() {
       </div>
 
       {/* Two students' phones */}
-      <div aria-hidden className="pointer-events-none absolute right-3 top-full -mt-5 flex items-start gap-3 sm:right-8 sm:-mt-7 sm:gap-4">
+      <div aria-hidden className="pointer-events-none absolute right-4 top-full -mt-3 flex items-start gap-3 sm:right-10 sm:-mt-4 sm:gap-4">
         <Phone className="hidden sm:block" q={q} pick={pickB} reveal={reveal} name="Tunde" />
         <Phone q={q} pick={pickA} reveal={reveal} name="Ada" lead />
       </div>
@@ -102,7 +102,7 @@ export function LiveDemo() {
 function Phone({ q, pick, reveal, name, lead, className }: { q: Q; pick: number | null; reveal: boolean; name: string; lead?: boolean; className?: string }) {
   const right = pick === q.right;
   return (
-    <div className={cn("w-[112px] rounded-[24px] bg-ink-950 p-[5px] shadow-[0_30px_60px_-25px_rgb(0_0_0/0.6)] sm:w-[128px]", lead ? "" : "translate-y-5", className)}>
+    <div className={cn("w-[112px] rounded-[24px] bg-ink-950 p-[5px] shadow-[0_30px_60px_-25px_rgb(0_0_0/0.6)] sm:w-[128px]", lead ? "rotate-[3deg]" : "-rotate-[3deg]", className)}>
       <div className="flex aspect-[9/18.5] flex-col overflow-hidden rounded-[21px] bg-ink-50">
         <div className="flex items-center justify-between px-3 pb-1.5 pt-2.5 text-[8px] font-semibold text-ink-500 sm:text-[9px]">
           <span>{name}</span><span className="tabular-nums">{reveal && right ? "4,860" : "3,580"} pts</span>

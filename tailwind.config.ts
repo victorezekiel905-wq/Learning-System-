@@ -37,6 +37,9 @@ const config: Config = {
           // readable text colour on accent backgrounds (ink or white, computed per school)
           ink: "rgb(var(--accent-ink) / <alpha-value>)"
         },
+        // SwiftCipher's own answer tiles (fixed, never themed per school): bolt, star, hexagon,
+        // moon, heart, cloud. White text passes WCAG AA on each except star, which takes ink.
+        tile: { bolt: "#2B4ADB", star: "#C6EE3A", hex: "#B0179A", moon: "#0E7A6E", heart: "#C2410C", cloud: "#6D28D9" },
         // Warm neutrals: paper background, ink text. Every text shade from 500 up
         // meets WCAG AA on both white and paper.
         ink: {
@@ -59,12 +62,25 @@ const config: Config = {
       keyframes: {
         "fade-in": { from: { opacity: "0", transform: "translateY(4px)" }, to: { opacity: "1", transform: "none" } },
         "sheet-up": { from: { transform: "translateY(16px)", opacity: "0" }, to: { transform: "none", opacity: "1" } },
-        pulse2: { "0%,100%": { opacity: "1" }, "50%": { opacity: ".45" } }
+        pulse2: { "0%,100%": { opacity: "1" }, "50%": { opacity: ".45" } },
+        // Game moments (all switched off by prefers-reduced-motion in globals.css).
+        pop: { "0%": { transform: "scale(.6)", opacity: "0" }, "60%": { transform: "scale(1.06)", opacity: "1" }, "100%": { transform: "scale(1)" } },
+        rise: { from: { transform: "translateY(100%)" }, to: { transform: "none" } },
+        shake: { "0%,100%": { transform: "none" }, "20%,60%": { transform: "translateX(-6px)" }, "40%,80%": { transform: "translateX(6px)" } },
+        float: { "0%,100%": { transform: "translateY(0) rotate(var(--r,0deg))" }, "50%": { transform: "translateY(-14px) rotate(calc(var(--r,0deg) + 8deg))" } },
+        burst: { "0%": { transform: "translate(0,0) scale(.4) rotate(0)", opacity: "0" }, "12%": { opacity: "1" }, "100%": { transform: "translate(var(--dx),var(--dy)) scale(1) rotate(var(--spin))", opacity: "0" } },
+        flicker: { "0%,100%": { transform: "scale(1) rotate(-4deg)" }, "50%": { transform: "scale(1.15) rotate(4deg)" } }
       },
       animation: {
         "fade-in": "fade-in .18s ease-out",
         "sheet-up": "sheet-up .22s cubic-bezier(.2,.8,.2,1)",
-        pulse2: "pulse2 1.6s ease-in-out infinite"
+        pulse2: "pulse2 1.6s ease-in-out infinite",
+        pop: "pop .45s cubic-bezier(.2,.9,.3,1.3) both",
+        rise: "rise .7s cubic-bezier(.2,.8,.2,1) both",
+        shake: "shake .45s ease-in-out",
+        float: "float 7s ease-in-out infinite",
+        burst: "burst .9s cubic-bezier(.1,.7,.3,1) both",
+        flicker: "flicker .9s ease-in-out infinite"
       }
     }
   },

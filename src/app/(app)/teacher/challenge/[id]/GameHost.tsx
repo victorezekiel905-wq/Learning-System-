@@ -5,6 +5,7 @@ import { GoalBar } from "@/components/game/GoalBar";
 import { OptionShape } from "@/components/game/Shape";
 import { Lock, LockOpen, Pencil, X } from "lucide-react";
 import { BADGE, OPTION_COLORS, type GameState, type Leaderboard } from "@/components/game/types";
+import { GlyphField, Podium } from "@/components/game/Celebrate";
 import { RichText } from "@/components/RichText";
 import { Alert, Badge, Button, Card, useToast, useDialog } from "@/components/ui";
 import { useRpc } from "@/lib/hooks";
@@ -114,16 +115,11 @@ function Standings({ board, ended, school, title, certificates }: { board: Leade
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       {ended && podium.length > 0 && (
-        <Card title="Podium">
-          <div className="flex items-end justify-center gap-4 pt-4">
-            {[1, 0, 2].map((i) => podium[i] && (
-              <div key={podium[i]!.player_id} className="text-center">
-                <p className="font-bold">{podium[i]!.name}</p><p className="text-sm text-ink-500">{podium[i]!.score}</p>
-                <div className={cn("mt-2 w-24 rounded-t-xl ", i === 0 ? "bg-accent-500" : "bg-ink-900", i === 0 ? "h-32" : i === 1 ? "h-24" : "h-16")} />
-              </div>
-            ))}
-          </div>
-        </Card>
+        <div className="relative overflow-hidden rounded-[14px] bg-ink-950 px-4 pb-0 pt-8 text-white lg:col-span-2">
+          <GlyphField opacity={0.35} />
+          <h2 className="relative mb-6 text-center font-display text-3xl font-extrabold">Podium</h2>
+          <div className="relative"><Podium entries={podium.map((p) => ({ name: p.name, avatar: null, score: p.score, rank: p.rank }))} /></div>
+        </div>
       )}
       {board.teams && (
         <Card title="Teams">

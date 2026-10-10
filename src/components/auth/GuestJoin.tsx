@@ -107,7 +107,7 @@ export function GuestJoin({ initialCode = "" }: { initialCode?: string }) {
             <input id="join-code" autoFocus autoComplete="off" autoCapitalize="characters" spellCheck={false} inputMode="text" maxLength={9}
               value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ABC-123" aria-describedby={err ? "join-err" : undefined}
               className="mt-5 block w-full rounded-2xl border-0 bg-white px-4 py-4 text-center font-mono text-4xl font-extrabold tracking-[0.3em] text-ink-950 placeholder:text-ink-300 focus:outline-none focus:ring-4 focus:ring-accent-400" />
-            <Button type="submit" size="lg" className="btn-accent mt-4 w-full disabled:bg-white/10 disabled:text-ink-400 disabled:opacity-100" disabled={cleanCode.length < 6}>Next</Button>
+            <Button type="submit" size="lg" className="btn-accent mt-4 w-full disabled:bg-white/15 disabled:text-white/80 disabled:opacity-100" disabled={cleanCode.length < 6}>Next</Button>
           </form>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); void join(); }}>
@@ -119,7 +119,7 @@ export function GuestJoin({ initialCode = "" }: { initialCode?: string }) {
             <input id="join-name" ref={nameRef} autoFocus={step === "name"} autoComplete="given-name" maxLength={40}
               value={name} onChange={(e) => setName(e.target.value)} placeholder="First name and initial" aria-describedby={err ? "join-err" : undefined}
               className="mt-5 block w-full rounded-2xl border-0 bg-white px-4 py-4 text-center text-2xl font-bold text-ink-950 placeholder:text-ink-300 focus:outline-none focus:ring-4 focus:ring-accent-400" />
-            <Button type="submit" size="lg" className="btn-accent mt-4 w-full disabled:bg-white/10 disabled:text-ink-400 disabled:opacity-100" loading={busy} disabled={name.trim().length < 2}>Join the lesson</Button>
+            <Button type="submit" size="lg" className="btn-accent mt-4 w-full disabled:bg-white/15 disabled:text-white/80 disabled:opacity-100" loading={busy} disabled={name.trim().length < 2}>Join the lesson</Button>
             <p className="mt-3 text-center text-xs text-ink-400">
               By joining you agree to the <Link href="/terms" className="text-ink-200 underline">Terms</Link> and <Link href="/privacy" className="text-ink-200 underline">Privacy Notice</Link>.
             </p>

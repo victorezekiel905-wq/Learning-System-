@@ -14,7 +14,7 @@ import { useClassroomGuard } from "@/lib/classroom-guard";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader, useNetwork, useRpc } from "@/lib/hooks";
 import { listen, useSignal } from "@/lib/realtime";
-import type { LiveTimer } from "@/components/game/LiveGame";
+import { StreakChip, type LiveTimer } from "@/components/game/LiveGame";
 import { useOfflineQueue } from "@/lib/offline-queue";
 import { errorText, rpc } from "@/lib/rpc";
 import { FEATURES } from "@/lib/features";
@@ -153,8 +153,9 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
         <div className="flex flex-wrap items-center gap-2">
           {s.my && <span className="inline-flex items-center gap-2 rounded-lg bg-ink-950 px-3 py-1.5 text-sm font-semibold text-white" title="Your score and rank">
             <span className="font-display text-base font-extrabold tabular-nums text-accent-400">{s.my.score.toLocaleString()}</span>
-            <span className="text-ink-300">#{s.my.rank} of {s.my.of}</span>{s.my.streak >= 2 && <span aria-label={`${s.my.streak} in a row`}>🔥{s.my.streak}</span>}
+            <span className="text-ink-300">#{s.my.rank} of {s.my.of}</span>
           </span>}
+          {s.my && <StreakChip streak={s.my.streak} />}
           {guard.sharing && <Badge tone="red"><span className="mr-1 inline-block h-2 w-2 animate-pulse2 rounded-full bg-rose-600" />Sharing screen with your teacher</Badge>}
           {guard.locked && <Badge tone="gray"><Icon name="lock" className="mr-1 inline h-3 w-3" />Lockdown</Badge>}
           {pending > 0 && <Badge tone="amber">{pending} answer(s) waiting to sync</Badge>}

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Countdown } from "@/components/game/Countdown";
 import { GoalBar } from "@/components/game/GoalBar";
+import { AnswerResult } from "@/components/game/LiveGame";
 import { OptionShape } from "@/components/game/Shape";
 import { Icon } from "@/components/Icon";
 import { useSupports } from "@/lib/supports";
@@ -70,6 +71,8 @@ export function GamePlayer({ gameId }: { gameId: string }) {
   }
 
   const q = g.question;
+  const rightIndex = q && g.review ? q.options.findIndex((o) => g.review!.correct_option_ids.includes(o.id)) : -1;
+  const rightAnswer = q && rightIndex >= 0 ? { label: q.options[rightIndex]!.label, index: rightIndex } : null;
   const answered = g.me?.answered || sent === g.current_index;
   const multi = q?.kind === "multi_select";
 
@@ -108,10 +111,8 @@ export function GamePlayer({ gameId }: { gameId: string }) {
       {g.status === "review" && (
         <Card>
           {g.me?.last ? (
-            <div className={cn("rounded-xl p-6 text-center text-white", g.me.last.is_correct ? "bg-emerald-600" : "bg-rose-600")}>
-              <p className="font-display text-3xl font-extrabold">{g.me.last.is_correct ? "Correct!" : "Not this time"}</p>
-              <p className="mt-1 text-lg">+{g.me.last.points} points</p>
-            </div>
+            <AnswerResult key={g.current_index} correct={g.me.last.is_correct} title={g.me.last.is_correct ? "Correct!" : "Not this time"}
+              points={g.me.last.points} streak={g.me.streak} answer={rightAnswer} />
           ) : <p className="text-center text-ink-500">No answer this round.</p>}
           {g.review?.explanation && <p className="mt-4 rounded-xl bg-ink-50 p-4 text-[15px] leading-relaxed text-ink-800"><span className="font-semibold">Why: </span>{g.review.explanation}</p>}
         </Card>

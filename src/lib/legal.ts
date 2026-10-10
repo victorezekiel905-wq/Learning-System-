@@ -8,6 +8,8 @@ export const LEGAL = {
   entity: process.env.NEXT_PUBLIC_LEGAL_ENTITY || "",
   /** Registered office address. */
   address: process.env.NEXT_PUBLIC_LEGAL_ADDRESS || "",
+  /** The company that makes SwiftCipher, named in the footer so its email domain makes sense. */
+  company: process.env.NEXT_PUBLIC_COMPANY_NAME || "SynergySwift",
   domain: process.env.NEXT_PUBLIC_COMPANY_DOMAIN || "synergyswift.com",
   /** Help with accounts and classes; also the security reporting address. */
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@synergyswift.com",

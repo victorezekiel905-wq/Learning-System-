@@ -1,7 +1,7 @@
-import { Circle, Diamond, Hexagon, Square, Star, Triangle } from "lucide-react";
+import { Cloud, Heart, Hexagon, Moon, Star, Zap } from "lucide-react";
 import { OPTION_SHAPES } from "./types";
 
-const SHAPES = { triangle: Triangle, diamond: Diamond, circle: Circle, square: Square, hexagon: Hexagon, star: Star } as const;
+const SHAPES = { bolt: Zap, star: Star, hexagon: Hexagon, moon: Moon, heart: Heart, cloud: Cloud } as const;
 
 /** The shape that goes with answer tile i (so colour is never the only way to tell answers apart). */
 export function OptionShape({ i, className }: { i: number; className?: string }) {

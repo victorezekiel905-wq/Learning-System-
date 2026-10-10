@@ -23,8 +23,10 @@ export const BADGE: Record<string, string> = {
   perfect: "Perfect score", streak_5: "5-answer streak", speedster: "Fastest correct answers"
 };
 
-// White text on every colour passes WCAG AA; each answer also has a shape so colour is never the only cue.
-export const OPTION_COLORS = ["bg-rose-700", "bg-blue-700", "bg-amber-700", "bg-emerald-700", "bg-violet-700", "bg-teal-700"];
-export const OPTION_SHAPES = ["triangle", "diamond", "circle", "square", "hexagon", "star"] as const;
+// SwiftCipher's answer tiles: bolt, star, hexagon, moon, heart, cloud, each with its own colour
+// (tailwind "tile"). Each class sets the text colour too (ink on the lime star), so put it after
+// any text colour in cn(). Every answer has a shape, so colour is never the only cue.
+export const OPTION_COLORS = ["bg-tile-bolt text-white", "bg-tile-star text-ink-950", "bg-tile-hex text-white", "bg-tile-moon text-white", "bg-tile-heart text-white", "bg-tile-cloud text-white"];
+export const OPTION_SHAPES = ["bolt", "star", "hexagon", "moon", "heart", "cloud"] as const;
 
 export type GameGoal = { enabled: boolean; correct: number; target: number; possible_so_far: number; goal_percent: number };

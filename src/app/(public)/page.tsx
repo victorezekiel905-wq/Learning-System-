@@ -53,7 +53,7 @@ export default async function Landing() {
             Results arrive the moment you reveal them, and parents can follow progress in every subject.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <Link href="/signup" className="btn btn-ink btn-lg no-underline">Create your school</Link>
+            <Link href="/signup" className="btn btn-primary btn-lg no-underline">Create your school</Link>
             <Link href="#lesson" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-ink-900 no-underline hover:text-brand-700">
               See how a lesson runs <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
@@ -173,7 +173,7 @@ export default async function Landing() {
           <div className="divide-y divide-ink-200 border-y border-ink-200">
             {FAQ.map(([q, a]) => (
               <details key={q} className="group py-5">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-[16px] font-semibold text-ink-900 [&::-webkit-details-marker]:hidden">
+                <summary className="no-chevron flex cursor-pointer list-none items-center justify-between gap-6 text-[16px] font-semibold text-ink-900 [&::-webkit-details-marker]:hidden">
                   {q}<span aria-hidden className="text-xl font-normal leading-none text-ink-400 transition-transform group-open:rotate-45">+</span>
                 </summary>
                 <p className="mt-3 max-w-[40rem] text-[15px] leading-relaxed text-ink-600">{a}</p>
@@ -192,7 +192,7 @@ export default async function Landing() {
               <p className="mt-4 text-[17px] leading-relaxed text-ink-300">Create your school in a few minutes, or talk to us about bringing in your whole staff.</p>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-              <Link href="/signup" className="btn btn-lg bg-white text-ink-950 no-underline hover:bg-ink-100 hover:text-ink-950">Create your school</Link>
+              <Link href="/signup" className="btn btn-primary btn-lg no-underline">Create your school</Link>
               <a href={`mailto:${LEGAL.infoEmail}`} className="text-[15px] font-semibold text-white no-underline hover:text-accent-300">Talk to us</a>
             </div>
           </div>

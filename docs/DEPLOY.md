@@ -36,6 +36,7 @@ Recommended stack: **Vercel** (app) + **Supabase Pro** (database, auth, storage)
 | `NEXT_PUBLIC_LEGAL_ADDRESS` | Registered address |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | default `support@synergyswift.com` (support and security reports) |
 | `NEXT_PUBLIC_INFO_EMAIL` | default `info@synergyswift.com` (general enquiries and sales) |
+| `NEXT_PUBLIC_COMPANY_NAME` | default `SynergySwift` (shown as "Made by …" in the footer, so the contact addresses make sense) |
 | `NEXT_PUBLIC_SUPPORT_PHONE` | default `+234 816 647 0416` |
 | `NEXT_PUBLIC_PRIVACY_EMAIL` | default `admin@synergyswift.com` (privacy and data requests) |
 | `NEXT_PUBLIC_HOSTING_REGION` | default "European Union: West EU (Ireland)" |

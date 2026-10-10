@@ -53,7 +53,7 @@ export default async function StudentHome() {
             <span className="mt-1 block font-display text-2xl font-extrabold tracking-tight">{g.title}</span>
             <span className="block text-sm opacity-80">{g.class}</span>
           </span>
-          <span className="btn btn-ink btn-lg">Play</span>
+          <span className="btn btn-primary btn-lg">Play</span>
         </Link>
       ))}
       {h.live.some((s) => s.environment_active) && h.devices > 0 && (

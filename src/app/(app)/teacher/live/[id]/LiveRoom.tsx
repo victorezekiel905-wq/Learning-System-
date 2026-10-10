@@ -234,7 +234,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
           <Link href={`/present/${sessionId}`} className="btn btn-secondary btn-sm no-underline" title="Full-screen view for the projector, with its own controls"><Icon name="monitor" className="h-4 w-4" /> Present</Link>
           {/* Challenges are for one class's students; a lesson without a class plays its question slides as the game. */}
           {s.session.class_id && <Link href={`/teacher/challenge/new?class=${s.session.class_id}&session=${sessionId}${s.session.active_activity_id ? `&activity=${s.session.active_activity_id}` : ""}`}
-            className="btn btn-secondary btn-sm no-underline" title="Kahoot-style quiz game with a live leaderboard"><Icon name="trophy" className="h-4 w-4" /> Game</Link>}
+            className="btn btn-secondary btn-sm no-underline" title="A quiz game with a live leaderboard"><Icon name="trophy" className="h-4 w-4" /> Game</Link>}
           <Button size="sm" variant="danger" onClick={end}>End session</Button>
         </div>
       </div>

@@ -12,7 +12,7 @@ import { isAnswered, Prompt, QuestionInput, type Answer } from "./QuestionInput"
 import { BADGE_LABEL, CHALLENGE, type Progress } from "@/lib/progress";
 import { Icon } from "@/components/Icon";
 import { useSupports } from "@/lib/supports";
-import { AnswerTiles, TimerRing, useSecondsLeft, type LiveTimer } from "@/components/game/LiveGame";
+import { AnswerResult, AnswerTiles, TimerRing, useSecondsLeft, type LiveTimer } from "@/components/game/LiveGame";
 import { OptionShape } from "@/components/game/Shape";
 import { OPTION_COLORS } from "@/components/game/types";
 import { buzz } from "@/lib/sound";
@@ -224,6 +224,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
     };
     const graded = fb && !fb.queued && !fb.second_chance && fb.is_correct !== undefined && fb.status === "auto_graded" && q.kind !== "poll";
     const rightLabels = fb?.correct_option_ids ? q.options.filter((o) => fb.correct_option_ids!.includes(o.id)).map((o) => o.label).join(", ") : "";
+    const rightIndex = fb?.correct_option_ids ? q.options.findIndex((o) => fb.correct_option_ids!.includes(o.id)) : -1;
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -235,18 +236,15 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
         </div>
         <div className="rounded-2xl bg-white p-4 text-xl font-bold text-ink-900 shadow-sm sm:text-2xl"><Prompt q={q} readAloud={supports.read_aloud ? "emphasis" : "offer"} /></div>
         {graded ? (
-          <div role="status" className={cn("rounded-2xl p-6 text-center text-white", fb.is_correct ? "bg-emerald-600" : "bg-rose-600")}>
-            <p className="font-display text-4xl font-extrabold">{fb.is_correct ? (fb.tries === 2 ? "Correct, second try!" : "Correct!") : "Not quite"}</p>
-            {fb.points && <p className="mt-2 font-display text-2xl font-extrabold">+{fb.points.points.toLocaleString()}</p>}
-            {fb.points && fb.points.streak >= 2 && <p className="mt-1 text-lg">🔥 {fb.points.streak} in a row</p>}
-            {!fb.is_correct && rightLabels && <p className="mt-2 text-lg">The answer: <b>{rightLabels}</b></p>}
-            {fb.explanation && <p className="mx-auto mt-3 max-w-md text-[15px] text-white/90">{fb.explanation}</p>}
-          </div>
+          <AnswerResult key={`${q.id}-${fb.is_correct}`} correct={!!fb.is_correct} title={fb.is_correct && fb.tries === 2 ? "Correct, second try!" : undefined}
+            points={fb.points?.points} extras={fb.points ? [fb.points.speed > 0 && `fast +${fb.points.speed}`, fb.points.streak_bonus > 0 && `streak +${fb.points.streak_bonus}`].filter(Boolean).join(" · ") : undefined}
+            streak={fb.points?.streak ?? 0} explanation={fb.explanation}
+            answer={!fb.is_correct && rightIndex >= 0 ? { label: rightLabels, index: rightIndex } : null} />
         ) : fb && !fb.second_chance ? (
-          <div role="status" className={cn("flex flex-col items-center gap-3 rounded-2xl p-8 text-center text-white", pickedIndex >= 0 ? OPTION_COLORS[pickedIndex % OPTION_COLORS.length] : "bg-ink-800")}>
+          <div role="status" className={cn("flex animate-pop flex-col items-center gap-3 rounded-3xl p-8 text-center text-white", pickedIndex >= 0 ? OPTION_COLORS[pickedIndex % OPTION_COLORS.length] : "bg-ink-800")}>
             {pickedIndex >= 0 && <OptionShape i={pickedIndex} className="h-14 w-14" />}
             <p className="font-display text-3xl font-extrabold">{fb.queued ? "Saved offline" : "Answer locked in"}</p>
-            <p className="text-white/90">{fb.points && q.kind === "poll" ? `+${fb.points.points} for taking part. ` : ""}{index < questions.length - 1 ? "Next question coming up…" : "Waiting for your teacher to show the answers."}</p>
+            <p className="opacity-90">{fb.points && q.kind === "poll" ? `+${fb.points.points} for taking part. ` : ""}{index < questions.length - 1 ? "Next question coming up…" : "Waiting for your teacher to show the answers."}</p>
           </div>
         ) : timeUp ? (
           <div role="status" className="rounded-2xl bg-ink-800 p-8 text-center text-white">

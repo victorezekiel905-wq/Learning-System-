@@ -32,8 +32,8 @@ const SLIDE: CanvasContent = {
     { id: "s1", type: "shape", shape: "round", x: 900, y: 140, w: 600, h: 620, fill: "#f5f3ef", stroke: "transparent", strokeWidth: 0 },
     { id: "s2", type: "shape", shape: "ellipse", x: 1040, y: 250, w: 300, h: 300, fill: "#f59e0b", stroke: "transparent", strokeWidth: 0 },
     { id: "s3", type: "shape", shape: "arrow", x: 1010, y: 610, w: 380, h: 60, fill: "#111827", stroke: "transparent", strokeWidth: 10 },
-    { id: "t1", type: "text", x: 100, y: 120, w: 760, h: 200, text: "Light travels in straight lines", size: 72, bold: true, font: "display", color: "#111827", align: "left", valign: "top" },
-    { id: "t2", type: "text", x: 100, y: 380, w: 740, h: 400, text: "That is why shadows form\nWe see objects when light enters our eyes\nSome objects give out their own light", size: 36, color: "#475569", font: "sans", align: "left", valign: "top", list: true }
+    { id: "t1", type: "text", x: 90, y: 100, w: 780, h: 400, text: "Light travels in straight lines", size: 100, bold: true, font: "display", color: "#111827", align: "left", valign: "top" },
+    { id: "t2", type: "text", x: 90, y: 640, w: 780, h: 360, text: "That is why shadows form\nSome objects give out light", size: 54, color: "#475569", font: "sans", align: "left", valign: "top", list: true }
   ]
 };
 
