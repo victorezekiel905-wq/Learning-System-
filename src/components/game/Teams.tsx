@@ -12,7 +12,7 @@ export function useTeamScores(sessionId: string, refresh: unknown, enabled = tru
 }
 
 /** Team bars, biggest score first. */
-export function TeamStandings({ teams, big }: { teams: TeamScore[]; big?: boolean }) {
+export function TeamStandings({ teams, big, light }: { teams: TeamScore[]; big?: boolean; /** On a white card (the control room) instead of a dark screen. */ light?: boolean }) {
   if (!teams.length) return null;
   const top = Math.max(1, ...teams.map((t) => t.score));
   return (
@@ -23,7 +23,7 @@ export function TeamStandings({ teams, big }: { teams: TeamScore[]; big?: boolea
             <OptionShape i={t.team - 1} className={big ? "h-6 w-6" : "h-4 w-4"} />
           </span>
           <span className={cn("shrink-0 font-semibold", big ? "w-44 sm:w-60" : "w-32 sm:w-40")}>{t.name}{t.mine && <span className="ml-1 text-xs font-normal opacity-70">(you)</span>}</span>
-          <span className="relative h-3 flex-1 overflow-hidden rounded-full bg-white/10 sm:h-4">
+          <span className={cn("relative h-3 flex-1 overflow-hidden rounded-full sm:h-4", light ? "bg-ink-100" : "bg-white/10")}>
             <span className={cn("absolute inset-y-0 left-0 rounded-full", OPTION_COLORS[(t.team - 1) % OPTION_COLORS.length])} style={{ width: `${(t.score / top) * 100}%` }} />
           </span>
           <span className="w-20 text-right font-display font-extrabold tabular-nums">{t.score.toLocaleString()}</span>

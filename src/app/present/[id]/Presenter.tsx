@@ -104,7 +104,7 @@ export function Presenter({ sessionId }: { sessionId: string }) {
           </div>
         ) : s?.show_leaderboard && s.leaderboard && s.settings?.leaderboard !== false ? (
           <div className="w-full max-w-4xl" key={s.leaderboard.at ?? "board"}>
-            <h2 className="mb-10 text-center font-display text-6xl font-extrabold">Leaderboard</h2>
+            <h2 className="mb-10 text-center font-display text-4xl font-extrabold sm:text-6xl">Leaderboard</h2>
             {teamsOn && (teams.data ?? []).length > 0 && <div className="mx-auto mb-10 max-w-3xl"><TeamStandings teams={teams.data!} big /></div>}
             <Podium entries={s.leaderboard.top.slice(0, 3)} />
             {s.leaderboard.top.length > 3 && <div className="mx-auto mt-8 max-w-2xl"><Leaderboard entries={s.leaderboard.top.slice(3, 5)} size="lg" /></div>}

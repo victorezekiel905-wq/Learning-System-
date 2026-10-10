@@ -305,7 +305,7 @@ function FileAnswer({ value, onChange, disabled, prefix }: { value: Answer; onCh
   return (
     <div className="space-y-2">
       {value.name ? <p className="text-sm">Attached: <strong>{String(value.name)}</strong></p> : null}
-      <input type="file" disabled={disabled || busy || !prefix} onChange={async (e) => {
+      <input type="file" aria-label="Attach your file" disabled={disabled || busy || !prefix} onChange={async (e) => {
         const f = e.target.files?.[0];
         if (!f || !prefix) return;
         if (f.size > 50 * 1024 * 1024) { setErr("Files must be under 50 MB."); return; }

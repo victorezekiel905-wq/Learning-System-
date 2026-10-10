@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ImportPreview, Preview } from "./Preview";
+import { EditorPreview, ImportPreview, Preview } from "./Preview";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Design preview", robots: { index: false } };
@@ -12,5 +12,5 @@ export const metadata = { title: "Design preview", robots: { index: false } };
 export default async function DesignPreviewPage(props: { searchParams: Promise<{ view?: string }> }) {
   if (process.env.SWIFTCIPHER_DESIGN_PREVIEW !== "1") notFound();
   const { view } = await props.searchParams;
-  return view === "import" ? <ImportPreview /> : <Preview />;
+  return view === "import" ? <ImportPreview /> : view === "editor" ? <EditorPreview /> : <Preview />;
 }

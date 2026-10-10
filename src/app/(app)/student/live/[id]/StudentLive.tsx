@@ -124,7 +124,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   }
   const myName = s.me?.name ?? me.name;
   if (s.session.status !== "live" || s.session.phase === "ended") {
-    return <EndScreen name={myName} avatar={s.me?.avatar ?? null} summary={s.summary ?? null} guest={guest} score={s.my ?? null} />;
+    return <EndScreen name={myName} avatar={s.me?.avatar ?? null} summary={s.summary ?? null} guest={guest} score={s.my ?? null} closedNote={s.session.mode === "student_paced" ? "This has closed. Your answers are saved." : undefined} />;
   }
   if (s.session.phase === "lobby") {
     return <Lobby sessionId={sessionId} title={s.session.title} teacher={s.session.teacher} name={myName} avatar={s.me?.avatar ?? null}

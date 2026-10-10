@@ -57,7 +57,24 @@ export function HomeworkBoard({ rows, classes, lessons, initialLesson }: {
 
       <div className="min-w-0">
         {!rows.length ? <Empty title="No homework yet">Set a lesson as homework and it appears here, with who has started and finished.</Empty> : (
-          <div className="card overflow-hidden">
+          <>
+          <ul className="space-y-3 sm:hidden">
+            {rows.map((r) => (
+              <li key={r.id} className="card card-pad">
+                <div className="flex items-start justify-between gap-2">
+                  <div><p className="font-medium text-ink-900">{r.title}</p><p className="text-xs text-ink-500">{r.class}</p></div>
+                  {r.open ? <Badge tone="green">Open</Badge> : <Badge>Closed</Badge>}
+                </div>
+                <p className="mt-2 text-sm text-ink-700">Due {formatDateTime(r.due_at)}</p>
+                <p className="mt-1 text-sm tabular-nums"><b>{r.finished}</b> of {r.students} finished · {r.started} started</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href={r.open ? `/teacher/live/${r.id}` : `/teacher/reports?session=${r.id}`} className="btn btn-secondary btn-sm no-underline">{r.open ? "Watch" : "Report"}</Link>
+                  {r.open && <Button size="sm" variant="ghost" onClick={() => { setMoving(r); setNewDue(localInput(new Date(r.due_at))); }}>Change due date</Button>}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="card hidden overflow-hidden sm:block">
             <table className="table">
               <thead><tr><th>Homework</th><th>Due</th><th>Done</th><th /></tr></thead>
               <tbody>{rows.map((r) => (
@@ -73,6 +90,7 @@ export function HomeworkBoard({ rows, classes, lessons, initialLesson }: {
               ))}</tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

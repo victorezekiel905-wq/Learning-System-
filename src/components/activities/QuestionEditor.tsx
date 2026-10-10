@@ -121,6 +121,24 @@ export function validateQuestion(q: EditableQuestion): string | null {
   if (q.kind === "multi_select" && !q.options.some((o) => o.is_correct)) return "Mark at least one correct option.";
   if (["mcq", "multi_select", "poll"].includes(q.kind) && q.options.filter((o) => o.label.trim()).length < 2) return "Add at least two options.";
   if (q.kind === "fill_blank" && !/_{3,}/.test(q.prompt)) return "Use ___ (three underscores) in the prompt to mark each blank.";
+  const filled = (xs: unknown) => ((xs as Item[] | undefined) ?? []).filter((x) => x.label.trim());
+  if (q.kind === "ordering" && filled(q.config.items).length < 2) return "Add at least two items to put in order.";
+  if (q.kind === "matching" && (filled(q.config.left).length < 2 || filled(q.config.right).length < filled(q.config.left).length)) return "Fill in at least two pairs.";
+  if (q.kind === "categorize") {
+    const items = filled(q.config.items), placed = (q.answer_key.placements as Record<string, string>) ?? {};
+    if (filled(q.config.categories).length < 2) return "Name at least two groups.";
+    if (!items.length || items.some((i) => !placed[i.id])) return "Add items and choose the group each one belongs to.";
+  }
+  if (q.kind === "label_diagram") {
+    const c = q.config as { image_path?: string; image_url?: string; spots?: { id: string }[]; labels?: Item[] };
+    const placed = (q.answer_key.placements as Record<string, string>) ?? {};
+    const labelOf = (id: string) => c.labels?.find((l) => l.id === placed[id])?.label.trim() ?? "";
+    if (!c.image_path && !c.image_url) return "Upload a picture, or paste its web address.";
+    if (!c.spots?.length) return "Click the picture to place at least one spot.";
+    if (c.spots.some((s) => !labelOf(s.id))) return "Type a label for every spot.";
+    const names = filled(c.labels).map((l) => l.label.trim().toLowerCase());
+    if (new Set(names).size !== names.length) return "Each label needs different words, so students can tell them apart.";
+  }
   return null;
 }
 

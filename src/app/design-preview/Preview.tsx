@@ -12,6 +12,11 @@ import { StartGuide } from "@/app/(app)/teacher/StartGuide";
 import { WordCloud } from "@/components/game/WordCloud";
 import { TeamStandings } from "@/components/game/Teams";
 import { DiagramInput } from "@/components/activities/Diagram";
+import { QuestionEditor, blankQuestion, type EditableQuestion } from "@/components/activities/QuestionEditor";
+import { useState } from "react";
+import { HomeworkBoard } from "@/app/(app)/teacher/homework/HomeworkBoard";
+import { HomeworkList } from "@/app/(app)/student/HomeworkList";
+import { LibraryGrid } from "@/app/(app)/teacher/lessons/LibraryGrid";
 
 const WORDS = [["sunlight", 9], ["chlorophyll", 7], ["food", 5], ["green", 4], ["oxygen", 4], ["leaves", 3], ["energy", 3], ["glucose", 2], ["water", 2], ["carbon dioxide", 2], ["plants", 1], ["light", 1]]
   .map(([word, count]) => ({ word: word as string, count: count as number }));
@@ -71,6 +76,18 @@ export function Preview() {
         <div className="relative mx-auto mt-8 max-w-2xl"><Leaderboard entries={BOARD.slice(3)} size="lg" /></div>
       </section>
 
+      <section id="hwteacher" className="bg-ink-50 p-5"><HomeworkBoard classes={[{ id: "c1", name: "JSS 1 Gold" }]} lessons={[{ id: "l1", title: "Place value", mine: true }]}
+        rows={[{ id: "h1", title: "Place value", class: "JSS 1 Gold", class_id: "c1", due_at: "2026-10-14T17:00:00Z", open: true, students: 32, started: 21, finished: 14 },
+               { id: "h2", title: "Equivalent fractions", class: "JSS 1 Gold", class_id: "c1", due_at: "2026-10-03T17:00:00Z", open: false, students: 32, started: 30, finished: 27 }]} /></section>
+      <section id="hwstudent" className="bg-ink-50 p-5"><HomeworkList now={Date.parse("2026-10-13T20:00:00Z")} items={[
+        { id: "h1", title: "Place value", class: "JSS 1 Gold", due_at: "2026-10-14T17:00:00Z", open: true, questions: 5, answered: 2, started: true },
+        { id: "h3", title: "States of matter", class: "Basic Science", due_at: "2026-10-18T17:00:00Z", open: true, questions: 5, answered: 0, started: false },
+        { id: "h2", title: "Equivalent fractions", class: "JSS 1 Gold", due_at: "2026-10-03T17:00:00Z", open: false, questions: 5, answered: 5, started: true }]} /></section>
+      <section id="library" className="bg-ink-50 p-5"><LibraryGrid items={[
+        { id: "a", title: "Light: where it comes from", subject: "Basic Science", level: "JSS 1", description: "Luminous and non-luminous objects, light travelling in straight lines, shadows.", slides: 4, questions: 5, uses: 12 },
+        { id: "b", title: "Simple interest", subject: "Mathematics", level: "SS 1", description: "The formula I = PRT ÷ 100, the amount at the end, and finding the time.", slides: 4, questions: 5, uses: 0 },
+        { id: "c", title: "Parts of speech", subject: "English", level: "JSS 2", description: "Nouns, verbs, adjectives and adverbs.", slides: 4, questions: 5, uses: 3 }]} /></section>
+
       <section id="cloud" className="bg-ink-900 px-6 py-12 text-white"><h2 className="mb-8 text-center font-display text-4xl font-extrabold">One word for photosynthesis?</h2><WordCloud words={WORDS} dark big /></section>
       <section id="diagram" className="mx-auto max-w-xl bg-ink-50 p-5"><p className="mb-3 text-lg font-bold">Label the leaf</p><DiagramInput config={DIAGRAM} placements={{ s1: "a" }} onChange={() => {}} /></section>
       <section id="teams" className="bg-ink-900 p-8 text-white"><TeamStandings big teams={[
@@ -102,4 +119,10 @@ export function Preview() {
 /** The Import questions window, as a quiz activity opens it. */
 export function ImportPreview() {
   return <ImportQuestions allowed={["mcq", "multi_select", "true_false", "fill_blank", "matching", "short"]} startAt={0} onClose={() => {}} onImport={async () => {}} />;
+}
+
+/** The question editor on a "Label the diagram" question, to try placing spots. */
+export function EditorPreview() {
+  const [q, setQ] = useState<EditableQuestion>(() => ({ ...blankQuestion("label_diagram"), prompt: "Label the leaf", config: { image_url: LEAF, spots: [], labels: [] } }));
+  return <div className="mx-auto max-w-2xl p-5"><QuestionEditor value={q} onChange={setQ} onSave={() => {}} saving={false} /></div>;
 }

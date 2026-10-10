@@ -104,7 +104,7 @@ export function AddStudents({ classId, className, onClose }: { classId: string; 
         <div className="space-y-4">
           <p className="text-sm text-ink-600">Use a file with a <b>Name</b> column (or <b>First name</b> and <b>Surname</b>). <b>Admission number</b> and <b>Email</b> are optional. The first row must be the column names.</p>
           <div className="flex flex-wrap items-center gap-3">
-            <input type="file" accept=".xlsx,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            <input type="file" aria-label="Choose a class list (Excel or CSV)" accept=".xlsx,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={(e) => void choose(e.target.files?.[0])}
               className="block text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-ink-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
             <button type="button" className="text-[13px] font-semibold text-brand-700"

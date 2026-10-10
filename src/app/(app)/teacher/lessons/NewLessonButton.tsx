@@ -70,7 +70,7 @@ export function NewLessonButton({ openInitially, templates }: { openInitially?: 
           {tab === "import" && (
             <div className="space-y-3">
               <Field label="Your slides" hint="PDF, PowerPoint, Word, Markdown or text. Up to 20 MB and 80 slides.">
-                <input type="file" accept=".pdf,.pptx,.ppt,.ppsx,.odp,.docx,.md,.markdown,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                <input type="file" aria-label="Your slides" accept=".pdf,.pptx,.ppt,.ppsx,.odp,.docx,.md,.markdown,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-ink-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
               </Field>
               {isPdf ? (

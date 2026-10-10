@@ -397,7 +397,7 @@ function TeamsCard({ sessionId, state, onChanged }: { sessionId: string; state: 
           <option value="0">Off</option>{[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n} teams</option>)}
         </Select>
       </div>
-      {count >= 2 ? <div className="text-ink-900 [&_.bg-white\/10]:bg-ink-100"><TeamStandings teams={teams.data ?? []} /></div>
+      {count >= 2 ? <TeamStandings teams={teams.data ?? []} light />
         : <p className="text-[12px] text-ink-500">Everyone is put in a team, balanced automatically; team scores show with the leaderboard.</p>}
     </div>
   );

@@ -100,9 +100,11 @@ export function PausedOverlay({ teacher }: { teacher: string }) {
 }
 
 /** After the lesson: thanks, and how you did. */
-export function EndScreen({ name, avatar, summary, guest, score = null }: {
+export function EndScreen({ name, avatar, summary, guest, score = null, closedNote = "The lesson has ended." }: {
   name: string; avatar: string | null; summary: { answered: number; correct: number } | null; guest: boolean;
   score?: { score: number; rank: number; of: number } | null;
+  /** Under "Well done": e.g. homework closing at its due date. */
+  closedNote?: string;
 }) {
   const answered = summary?.answered ?? 0;
   const correct = summary?.correct ?? 0;
@@ -113,7 +115,7 @@ export function EndScreen({ name, avatar, summary, guest, score = null }: {
         <Critter name={avatarFor(avatar)} className="h-16 w-16" />{score && score.score > 0 && score.rank <= 3 && <Burst delay={300} />}
       </span>
       <h1 className="relative mt-5 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">Well done, {name}!</h1>
-      <p className="relative mt-1 text-ink-300">The lesson has ended.</p>
+      <p className="relative mt-1 text-ink-300">{closedNote}</p>
       {score && score.score > 0 && (
         <p className="relative mt-6 font-display text-5xl font-extrabold text-accent-400">{score.score.toLocaleString()}<span className="ml-2 text-xl text-ink-300">points</span></p>
       )}

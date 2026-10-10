@@ -1963,6 +1963,9 @@ test("word clouds, labelled diagrams and teams in live lessons (1090)", async ()
   const all = (await db.admin("select coalesce(sum(total_score), 0)::int t from public.session_participants where session_id = $1 and user_id <> $2", [s.id, T]))[0].t;
   assert.equal(totals.reduce((n, t) => n + t.score, 0), all);
   assert.deepEqual(await db.rpc(T, "set_session_teams", { p_session: s.id, p_teams: 0 }), []);
+  // The lesson report lists who wrote which words (1100).
+  const report = await db.rpc(T, "session_report", { p_session: s.id });
+  assert.equal(report.questions.find((q) => q.question_id === cloud).written.length, 4);
   await db.rpc(T, "end_session", { p_session: s.id });
 });
 

@@ -74,7 +74,7 @@ export function ImportQuestions({ allowed, startAt, onClose, onImport }: {
             setNote({ tone: "success", text: `Claude wrote ${qs.length} question${qs.length === 1 ? "" : "s"}. Check each one in the preview and change anything you'd teach differently before adding them.` });
           }} />
           <div className="flex flex-wrap items-center gap-2">
-            <input ref={fileRef} type="file" className="sr-only" id="question-file" onChange={(e) => void choose(e.target.files?.[0])}
+            <input ref={fileRef} type="file" className="sr-only" id="question-file" aria-label="Choose a file of questions" tabIndex={-1} onChange={(e) => void choose(e.target.files?.[0])}
               accept=".docx,.xlsx,.csv,.txt,.md,text/plain,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
             <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()}><Icon name="upload" className="h-4 w-4" />Choose a file</Button>
             <span className="text-[12px] text-ink-500">Word, Excel, CSV or text</span>
@@ -176,7 +176,7 @@ function WriteWithAi({ allowed, onWritten }: { allowed: QuestionKind[]; onWritte
       <Textarea rows={3} value={topic} onChange={(e) => setTopic(e.target.value)} aria-label="Topic or notes"
         placeholder="A topic (e.g. Photosynthesis, Simple interest) or paste your lesson notes" />
       <div className="flex flex-wrap items-center gap-2">
-        <input ref={pdfRef} type="file" accept="application/pdf,.pdf" className="sr-only" id="ai-pdf" onChange={(e) => void pickPdf(e.target.files?.[0])} />
+        <input ref={pdfRef} type="file" accept="application/pdf,.pdf" className="sr-only" id="ai-pdf" aria-label="Choose a PDF for AI to read" tabIndex={-1} onChange={(e) => void pickPdf(e.target.files?.[0])} />
         <Button size="sm" variant="secondary" onClick={() => pdfRef.current?.click()}><Icon name="upload" className="h-4 w-4" />{pdf ? "Change PDF" : "From a PDF"}</Button>
         {pdf && <span className="flex min-w-0 items-center gap-1 text-[13px] text-ink-700"><span className="truncate">{pdf.name}</span>
           <button type="button" className="text-ink-500 hover:text-ink-900" aria-label="Remove PDF" onClick={() => setPdf(null)}>✕</button></span>}

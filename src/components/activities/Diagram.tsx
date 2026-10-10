@@ -70,7 +70,7 @@ export function DiagramEditor({ q, onChange }: { q: EditableQuestion; onChange: 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <input ref={fileRef} type="file" accept="image/*" className="sr-only" id={`diagram-${q.position}`} onChange={(e) => void upload(e.target.files?.[0])} />
+        <input ref={fileRef} type="file" accept="image/*" className="sr-only" id={`diagram-${q.position}`} aria-label="Upload a picture for the diagram" tabIndex={-1} onChange={(e) => void upload(e.target.files?.[0])} />
         <Button size="sm" variant="secondary" loading={busy} onClick={() => fileRef.current?.click()}>{config.image_path || config.image_url ? "Change picture" : "Upload a picture"}</Button>
         <span className="text-[13px] text-ink-500">or</span>
         <Input className="min-w-0 flex-1" placeholder="Paste a picture's web address (https://…)" value={config.image_url ?? ""}
