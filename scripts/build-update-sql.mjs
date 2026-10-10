@@ -34,7 +34,7 @@ const body = ["20260901000740_web_screens.sql", "20260901000750_operations.sql",
               "20260901000840_teacher_not_monitored.sql",
               "20260901000850_super_admin_settings.sql", "20260901000860_guests.sql",
               "20260901000870_monitoring_addon.sql", "20260901000880_live_engine_core.sql",
-              "20260901000890_scoring.sql", "20260901000900_reveal.sql", "20260901000910_canvas_slides.sql", "20260901000920_session_report.sql", "20260901000930_progress.sql", "20260901000940_game_timer.sql", "20260901000950_roles_progress.sql", "20260901000960_signup_support.sql", "20260901000970_rosters.sql", "20260901000980_results_privacy.sql", "20260901000990_subject_teachers.sql", "20260901001000_guest_accounts.sql", "20260901001010_slide_moves_on.sql", "20260901001020_teacher_closes_lesson.sql", "20260901001030_lobby_players.sql", "20260901001040_teacher_away_grace.sql", "20260901001050_student_paced_stays.sql", "20260901001060_lesson_library.sql", "20260901001070_shared_rate_limits.sql"].map(read).join("\n");
+              "20260901000890_scoring.sql", "20260901000900_reveal.sql", "20260901000910_canvas_slides.sql", "20260901000920_session_report.sql", "20260901000930_progress.sql", "20260901000940_game_timer.sql", "20260901000950_roles_progress.sql", "20260901000960_signup_support.sql", "20260901000970_rosters.sql", "20260901000980_results_privacy.sql", "20260901000990_subject_teachers.sql", "20260901001000_guest_accounts.sql", "20260901001010_slide_moves_on.sql", "20260901001020_teacher_closes_lesson.sql", "20260901001030_lobby_players.sql", "20260901001040_teacher_away_grace.sql", "20260901001050_student_paced_stays.sql", "20260901001060_lesson_library.sql", "20260901001070_shared_rate_limits.sql", "20260901001080_homework.sql"].map(read).join("\n");
 writeFileSync("supabase/updates/2026-09-24_production_release.sql", header + body + footer);
 console.log("supabase/updates/2026-09-24_production_release.sql written");
 
@@ -62,19 +62,19 @@ writeFileSync("supabase/updates/2026-09-25_classroom_update.sql",
   "\n-- Done. Should return 0790:\nselect public.health() ->> 'schema' as schema;\n");
 console.log("supabase/updates/2026-09-25_classroom_update.sql written");
 
-// THE script to run now, for databases at 0790 (ran 2026-09-25): 0800–1070. Safe to re-run.
+// THE script to run now, for databases at 0790 (ran 2026-09-25): 0800–1080. Safe to re-run.
 const RUN_THIS = ["20260901000800_fair_play.sql", "20260901000810_audit_fixes.sql", "20260901000820_parent_reports.sql", "20260901000830_pentest_fixes.sql",
                   "20260901000840_teacher_not_monitored.sql", "20260901000850_super_admin_settings.sql",
                   "20260901000860_guests.sql", "20260901000870_monitoring_addon.sql",
                   "20260901000880_live_engine_core.sql", "20260901000890_scoring.sql",
-                  "20260901000900_reveal.sql", "20260901000910_canvas_slides.sql", "20260901000920_session_report.sql", "20260901000930_progress.sql", "20260901000940_game_timer.sql", "20260901000950_roles_progress.sql", "20260901000960_signup_support.sql", "20260901000970_rosters.sql", "20260901000980_results_privacy.sql", "20260901000990_subject_teachers.sql", "20260901001000_guest_accounts.sql", "20260901001010_slide_moves_on.sql", "20260901001020_teacher_closes_lesson.sql", "20260901001030_lobby_players.sql", "20260901001040_teacher_away_grace.sql", "20260901001050_student_paced_stays.sql", "20260901001060_lesson_library.sql", "20260901001070_shared_rate_limits.sql"];
+                  "20260901000900_reveal.sql", "20260901000910_canvas_slides.sql", "20260901000920_session_report.sql", "20260901000930_progress.sql", "20260901000940_game_timer.sql", "20260901000950_roles_progress.sql", "20260901000960_signup_support.sql", "20260901000970_rosters.sql", "20260901000980_results_privacy.sql", "20260901000990_subject_teachers.sql", "20260901001000_guest_accounts.sql", "20260901001010_slide_moves_on.sql", "20260901001020_teacher_closes_lesson.sql", "20260901001030_lobby_players.sql", "20260901001040_teacher_away_grace.sql", "20260901001050_student_paced_stays.sql", "20260901001060_lesson_library.sql", "20260901001070_shared_rate_limits.sql", "20260901001080_homework.sql"];
 writeFileSync("supabase/updates/2026-09-27_RUN_THIS_update.sql", `-- =============================================================================
--- SwiftCipher update 2026-09-27  (database 0790 or later -> 1070)
+-- SwiftCipher update 2026-09-27  (database 0790 or later -> 1080)
 --
 -- HOW TO RUN
 --   1. Supabase dashboard -> SQL Editor -> New query.
 --   2. Paste this whole file and click Run (about 10 seconds).
---   3. The last result should show schema = 1070 and every check = true.
+--   3. The last result should show schema = 1080 and every check = true.
 --   Safe to run more than once. It changes structure and code only. The one
 --   thing it deletes is false "left the class" alerts raised about teachers.
 --
@@ -156,11 +156,13 @@ writeFileSync("supabase/updates/2026-09-27_RUN_THIS_update.sql", `-- ===========
 --     * Ready-made lessons on the Nigerian curriculum that any teacher can copy and change.
 --   Shared limits (1070)
 --     * Too-many-attempts limits hold across every app server.
+--   Homework (1080)
+--     * Teachers set a lesson as homework with a due date; it closes when due and counts in progress.
 --
 -- For a database that already ran supabase/updates/2026-09-25_classroom_update.sql (0790),
--- with or without the earlier 2026-09-26 update (0810) or an earlier copy of this file (0830 to 1060).
+-- with or without the earlier 2026-09-26 update (0810) or an earlier copy of this file (0830 to 1070).
 -- Check first:
---   select public.health() ->> 'schema';   -- 0790 or later before, 1070 after.
+--   select public.health() ->> 'schema';   -- 0790 or later before, 1080 after.
 -- Generated by scripts/build-update-sql.mjs; do not edit by hand.
 -- =============================================================================
 
@@ -169,7 +171,7 @@ writeFileSync("supabase/updates/2026-09-27_RUN_THIS_update.sql", `-- ===========
 notify pgrst, 'reload schema';
 
 -- =============================================================================
--- Done. One row: schema should be 1070 and every other column true.
+-- Done. One row: schema should be 1080 and every other column true.
 -- =============================================================================
 select public.health() ->> 'schema' as schema,
        exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'student_supports') as fair_play_ready,
@@ -195,6 +197,7 @@ select public.health() ->> 'schema' as schema,
        exists (select 1 from information_schema.routines where routine_schema = 'app' and routine_name = 'is_guest_account') as guest_accounts_ready,
        exists (select 1 from information_schema.columns where table_name = 'class_sessions' and column_name = 'teacher_left_at') as teacher_close_ready,
        exists (select 1 from information_schema.routines where routine_schema = 'public' and routine_name = 'session_lobby') as lobby_players_ready,
-       exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'library_lessons') as library_ready;
+       exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'library_lessons') as library_ready,
+       exists (select 1 from information_schema.columns where table_name = 'class_sessions' and column_name = 'due_at') as homework_ready;
 `);
 console.log("supabase/updates/2026-09-27_RUN_THIS_update.sql written");

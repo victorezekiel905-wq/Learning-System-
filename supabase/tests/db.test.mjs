@@ -1858,6 +1858,57 @@ test("shared rate limits: a token bucket per key, for the app server only (1070)
   await rejects(db.as(u, "select * from public.rate_buckets"), /permission denied/);
 });
 
+test("homework: set with a due date, alongside live lessons, closes when due (1080)", async () => {
+  const T = await db.signUp("t@homework.test", "Homework Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Homework School", p_full_name: "Homework Teacher" })).tenant_id;
+  const cls = await db.rpc(T, "create_class", { p_name: "JSS 1 Gold" });
+  const [a, b] = [await db.signUp("a@homework.test", "Amina Bello"), await db.signUp("b@homework.test", "Bode Ade")];
+  for (const u of [a, b]) await db.rpc(u, "redeem_code", { p_code: cls.join_code });
+  const lib = (await db.rpc(T, "library_list", { p_query: "Place value" }))[0];
+  const lesson = await db.rpc(T, "library_copy", { p_item: lib.id });
+
+  await rejects(db.rpc(T, "set_homework", { p_class: cls.id, p_lesson: lesson, p_due: new Date(Date.now() - 60_000).toISOString() }), /future/);
+  const hw = await db.rpc(T, "set_homework", { p_class: cls.id, p_lesson: lesson, p_due: new Date(Date.now() + 2 * 86_400_000).toISOString() });
+  assert.deepEqual([hw.mode, hw.phase, hw.status, hw.is_homework], ["student_paced", "active", "live", true]);
+  // Students are told; a stranger can't set homework for this class.
+  assert.equal((await db.admin("select count(*)::int n from public.notifications where kind = 'homework_set'"))[0].n >= 2, true);
+  const outsider = await db.signUp("o@homework.test", "Other Teacher");
+  await db.rpc(outsider, "bootstrap_school", { p_school_name: "Other School", p_full_name: "Other Teacher" });
+  await rejects(db.rpc(outsider, "set_homework", { p_class: cls.id, p_lesson: lesson, p_due: new Date(Date.now() + 86_400_000).toISOString() }), /your classes/);
+
+  // A live lesson can still start for the class; homework is never listed as live.
+  const live = await goLive(T, { p_class: cls.id });
+  const home = await db.rpc(a, "student_home", {});
+  assert.deepEqual(home.live.map((x) => x.id), [live.id]);
+  assert.deepEqual(home.homework.map((x) => [x.id, x.open, x.questions, x.answered]), [[hw.id, true, 5, 0]]);
+  await db.rpc(T, "end_session", { p_session: live.id });
+
+  // Amina answers every question; Bode only opens it.
+  const act = (await db.as(T, "select activity_id from public.lesson_slides where lesson_id = $1 and activity_id is not null", [lesson]))[0].activity_id;
+  const qs = await db.as(T, "select q.id, (select id from public.question_options o where o.question_id = q.id and o.is_correct) as right_id from public.questions q where q.activity_id = $1 order by position", [act]);
+  await db.rpc(a, "join_session", { p_code: hw.join_code });
+  await db.rpc(b, "join_session", { p_code: hw.join_code });
+  const att = (await db.rpc(a, "start_attempt", { p_activity: act, p_session: hw.id })).attempt.id;
+  for (const q of qs) await db.rpc(a, "submit_answer", { p_attempt: att, p_question: q.id, p_response: JSON.stringify({ option_id: q.right_id }) });
+  assert.deepEqual((await db.rpc(a, "my_homework", {})).map((x) => x.answered), [5]);
+  const th = (await db.rpc(T, "teacher_homework", {}))[0];
+  assert.deepEqual([th.students, th.started, th.finished, th.open], [2, 2, 1, true]);
+
+  // Neither the teacher leaving nor 12 quiet hours closes it; the due date does, on the next student tick.
+  await db.admin("update public.class_sessions set teacher_seen_at = now() - interval '1 day', started_at = now() - interval '1 day' where id = $1", [hw.id]);
+  await db.admin("update public.session_participants set last_seen_at = now() - interval '3 hours' where session_id = $1", [hw.id]);
+  await db.admin("select app.run_maintenance()");
+  const status = async () => (await db.admin("select status from public.class_sessions where id = $1", [hw.id]))[0].status;
+  assert.equal(await status(), "live");
+  await db.rpc(T, "set_homework_due", { p_session: hw.id, p_due: new Date(Date.now() + 3 * 86_400_000).toISOString() });
+  await db.admin("update public.class_sessions set due_at = now() - interval '1 minute' where id = $1", [hw.id]);
+  await db.rpc(b, "student_report", { p_session: hw.id, p_visible: true, p_fullscreen: false, p_sharing: false });
+  assert.equal(await status(), "ended");
+  // Its answers count in the student's progress like any lesson.
+  const prog = await db.rpc(a, "progress_report", { p_student: a, p_period: "week" });
+  assert.ok(JSON.stringify(prog).includes("Place value"), "homework shows in progress");
+});
+
 test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {
   const T = await db.signUp("t@canvas.test", "Canvas Teacher");
   const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Canvas School", p_full_name: "Canvas Teacher" })).tenant_id;

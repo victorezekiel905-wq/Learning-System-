@@ -48,6 +48,7 @@ const NAV: NavItem[] = [
   { href: "/teacher/media", label: "Media library", icon: "image", roles: T, group: "Teach" },
   { href: "/teacher/live", label: "Live classroom", short: "Live", icon: "broadcast", roles: T, group: "Run" },
   { href: "/teacher/challenge", label: "Challenge", icon: "trophy", roles: T, group: "Run" },
+  { href: "/teacher/homework", label: "Homework", icon: "clipboard", roles: T, group: "Run" },
   { href: "/teacher/insights", label: "Analytics", icon: "chart", roles: T, group: "Assess" },
   { href: "/teacher/reports", label: "Reports", icon: "file", roles: [...T, "it_admin"], group: "Assess" },
   { href: "/admin/progress", label: "School progress", icon: "chart", roles: A, group: "Assess" },

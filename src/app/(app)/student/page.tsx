@@ -4,6 +4,7 @@ import { Alert, Empty, PageHeader } from "@/components/ui";
 import { firstName } from "@/lib/utils";
 import { ProgressPanel } from "./ProgressPanel";
 import { MyClasses, type MyClass } from "./MyClasses";
+import { HomeworkList, type StudentHomework } from "./HomeworkList";
 import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "Home" };
@@ -16,6 +17,7 @@ type Home = {
   feedback: { kind: string; title: string; score: number | null; out_of: number; feedback: string | null; at: string }[];
   scores: { activity: string; score: number | null; max: number | null; status: string; at: string }[];
   devices: number;
+  homework?: StudentHomework[];
 };
 
 export default async function StudentHome() {
@@ -59,6 +61,8 @@ export default async function StudentHome() {
       {h.live.some((s) => s.environment_active) && h.devices > 0 && (
         <div className="mb-4"><Alert>A managed class session is active. While it runs, your teacher can see the site you're on and a low-resolution picture of your screen. <Link href="/student/device">What's shared?</Link></Alert></div>
       )}
+
+      <HomeworkList items={h.homework ?? []} now={Date.now()} />
 
       {myClasses.length > 0 ? <MyClasses classes={myClasses} /> : (
         <div className="mb-8"><Empty title="You're not in a class yet" action={<Link href="/student/join" className="btn btn-primary no-underline">Enter a code</Link>}>

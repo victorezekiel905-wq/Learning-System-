@@ -149,7 +149,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
       {s.leaderboard && s.session.phase !== "paused" && <BoardOverlay entries={s.leaderboard} me={myName} my={s.my ?? null} />}
       <LockdownGate guard={guard} teacher={s.session.teacher} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs text-ink-500">Live with {s.session.teacher}</p><h1 className="text-xl font-bold">{s.session.title}</h1></div>
+        <div><p className="text-xs text-ink-500">{paced ? "From" : "Live with"} {s.session.teacher}</p><h1 className="text-xl font-bold">{s.session.title}</h1></div>
         <div className="flex flex-wrap items-center gap-2">
           {s.my && <span className="inline-flex items-center gap-2 rounded-lg bg-ink-950 px-3 py-1.5 text-sm font-semibold text-white" title="Your score and rank">
             <span className="font-display text-base font-extrabold tabular-nums text-accent-400">{s.my.score.toLocaleString()}</span>
