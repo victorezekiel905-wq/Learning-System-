@@ -86,7 +86,7 @@ export type ActivityKind =
 
 export type QuestionKind =
   | "mcq" | "multi_select" | "true_false" | "poll" | "open" | "short" | "fill_blank"
-  | "matching" | "ordering" | "categorize" | "draw" | "file" | "code";
+  | "matching" | "ordering" | "categorize" | "draw" | "file" | "code" | "word_cloud" | "label_diagram";
 
 export type ActivitySettings = {
   time_limit_seconds?: number;
@@ -119,6 +119,11 @@ export type PublicQuestion = {
     starter?: string;
     tests?: { name: string; input?: string; expected?: string }[];
     partial_credit?: boolean;
+    /** label_diagram (1090): the picture (storage path or web address), its spots (x/y in percent) and the labels to choose from. */
+    image_path?: string;
+    image_url?: string;
+    spots?: { id: string; x: number; y: number }[];
+    labels?: Item[];
     case_sensitive?: boolean;
     max_chars?: number;
     /** A student wrote this question and the teacher approved it (migration 0800). */

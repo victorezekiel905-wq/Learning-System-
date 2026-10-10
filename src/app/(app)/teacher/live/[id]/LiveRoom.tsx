@@ -2,7 +2,7 @@
 import { useSecondsLeft } from "@/components/game/LiveGame";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Avatar, Badge, Button, Tabs, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
+import { Alert, Avatar, Badge, Button, Select, Tabs, Textarea, Toggle, useToast, useDialog } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL, type SessionState } from "@/components/live/types";
 import { createClient } from "@/lib/supabase/client";
@@ -22,6 +22,7 @@ import { ScreensPanel } from "./ScreensPanel";
 import { EnvironmentPanel } from "./EnvironmentPanel";
 import { ChatPanel } from "./ChatPanel";
 import { FocusView, ScreenRail, type Screen } from "@/components/live/ScreenRail";
+import { TeamStandings, useTeamScores } from "@/components/game/Teams";
 
 type Tab = "lesson" | "responses" | "screens" | "environment" | "chat";
 export type Me = { id: string; tenantId: string; name: string };
@@ -286,6 +287,8 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
             </div>
           )}
 
+          <TeamsCard sessionId={sessionId} state={s} onChanged={() => void state.reload()} />
+
           <GuestControls sessionId={sessionId} state={s} monitoring={mon} onChanged={() => void state.reload()} />
 
           <Announce sessionId={sessionId} classId={s.session.class_id} me={me} />
@@ -374,6 +377,28 @@ function WaitingRoom({ state, onStart }: { state: SessionState; onStart: () => v
       </ul>
       <Button size="lg" variant="accent" className="mt-8" onClick={onStart}>Start lesson</Button>
       <p className="mt-2 text-sm text-ink-400">Students see the first slide as soon as you start. You can also use Present for the projector.</p>
+    </div>
+  );
+}
+
+/** Teams (migration 1090): 2 to 6 teams named after the answer tiles, balanced automatically, with their scores. */
+function TeamsCard({ sessionId, state, onChanged }: { sessionId: string; state: SessionState; onChanged: () => void }) {
+  const toast = useToast();
+  const count = state.session.settings?.teams ?? 0;
+  const teams = useTeamScores(sessionId, state.server_now, count >= 2);
+  return (
+    <div className="card space-y-3 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold">Teams</p>
+        <Select className="w-auto py-1 text-xs" aria-label="Number of teams" value={String(count)} onChange={async (e) => {
+          try { await rpc("set_session_teams", { p_session: sessionId, p_teams: Number(e.target.value) }); onChanged(); void teams.reload(); }
+          catch (err) { toast(errorText(err), "error"); }
+        }}>
+          <option value="0">Off</option>{[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n} teams</option>)}
+        </Select>
+      </div>
+      {count >= 2 ? <div className="text-ink-900 [&_.bg-white\/10]:bg-ink-100"><TeamStandings teams={teams.data ?? []} /></div>
+        : <p className="text-[12px] text-ink-500">Everyone is put in a team, balanced automatically; team scores show with the leaderboard.</p>}
     </div>
   );
 }

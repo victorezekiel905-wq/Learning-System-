@@ -18,6 +18,8 @@ import { formatJoinCode } from "@/lib/utils";
 import { AnswerBars, AnswerTiles, TimerRing } from "@/components/game/LiveGame";
 import { getSound } from "@/lib/sound";
 import { useTeacherPresence } from "@/lib/teacher-presence";
+import { WordCloud, useWordCloud } from "@/components/game/WordCloud";
+import { TeamStandings, useTeamScores } from "@/components/game/Teams";
 
 const TILE_KINDS = ["mcq", "true_false", "poll", "multi_select"];
 
@@ -31,6 +33,10 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   const ann = useAnnotations(sessionId, s?.current_slide ?? 0);
   const slide = (lesson.data?.slides ?? []).find((x) => x.position === s?.current_slide);
   const results = state.data?.activity;
+  const isCloud = results?.questions[0]?.kind === "word_cloud";
+  const cloud = useWordCloud(results?.activity.id, sessionId, isCloud);
+  const teamsOn = (state.data?.session.settings?.teams ?? 0) >= 2;
+  const teams = useTeamScores(sessionId, state.data?.session.leaderboard?.at, teamsOn && !!state.data?.session.show_leaderboard);
   const host = typeof window !== "undefined" ? window.location.host : "";
   const here = (state.data?.roster ?? []).filter((r) => r.presence === "online" || r.presence === "idle");
 
@@ -99,6 +105,7 @@ export function Presenter({ sessionId }: { sessionId: string }) {
         ) : s?.show_leaderboard && s.leaderboard && s.settings?.leaderboard !== false ? (
           <div className="w-full max-w-4xl" key={s.leaderboard.at ?? "board"}>
             <h2 className="mb-10 text-center font-display text-6xl font-extrabold">Leaderboard</h2>
+            {teamsOn && (teams.data ?? []).length > 0 && <div className="mx-auto mb-10 max-w-3xl"><TeamStandings teams={teams.data!} big /></div>}
             <Podium entries={s.leaderboard.top.slice(0, 3)} />
             {s.leaderboard.top.length > 3 && <div className="mx-auto mt-8 max-w-2xl"><Leaderboard entries={s.leaderboard.top.slice(3, 5)} size="lg" /></div>}
           </div>
@@ -126,6 +133,7 @@ export function Presenter({ sessionId }: { sessionId: string }) {
               </div>
             </div>
             {TILE_KINDS.includes(q0!.kind) && <AnswerTiles options={q0!.options} big />}
+            {isCloud && <WordCloud words={cloud.data ?? []} dark big />}
             {timer && timeUp === timer.ends_at && <p className="text-center font-display text-4xl font-extrabold text-accent-300">Time's up!</p>}
           </div>
         ) : revealedTiles ? (
@@ -134,6 +142,11 @@ export function Presenter({ sessionId }: { sessionId: string }) {
             <AnswerBars options={q0!.options} counts={Object.fromEntries(q0!.options.map((o) => [o.id, o.count]))}
               correct={q0!.kind === "poll" ? [] : q0!.options.filter((o) => o.is_correct).map((o) => o.id)} />
             <AnswerTiles options={q0!.options} big correct={q0!.kind === "poll" ? undefined : q0!.options.filter((o) => o.is_correct).map((o) => o.id)} />
+          </div>
+        ) : results && isCloud && (s?.responses_visible || results.revealed) ? (
+          <div className="w-full max-w-6xl space-y-8 text-center">
+            <h2 className="font-display text-5xl font-extrabold leading-tight">{q0!.prompt}</h2>
+            <WordCloud words={cloud.data ?? []} dark big />
           </div>
         ) : results && s?.responses_visible ? (
           <div className="w-full max-w-4xl space-y-6">

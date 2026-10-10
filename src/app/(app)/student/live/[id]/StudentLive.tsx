@@ -20,9 +20,10 @@ import { errorText, rpc } from "@/lib/rpc";
 import { FEATURES } from "@/lib/features";
 import { BoardOverlay, EndScreen, Lobby, PausedOverlay, RevealedResults } from "@/components/live/StudentPhases";
 import type { BoardEntry } from "@/components/live/Leaderboard";
+import { TeamChip, useTeamScores } from "@/components/game/Teams";
 
 type StudentState = {
-  session: { id: string; title: string; status: string; mode: string; current_slide: number; group_chat_enabled: boolean; responses_visible: boolean; class_id: string | null; teacher: string; environment_active: boolean;
+  session: { id: string; title: string; status: string; mode: string; current_slide: number; group_chat_enabled: boolean; responses_visible: boolean; class_id: string | null; teacher: string; environment_active: boolean; settings?: { teams?: number };
     /** Live engine (0880): lobby, active, paused, ended. Missing before that update. */
     phase?: "lobby" | "active" | "paused" | "ended"; join_code?: string };
   me?: { name: string; avatar: string | null };
@@ -90,6 +91,8 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   const [skew, setSkew] = useState(0);
   useEffect(() => { if (st.data?.server_now) setSkew(new Date(st.data.server_now).getTime() - Date.now()); }, [st.data]);
   const paced = s?.session.mode === "student_paced";
+  const teams = useTeamScores(sessionId, s?.my?.score, (s?.session.settings?.teams ?? 0) >= 2);
+  const myTeam = (teams.data ?? []).find((t) => t.mine);
   const slideIndex = paced ? (ownSlide ?? s?.my_slide ?? 0) : s?.session.current_slide ?? 0;
   const ann = useAnnotations(sessionId, slideIndex);
   // One tick (presence, slide, focus, lockdown) every 10 s and on every change.
@@ -156,6 +159,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
             <span className="text-ink-300">#{s.my.rank} of {s.my.of}</span>
           </span>}
           {s.my && <StreakChip streak={s.my.streak} />}
+          {myTeam && <TeamChip team={myTeam} />}
           {guard.sharing && <Badge tone="red"><span className="mr-1 inline-block h-2 w-2 animate-pulse2 rounded-full bg-rose-600" />Sharing screen with your teacher</Badge>}
           {guard.locked && <Badge tone="gray"><Icon name="lock" className="mr-1 inline h-3 w-3" />Lockdown</Badge>}
           {pending > 0 && <Badge tone="amber">{pending} answer(s) waiting to sync</Badge>}

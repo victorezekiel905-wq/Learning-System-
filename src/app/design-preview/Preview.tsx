@@ -9,6 +9,14 @@ import type { SessionState } from "@/components/live/types";
 import { ControlBar } from "@/app/(app)/teacher/live/[id]/ControlBar";
 import { ImportQuestions } from "@/components/activities/ImportQuestions";
 import { StartGuide } from "@/app/(app)/teacher/StartGuide";
+import { WordCloud } from "@/components/game/WordCloud";
+import { TeamStandings } from "@/components/game/Teams";
+import { DiagramInput } from "@/components/activities/Diagram";
+
+const WORDS = [["sunlight", 9], ["chlorophyll", 7], ["food", 5], ["green", 4], ["oxygen", 4], ["leaves", 3], ["energy", 3], ["glucose", 2], ["water", 2], ["carbon dioxide", 2], ["plants", 1], ["light", 1]]
+  .map(([word, count]) => ({ word: word as string, count: count as number }));
+const LEAF = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240"><rect width="400" height="240" fill="#f6f5f1"/><path d="M60 200 C 80 60, 300 20, 350 60 C 330 160, 180 220, 60 200 Z" fill="#7cc36a" stroke="#2f6b2a" stroke-width="4"/><path d="M60 200 L 330 70" stroke="#2f6b2a" stroke-width="3"/><circle cx="210" cy="150" r="10" fill="#f6f5f1" stroke="#2f6b2a" stroke-width="3"/></svg>');
+const DIAGRAM = { image_url: LEAF, spots: [{ id: "s1", x: 52, y: 62 }, { id: "s2", x: 70, y: 38 }], labels: [{ id: "a", label: "Stoma" }, { id: "b", label: "Vein (xylem and phloem)" }, { id: "c", label: "Root hair" }] };
 
 /** A control room state in one phase, with or without an open question. */
 function bar(phase: "lobby" | "active" | "paused", question: "open" | "revealed" | "none"): SessionState {
@@ -62,6 +70,12 @@ export function Preview() {
         <div className="relative"><Podium entries={BOARD.slice(0, 3)} /></div>
         <div className="relative mx-auto mt-8 max-w-2xl"><Leaderboard entries={BOARD.slice(3)} size="lg" /></div>
       </section>
+
+      <section id="cloud" className="bg-ink-900 px-6 py-12 text-white"><h2 className="mb-8 text-center font-display text-4xl font-extrabold">One word for photosynthesis?</h2><WordCloud words={WORDS} dark big /></section>
+      <section id="diagram" className="mx-auto max-w-xl bg-ink-50 p-5"><p className="mb-3 text-lg font-bold">Label the leaf</p><DiagramInput config={DIAGRAM} placements={{ s1: "a" }} onChange={() => {}} /></section>
+      <section id="teams" className="bg-ink-900 p-8 text-white"><TeamStandings big teams={[
+        { team: 2, name: "Team Star", score: 18240, members: 7, mine: false }, { team: 1, name: "Team Bolt", score: 16110, members: 7, mine: true },
+        { team: 3, name: "Team Hexagon", score: 12800, members: 6, mine: false }]} /></section>
 
       <section id="guide" className="bg-ink-50 p-5"><StartGuide done={{ classes: true, lessons: false, taught: false, report: false }} /></section>
 

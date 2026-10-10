@@ -51,7 +51,7 @@ export type SessionState = {
     guest_monitoring?: boolean; guests_closed?: boolean;
     /** Live engine (0880). Missing on older databases (treated as active). */
     phase?: "lobby" | "active" | "paused" | "ended";
-    settings?: { leaderboard?: boolean; anonymous_names?: boolean; late_join?: boolean; speed_bonus?: boolean; timer?: boolean; auto_reveal?: boolean };
+    settings?: { leaderboard?: boolean; anonymous_names?: boolean; late_join?: boolean; speed_bonus?: boolean; timer?: boolean; auto_reveal?: boolean; teams?: number };
     show_leaderboard?: boolean;
     leaderboard?: { at: string; top: { name: string; avatar: string | null; score: number; rank: number; delta: number }[] } | null;
   };

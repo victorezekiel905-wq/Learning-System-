@@ -18,13 +18,13 @@ export const ACTIVITY_LABEL: Record<ActivityKind, string> = {
 
 export const KINDS_FOR: Record<ActivityKind, QuestionKind[]> = {
   multiple_choice: ["mcq", "multi_select", "true_false"],
-  poll: ["poll"],
+  poll: ["poll", "word_cloud"],
   open_ended: ["open"],
-  quiz: ["mcq", "multi_select", "true_false", "fill_blank", "matching", "ordering", "categorize", "short", "open", "draw", "code", "file"],
+  quiz: ["mcq", "multi_select", "true_false", "fill_blank", "matching", "ordering", "categorize", "label_diagram", "short", "open", "word_cloud", "draw", "code", "file"],
   draw: ["draw"],
   fill_blank: ["fill_blank"],
   matching: ["matching"],
-  drag_drop: ["ordering", "categorize"],
+  drag_drop: ["ordering", "categorize", "label_diagram"],
   collab_board: [],
   file_upload: ["file"],
   short_answer: ["short"],

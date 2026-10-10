@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Item, PublicQuestion, Stroke } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CodeRunner, type RunResult } from "./CodeRunner";
+import { DiagramInput } from "./Diagram";
 
 export type Answer = Record<string, unknown>;
 
@@ -193,6 +194,16 @@ function AnswerWidget({ q, value, onChange, disabled, uploadPrefix, reveal }: An
           <p className="hint text-right">{((v.text as string) ?? "").length}/{q.config.max_chars ?? 5000}</p>
         </div>
       );
+    case "word_cloud":
+      return (
+        <div>
+          <input className="input h-12 text-lg" disabled={disabled} maxLength={60} value={(v.text as string) ?? ""} aria-label="Your words"
+            onChange={(e) => onChange({ text: e.target.value })} placeholder="Up to three words" />
+          <p className="hint">Up to three words. Your class sees everyone's words as a cloud.</p>
+        </div>
+      );
+    case "label_diagram":
+      return <DiagramInput config={q.config} placements={(v.placements as Record<string, string> | undefined) ?? {}} disabled={disabled} onChange={(placements) => onChange({ placements })} />;
     case "draw":
       return <Whiteboard strokes={(v.strokes as Stroke[]) ?? []} editable={!disabled} onChange={(strokes) => onChange({ strokes })} />;
     case "file":
@@ -218,7 +229,8 @@ export function isAnswered(q: PublicQuestion, v: Answer | undefined): boolean {
     case "fill_blank": return ((v.blanks as string[]) ?? []).some((b) => b?.trim());
     case "matching": return Object.values((v.pairs as Record<string, string>) ?? {}).some(Boolean);
     case "ordering": return ((v.order as string[]) ?? []).length > 0;
-    case "categorize": return Object.keys((v.placements as object) ?? {}).length > 0;
+    case "categorize": case "label_diagram": return Object.values((v.placements as Record<string, string>) ?? {}).some(Boolean);
+    case "word_cloud": return !!(v.text as string)?.trim();
     case "open": case "short": return !!(v.text as string)?.trim();
     case "draw": return ((v.strokes as unknown[]) ?? []).length > 0;
     case "file": return !!v.path;

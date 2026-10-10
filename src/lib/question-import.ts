@@ -56,7 +56,8 @@ const TYPE_WORDS: [RegExp, QuestionKind][] = [
 export const IMPORT_KIND_NAME: Record<QuestionKind, string> = {
   mcq: "multiple choice", multi_select: "select all that apply", true_false: "true / false", poll: "poll",
   open: "open-ended", short: "short answer", fill_blank: "fill in the blanks", matching: "matching pairs",
-  ordering: "put in order", categorize: "sort into groups", draw: "drawing", file: "file upload", code: "code"
+  ordering: "put in order", categorize: "sort into groups", draw: "drawing", file: "file upload", code: "code",
+  word_cloud: "word cloud", label_diagram: "label the diagram"
 };
 
 // "1.", "1)", "Q1.", "Question 1:" and "1.What…", but not "1.5 litres".

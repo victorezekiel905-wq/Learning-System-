@@ -11,6 +11,7 @@ import { pct } from "@/lib/utils";
 import type { Me } from "./LiveRoom";
 import { ThinkingInsights, type Insight } from "./ThinkingInsights";
 import { Icon } from "@/components/Icon";
+import { WordCloud, useWordCloud } from "@/components/game/WordCloud";
 
 export function ResponsesPanel({ state, me, reload }: { state: SessionState; me: Me; reload: () => Promise<void> }) {
   const toast = useToast();
@@ -69,6 +70,7 @@ export function ResponsesPanel({ state, me, reload }: { state: SessionState; me:
                 <Card key={q.question_id} title={<span>{i + 1}. {q.prompt}</span>}
                   actions={q.kind !== "poll" && q.responses > 0 && ["mcq", "multi_select", "true_false", "fill_blank", "matching", "ordering", "categorize"].includes(q.kind)
                     ? <Badge tone={q.correct / total >= 0.7 ? "green" : q.correct / total >= 0.4 ? "amber" : "red"}>{pct((100 * q.correct) / total)} correct</Badge> : <Badge>{q.responses} responses</Badge>}>
+                  {q.kind === "word_cloud" && <ResponsesCloud activityId={r.activity.id} sessionId={s.id} />}
                   {q.options.length > 0 && (
                     <ul className="space-y-2">
                       {q.options.map((o) => (
@@ -100,4 +102,9 @@ export function ResponsesPanel({ state, me, reload }: { state: SessionState; me:
         )}
     </div>
   );
+}
+
+function ResponsesCloud({ activityId, sessionId }: { activityId: string; sessionId: string }) {
+  const words = useWordCloud(activityId, sessionId);
+  return <div className="py-2"><WordCloud words={words.data ?? []} /></div>;
 }

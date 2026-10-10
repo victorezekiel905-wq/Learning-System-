@@ -6,6 +6,7 @@ import { BLOOM } from "@/lib/progress";
 import { uid } from "@/lib/utils";
 import { Badge, Button, Field, Input, Select, Textarea, Toggle, useToast } from "@/components/ui";
 import { Icon } from "@/components/Icon";
+import { DiagramEditor } from "./Diagram";
 
 export type EditableOption = { id?: string; label: string; is_correct: boolean; feedback?: string | null };
 export type EditableQuestion = {
@@ -29,7 +30,8 @@ export type EditableQuestion = {
 export const KIND_LABEL: Record<QuestionKind, string> = {
   mcq: "Multiple choice", multi_select: "Select all that apply", true_false: "True / false", poll: "Poll",
   open: "Open-ended", short: "Short answer (rubric)", fill_blank: "Fill in the blanks", matching: "Matching pairs",
-  ordering: "Put in order (drag)", categorize: "Sort into groups (drag)", draw: "Draw / annotate", file: "File upload", code: "Code"
+  ordering: "Put in order (drag)", categorize: "Sort into groups (drag)", draw: "Draw / annotate", file: "File upload", code: "Code",
+  word_cloud: "Word cloud", label_diagram: "Label the diagram"
 };
 
 export function blankQuestion(kind: QuestionKind, position = 0): EditableQuestion {
@@ -41,6 +43,8 @@ export function blankQuestion(kind: QuestionKind, position = 0): EditableQuestio
   if (kind === "ordering") { base.config = { items: [{ id: uid(), label: "" }, { id: uid(), label: "" }, { id: uid(), label: "" }] }; }
   if (kind === "categorize") { base.config = { categories: [{ id: "c1", label: "" }, { id: "c2", label: "" }], items: [] }; base.answer_key = { placements: {} }; }
   if (kind === "code") { base.config = { language: "javascript", starter: "", tests: [] }; base.points = 5; }
+  if (kind === "word_cloud") base.points = 0;
+  if (kind === "label_diagram") { base.config = { spots: [], labels: [] }; base.answer_key = { placements: {} }; base.points = 2; }
   if (kind === "open" || kind === "short") base.points = kind === "short" ? 5 : 1;
   return base;
 }
@@ -247,6 +251,9 @@ export function QuestionEditor({ value, onChange, onSave, onDelete, saving }: {
           </div>
         );
       })()}
+
+      {q.kind === "label_diagram" && <DiagramEditor q={q} onChange={onChange} />}
+      {q.kind === "word_cloud" && <p className="hint">Students type up to three words. Their words appear as a cloud on your screen, bigger the more people chose them. Everyone who answers gets participation points.</p>}
 
       {(q.kind === "open" || q.kind === "short") && (
         <Field label="Max characters"><Input type="number" min={50} max={20000} value={Number(q.config.max_chars ?? (q.kind === "short" ? 1000 : 5000))} onChange={(e) => setConfig({ max_chars: Number(e.target.value) })} /></Field>

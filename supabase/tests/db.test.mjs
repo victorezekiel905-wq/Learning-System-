@@ -1909,6 +1909,63 @@ test("homework: set with a due date, alongside live lessons, closes when due (10
   assert.ok(JSON.stringify(prog).includes("Place value"), "homework shows in progress");
 });
 
+test("word clouds, labelled diagrams and teams in live lessons (1090)", async () => {
+  const T = await db.signUp("t@cloud.test", "Cloud Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Cloud School", p_full_name: "Cloud Teacher" })).tenant_id;
+  const [{ id: lesson }] = await db.admin("insert into public.lessons (tenant_id, owner_id, title, status) values ($1, $2, 'Cloud deck', 'published') returning id", [tenant, T]);
+  const [{ id: act }] = await db.admin("insert into public.activities (tenant_id, lesson_id, owner_id, kind, title) values ($1, $2, $3, 'quiz', 'Warm up') returning id", [tenant, lesson, T]);
+  await db.admin("insert into public.lesson_slides (tenant_id, lesson_id, position, kind, activity_id, content) values ($1, $2, 0, 'activity', $3, '{}')", [tenant, lesson, act]);
+  const [{ id: cloud }] = await db.admin("insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, position) values ($1, $2, $3, 'word_cloud', 'One word for photosynthesis?', 0, 0) returning id", [tenant, act, T]);
+  const diagram = { image: "https://example.com/leaf.png", labels: [{ id: "a", label: "Stoma" }, { id: "b", label: "Xylem" }], spots: [{ id: "s1", x: 20, y: 70 }, { id: "s2", x: 60, y: 30 }] };
+  const [{ id: label }] = await db.admin("insert into public.questions (tenant_id, activity_id, owner_id, kind, prompt, points, position, config, answer_key) values ($1, $2, $3, 'label_diagram', 'Label the leaf', 2, 1, $4, $5) returning id",
+    [tenant, act, T, JSON.stringify(diagram), JSON.stringify({ placements: { s1: "a", s2: "b" } })]);
+
+  const s = await goLive(T, { p_class: null, p_lesson: lesson });
+  const players = [];
+  for (const n of ["Ada", "Bola", "Chidi", "Dayo"]) { const g = await db.signInAnonymously(); await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: n }); players.push(g); }
+
+  // Teams: four players into two teams of two; a latecomer goes to the smaller team.
+  const teams = await db.rpc(T, "set_session_teams", { p_session: s.id, p_teams: 2 });
+  assert.deepEqual(teams.map((t) => t.members).sort(), [2, 2]);
+  assert.deepEqual(teams.map((t) => t.name).sort(), ["Team Bolt", "Team Star"]);
+  const late = await db.signInAnonymously();
+  await db.rpc(late, "join_session_as_guest", { p_code: s.join_code, p_name: "Efe" });
+  assert.deepEqual((await db.rpc(T, "session_team_scores", { p_session: s.id })).map((t) => t.members).sort(), [2, 3]);
+  assert.equal((await db.rpc(late, "session_team_scores", { p_session: s.id })).filter((t) => t.mine).length, 1);
+  await rejects(db.rpc(late, "set_session_teams", { p_session: s.id, p_teams: 3 }), /Not your session/);
+  await rejects(db.rpc(T, "set_session_teams", { p_session: s.id, p_teams: 7 }), /2 to 6/);
+
+  // Word cloud: up to three words, participation points, counted case-insensitively.
+  const words = ["Sunlight", "sunlight", "green leaves", "Chlorophyll"];
+  for (const [i, g] of players.entries()) {
+    const att = (await db.rpc(g, "start_attempt", { p_activity: act, p_session: s.id })).attempt.id;
+    if (i === 0) await rejects(db.rpc(g, "submit_answer", { p_attempt: att, p_question: cloud, p_response: JSON.stringify({ text: "far too many words here" }) }), /three words/);
+    const r = await db.rpc(g, "submit_answer", { p_attempt: att, p_question: cloud, p_response: JSON.stringify({ text: words[i] }) });
+    assert.equal(r.status, "ungraded");
+    // Labelled diagram: Ada gets both, Bola one of two.
+    if (i < 2) {
+      const placements = i === 0 ? { s1: "a", s2: "b" } : { s1: "a", s2: "a" };
+      await db.rpc(g, "submit_answer", { p_attempt: att, p_question: label, p_response: JSON.stringify({ placements }) });
+      const [d] = await db.admin("select is_correct, auto_score from public.quiz_answers where attempt_id = $1 and question_id = $2", [att, label]);
+      assert.deepEqual([d.is_correct, Number(d.auto_score)], i === 0 ? [true, 2] : [false, 1]);
+    }
+  }
+  const cloudWords = await db.rpc(T, "session_word_cloud", { p_activity: act, p_session: s.id });
+  assert.deepEqual(cloudWords[0], { word: "sunlight", count: 2 });
+  assert.equal(cloudWords.length, 3);
+  // Students see it only once results are shared.
+  await rejects(db.rpc(players[0], "session_word_cloud", { p_activity: act, p_session: s.id }), /Not available/);
+  await db.rpc(T, "set_session_state", { p_session: s.id, p_responses_visible: true });
+  assert.equal((await db.rpc(players[0], "session_word_cloud", { p_activity: act, p_session: s.id })).length, 3);
+
+  // Team scores add up members' points; teams off: no standings.
+  const totals = await db.rpc(T, "session_team_scores", { p_session: s.id });
+  const all = (await db.admin("select coalesce(sum(total_score), 0)::int t from public.session_participants where session_id = $1 and user_id <> $2", [s.id, T]))[0].t;
+  assert.equal(totals.reduce((n, t) => n + t.score, 0), all);
+  assert.deepEqual(await db.rpc(T, "set_session_teams", { p_session: s.id, p_teams: 0 }), []);
+  await db.rpc(T, "end_session", { p_session: s.id });
+});
+
 test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {
   const T = await db.signUp("t@canvas.test", "Canvas Teacher");
   const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Canvas School", p_full_name: "Canvas Teacher" })).tenant_id;
