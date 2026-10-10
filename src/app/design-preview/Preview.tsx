@@ -7,6 +7,7 @@ import { Critter } from "@/components/live/Critter";
 import { AVATARS } from "@/components/live/avatars";
 import type { SessionState } from "@/components/live/types";
 import { ControlBar } from "@/app/(app)/teacher/live/[id]/ControlBar";
+import { ImportQuestions } from "@/components/activities/ImportQuestions";
 
 /** A control room state in one phase, with or without an open question. */
 function bar(phase: "lobby" | "active" | "paused", question: "open" | "revealed" | "none"): SessionState {
@@ -79,4 +80,9 @@ export function Preview() {
       <section id="end"><EndScreen name="Ada" avatar="fox" guest summary={{ answered: 8, correct: 7 }} score={{ score: 4860, rank: 1, of: 26 }} /></section>
     </div>
   );
+}
+
+/** The Import questions window, as a quiz activity opens it. */
+export function ImportPreview() {
+  return <ImportQuestions allowed={["mcq", "multi_select", "true_false", "fill_blank", "matching", "short"]} startAt={0} onClose={() => {}} onImport={async () => {}} />;
 }

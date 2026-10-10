@@ -3,7 +3,8 @@ import { useMemo, useRef, useState } from "react";
 import type { QuestionKind } from "@/lib/types";
 import { IMPORT_KIND_NAME, importExample, parseQuestions, questionsToText, type ImportedQuestion } from "@/lib/question-import";
 import { readQuestionFile } from "@/lib/question-file";
-import { Alert, Badge, Button, Modal, Textarea } from "@/components/ui";
+import { Sparkles } from "lucide-react";
+import { Alert, Badge, Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { cn } from "@/lib/utils";
 import type { EditableQuestion } from "./QuestionEditor";
@@ -66,6 +67,12 @@ export function ImportQuestions({ allowed, startAt, onClose, onImport }: {
       </>}>
       <div className="grid gap-5 md:grid-cols-2">
         <div className="min-w-0 space-y-3">
+          <WriteWithAi allowed={allowed} onWritten={(qs) => {
+            setText((prev) => (prev.trim() ? `${prev.trim()}
+
+` : "") + questionsToText(qs));
+            setNote({ tone: "success", text: `Claude wrote ${qs.length} question${qs.length === 1 ? "" : "s"}. Check each one in the preview and change anything you'd teach differently before adding them.` });
+          }} />
           <div className="flex flex-wrap items-center gap-2">
             <input ref={fileRef} type="file" className="sr-only" id="question-file" onChange={(e) => void choose(e.target.files?.[0])}
               accept=".docx,.xlsx,.csv,.txt,.md,text/plain,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
@@ -83,7 +90,7 @@ export function ImportQuestions({ allowed, startAt, onClose, onImport }: {
               <li>Put each option on its own line: <code>A.</code> <code>B.</code> <code>C.</code>… or several on one line (<code>A. 2   B. 4</code>).</li>
               <li>Show the right answer with <code>Answer: B</code> (or <code>Answer: A, C</code> for more than one), or put <code>*</code> after it. In Word, making the right option <b>bold</b>, underlined, highlighted or coloured works too.</li>
               <li>Optional lines: <code>Topic:</code>, <code>Points:</code>, <code>Explanation:</code>. Other kinds use <code>Type:</code> (Matching, Order, Groups, Poll).</li>
-              <li>From a PDF: select the questions, copy, and paste them here.</li>
+              <li>From a PDF: select the questions, copy, and paste them here. Or use <b>Write with AI</b> to draft new questions from the PDF.</li>
             </ul>
             <Button size="sm" variant="secondary" className="mt-3" onClick={() => setText(example)}>Use the example</Button>
           </details>
@@ -103,6 +110,92 @@ export function ImportQuestions({ allowed, startAt, onClose, onImport }: {
         </div>
       </div>
     </Modal>
+  );
+}
+
+// What Claude can write (src/lib/ai-questions.ts AI_KINDS).
+const AI_KINDS: QuestionKind[] = ["mcq", "multi_select", "true_false", "short", "fill_blank"];
+const LEVELS = ["Primary 1", "Primary 2", "Primary 3", "Primary 4", "Primary 5", "Primary 6", "JSS 1", "JSS 2", "JSS 3", "SS 1", "SS 2", "SS 3", "University or college", "Adult learners"];
+
+/** Claude drafts questions from a topic, notes or a PDF; they land in the editable preview, never straight in the lesson. */
+function WriteWithAi({ allowed, onWritten }: { allowed: QuestionKind[]; onWritten: (qs: ImportedQuestion[]) => void }) {
+  const kinds = AI_KINDS.filter((k) => allowed.includes(k));
+  const [open, setOpen] = useState(false);
+  const [topic, setTopic] = useState("");
+  const [level, setLevel] = useState("JSS 1");
+  const [count, setCount] = useState(10);
+  const [pdf, setPdf] = useState<{ name: string; data: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const pdfRef = useRef<HTMLInputElement>(null);
+  if (!kinds.length) return null;
+
+  async function pickPdf(file?: File) {
+    if (!file) return;
+    setErr(null);
+    if (file.size > 12 * 1024 * 1024) { setErr("That PDF is too big. Use one under 12 MB."); return; }
+    const data = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ""));
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(file);
+    });
+    setPdf({ name: file.name, data });
+    if (pdfRef.current) pdfRef.current.value = "";
+  }
+
+  async function write() {
+    setBusy(true); setErr(null);
+    try {
+      const long = topic.trim().length > 300;
+      const res = await fetch("/api/ai/questions", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: long ? undefined : topic, text: long ? topic : undefined, pdf: pdf?.data, level, count, kinds })
+      });
+      const body = (await res.json().catch(() => ({}))) as { questions?: ImportedQuestion[]; error?: string };
+      if (!res.ok || !body.questions) { setErr(body.error ?? "Couldn't write questions. Try again."); return; }
+      onWritten(body.questions);
+      setOpen(false);
+    } catch { setErr("Couldn't reach SwiftCipher. Check your connection and try again."); }
+    finally { setBusy(false); }
+  }
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)}
+        className="flex w-full items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-left transition hover:border-brand-300">
+        <Sparkles className="h-5 w-5 shrink-0 text-brand-700" aria-hidden />
+        <span className="min-w-0"><span className="block text-sm font-semibold text-ink-900">Write with AI</span>
+          <span className="block text-[13px] text-ink-600">Claude drafts questions from a topic, your notes or a PDF. You check them before they&apos;re added.</span></span>
+      </button>
+    );
+  }
+  return (
+    <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
+      <p className="flex items-center gap-2 text-sm font-semibold text-ink-900"><Sparkles className="h-4 w-4 text-brand-700" aria-hidden />Write with AI</p>
+      <Textarea rows={3} value={topic} onChange={(e) => setTopic(e.target.value)} aria-label="Topic or notes"
+        placeholder="A topic (e.g. Photosynthesis, Simple interest) or paste your lesson notes" />
+      <div className="flex flex-wrap items-center gap-2">
+        <input ref={pdfRef} type="file" accept="application/pdf,.pdf" className="sr-only" id="ai-pdf" onChange={(e) => void pickPdf(e.target.files?.[0])} />
+        <Button size="sm" variant="secondary" onClick={() => pdfRef.current?.click()}><Icon name="upload" className="h-4 w-4" />{pdf ? "Change PDF" : "From a PDF"}</Button>
+        {pdf && <span className="flex min-w-0 items-center gap-1 text-[13px] text-ink-700"><span className="truncate">{pdf.name}</span>
+          <button type="button" className="text-ink-500 hover:text-ink-900" aria-label="Remove PDF" onClick={() => setPdf(null)}>✕</button></span>}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-[13px] font-semibold text-ink-800">Class
+          <Select className="mt-1" value={level} onChange={(e) => setLevel(e.target.value)}>{LEVELS.map((l) => <option key={l}>{l}</option>)}</Select>
+        </label>
+        <label className="text-[13px] font-semibold text-ink-800">Questions
+          <Input className="mt-1" type="number" min={1} max={20} value={count} onChange={(e) => setCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))} />
+        </label>
+      </div>
+      {err && <Alert tone="error">{err}</Alert>}
+      <div className="flex items-center justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+        <Button size="sm" loading={busy} disabled={!topic.trim() && !pdf} onClick={() => void write()}>{busy ? "Writing…" : "Write questions"}</Button>
+      </div>
+      <p className="text-[12px] text-ink-500">Claude can make mistakes. Read every question before adding it.</p>
+    </div>
   );
 }
 

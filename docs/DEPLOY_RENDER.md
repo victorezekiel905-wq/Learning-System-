@@ -33,6 +33,7 @@ No scheduled jobs are needed on Render: hourly maintenance runs inside the datab
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Project URL, `https://<ref>.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key |
+| `ANTHROPIC_API_KEY` | Optional. Turns on "Write with AI" (Claude drafts questions from a topic, notes or a PDF). From console.anthropic.com → API keys; set a monthly spend limit there. |
 | `NEXT_PUBLIC_APP_URL` | `https://swiftcipher.onrender.com` for now (Render shows the exact name), your own domain later |
 | `NEXT_PUBLIC_LEGAL_ENTITY` | Registered company name, e.g. "Synergy Swift Ltd (RC 1234567)" |
 | `NEXT_PUBLIC_LEGAL_ADDRESS` | Registered address |

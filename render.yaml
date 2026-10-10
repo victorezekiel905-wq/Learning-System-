@@ -42,6 +42,9 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SUPPORT_PHONE
         sync: false
+      # ---- Optional: "Write with AI" in Import questions (console.anthropic.com → API keys) ----
+      - key: ANTHROPIC_API_KEY
+        sync: false
       # ---- Optional: sign in with Google or Microsoft (enable them in Supabase Auth first) ----
       - key: NEXT_PUBLIC_SSO_PROVIDERS
         sync: false
