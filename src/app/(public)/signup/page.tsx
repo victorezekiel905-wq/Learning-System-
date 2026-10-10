@@ -38,7 +38,7 @@ export default async function SignupPage(props: { searchParams: Promise<{ as?: s
   return (
     <AuthShell
       title="Create your school."
-      intro={<>You&apos;ll be the school administrator and can invite staff after setup. Joining a school that already uses SwiftCipher? Sign up as a <Link href="/signup?as=student">student</Link>, <Link href="/signup?as=parent">parent</Link> or <Link href="/signup?as=staff">staff member</Link>.</>}
+      intro={<>You&apos;ll be the school administrator and can invite staff after setup. Joining a school that already uses SwiftCipher? Sign up as a <Link href="/signup?as=student" className="underline">student</Link>, <Link href="/signup?as=parent" className="underline">parent</Link> or <Link href="/signup?as=staff" className="underline">staff member</Link>.</>}
       art={AUTH_ART.school}>
       <Suspense><SignupForm mode="school" /></Suspense>
     </AuthShell>

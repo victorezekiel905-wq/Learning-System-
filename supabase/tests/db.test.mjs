@@ -1740,7 +1740,7 @@ test("moving to another slide closes the launched activity and hides results (10
   await db.rpc(T, "session_control", { p_session: s.id, p_action: "end" });
 });
 
-test("a lesson ends when the teacher closes it, without End session (1020)", async () => {
+test("a lesson ends when the teacher closes it, without End session (1020, timings 1040)", async () => {
   const T = await db.signUp("t@closes.test", "Closing Teacher");
   await db.rpc(T, "bootstrap_school", { p_school_name: "Closing School", p_full_name: "Closing Teacher" });
   const s = await goLive(T, { p_class: null });
@@ -1759,15 +1759,16 @@ test("a lesson ends when the teacher closes it, without End session (1020)", asy
   // Closing the tab, then a refresh coming back: the lesson carries on.
   await db.rpc(T, "teacher_here", { p_session: s.id, p_here: false });
   await tick();
-  assert.equal(await status(s.id), "live", "within the 45-second grace");
+  assert.equal(await status(s.id), "live", "within the 1-minute grace");
   await db.rpc(T, "teacher_here", { p_session: s.id });
-  await db.admin("update public.class_sessions set teacher_left_at = null, teacher_seen_at = now() - interval '2 minutes' where id = $1", [s.id]);
+  // An iPad pauses the page while the teacher uses another app: 9 quiet minutes, still live (1040).
+  await db.admin("update public.class_sessions set teacher_left_at = null, teacher_seen_at = now() - interval '9 minutes' where id = $1", [s.id]);
   await tick();
   assert.equal(await status(s.id), "live");
 
   // Closed for good: the next student tick ends it for everyone, with a report the teacher sees.
   await db.rpc(T, "teacher_here", { p_session: s.id, p_here: false });
-  await db.admin("update public.class_sessions set teacher_left_at = now() - interval '1 minute' where id = $1", [s.id]);
+  await db.admin("update public.class_sessions set teacher_left_at = now() - interval '2 minutes' where id = $1", [s.id]);
   await tick();
   assert.equal(await status(s.id), "ended");
   assert.equal((await db.rpc(g, "session_student_state", { p_session: s.id })).session.status, "ended");
@@ -1779,7 +1780,7 @@ test("a lesson ends when the teacher closes it, without End session (1020)", asy
   const quiet = await goLive(T, { p_class: null });
   const busy = await goLive(T, { p_class: null });
   await db.rpc(T, "teacher_here", { p_session: busy.id });
-  await db.admin("update public.class_sessions set teacher_seen_at = now() - interval '4 minutes' where id = $1", [quiet.id]);
+  await db.admin("update public.class_sessions set teacher_seen_at = now() - interval '11 minutes' where id = $1", [quiet.id]);
   await db.admin("select app.end_teacherless_sessions()");
   assert.deepEqual([await status(quiet.id), await status(busy.id)], ["ended", "live"]);
 

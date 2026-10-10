@@ -47,6 +47,8 @@ export function ControlBar({ state: s, sessionId, joined, timer, skew, monitorin
             : <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-rose-600 px-1.5 py-1 text-[11px] font-bold leading-none text-white">
               <span className="h-1.5 w-1.5 animate-pulse2 rounded-full bg-white" aria-hidden />LIVE</span>}
           <span className="truncate">{s.session.title}</span>
+          {monitoring && s.session.lockdown && <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-1.5 py-0.5 text-[11px] font-semibold text-ink-200"
+            title="Students must share their screen and stay in the full-screen lesson; leaving alerts you. Change it under More."><Lock className="h-3 w-3" aria-hidden />Lockdown on</span>}
         </h1>
       </div>
       <div className="flex items-stretch gap-2.5">

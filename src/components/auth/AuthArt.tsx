@@ -30,10 +30,10 @@ function StudentArt() {
           </div>
         </div>
       </div>
-      <div className="absolute -bottom-8 -right-32 w-[168px] rounded-2xl bg-emerald-600 p-4 text-white shadow-[0_24px_48px_-20px_rgb(0_0_0/0.7)]">
+      <div className="absolute -bottom-8 -right-32 w-[168px] rounded-2xl bg-emerald-700 p-4 text-white shadow-[0_24px_48px_-20px_rgb(0_0_0/0.7)]">
         <p className="font-display text-xl font-bold leading-none">Correct!</p>
         <p className="mt-2 font-display text-lg font-bold tabular-nums">+1,280</p>
-        <p className="mt-0.5 text-[12px] text-white/85">3 in a row · 2nd place</p>
+        <p className="mt-0.5 text-[12px] text-white/90">3 in a row · 2nd place</p>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { TEACHERS } from "@/lib/session";
 
 /**
  * Sent by the teacher's live pages with navigator.sendBeacon when the tab or
- * browser is closed. The lesson ends 45 seconds later unless the teacher comes
+ * browser is closed. The lesson ends 1 minute later unless the teacher comes
  * back (a refresh), even without "End session" (migration 1020).
  */
 export const POST = withErrorLog(async function POST(req: Request) {

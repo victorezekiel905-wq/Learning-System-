@@ -148,24 +148,24 @@ export function AnswerResult({ correct, title, points, extras, streak = 0, answe
   const shown = useCountUp(points ?? 0);
   return (
     <div role="status" className={cn("relative overflow-hidden rounded-3xl p-7 text-center text-white",
-      correct ? "animate-pop bg-emerald-600" : "animate-shake bg-rose-600", className)}>
+      correct ? "animate-pop bg-emerald-700" : "animate-shake bg-rose-700", className)}>
       {correct && <Burst />}
       <span className="relative mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/20" aria-hidden>
         {correct ? <Check className="h-9 w-9" strokeWidth={3.5} /> : <X className="h-9 w-9" strokeWidth={3.5} />}
       </span>
       <p className="relative mt-3 font-display text-4xl font-extrabold tracking-tight">{title ?? (correct ? "Correct!" : "Not quite")}</p>
       {points != null && points > 0 && <p className="relative mt-1 font-display text-3xl font-extrabold tabular-nums">+{shown.toLocaleString()}</p>}
-      {extras && <p className="relative mt-1 text-sm font-semibold text-white/85">{extras}</p>}
-      {streak >= 2 && <StreakChip streak={streak} className="relative mt-3 bg-white/20" />}
+      {extras && <p className="relative mt-1 text-sm font-semibold text-white/90">{extras}</p>}
+      {streak >= 2 && <StreakChip streak={streak} className="relative mt-3 bg-black/25" />}
       {!correct && answer && (
         <div className="relative mt-4">
-          <p className="text-sm font-semibold text-white/85">The answer</p>
+          <p className="text-sm font-semibold text-white/90">The answer</p>
           <span className={cn("mt-1.5 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-lg font-bold", OPTION_COLORS[answer.index % OPTION_COLORS.length])}>
             <OptionShape i={answer.index} className="h-5 w-5" />{answer.label}
           </span>
         </div>
       )}
-      {!correct && !answer && <p className="relative mt-1 text-white/85">Watch the screen for the answer. The next one could be yours.</p>}
+      {!correct && !answer && <p className="relative mt-1 text-white/90">Watch the screen for the answer. The next one could be yours.</p>}
       {explanation && <p className="relative mx-auto mt-4 max-w-md text-[15px] text-white/90">{explanation}</p>}
     </div>
   );

@@ -141,10 +141,10 @@ function Phone({ q, pick, reveal, name, lead, className }: { q: Q; pick: number 
           <span>{name}</span><span className="tabular-nums">{reveal && right ? "4,860" : "3,580"} pts</span>
         </div>
         {reveal && pick !== null ? (
-          <div className={cn("m-2 flex flex-1 flex-col items-center justify-center rounded-2xl px-2 text-center text-white", right ? "bg-emerald-600" : "bg-rose-600")}>
+          <div className={cn("m-2 flex flex-1 flex-col items-center justify-center rounded-2xl px-2 text-center text-white", right ? "bg-emerald-700" : "bg-rose-700")}>
             <p className="font-display text-[15px] font-bold leading-tight sm:text-lg">{right ? "Correct!" : "Not quite"}</p>
             <p className="mt-1 text-[11px] font-semibold sm:text-xs">{right ? "+1,280" : `Answer: ${q.options[q.right]}`}</p>
-            {right && <p className="mt-0.5 text-[10px] text-white/85">3 in a row</p>}
+            {right && <p className="mt-0.5 text-[10px] text-white/90">3 in a row</p>}
           </div>
         ) : pick !== null ? (
           <div className={cn("m-2 flex flex-1 flex-col items-center justify-center gap-2 rounded-2xl text-white", OPTION_COLORS[pick])}>

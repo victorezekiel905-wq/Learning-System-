@@ -109,7 +109,7 @@ export default async function Landing() {
                   <li key={n} className="flex items-center gap-3">
                     <span className="w-4 text-right font-semibold tabular-nums text-white/50">{i + 1}</span>
                     <span className="flex-1 font-semibold">{n}</span>
-                    <span className="text-[11px] text-white/45">{d}</span>
+                    <span className="text-[11px] text-white/60">{d}</span>
                     <span className="font-display font-bold tabular-nums">{p}</span>
                   </li>
                 ))}

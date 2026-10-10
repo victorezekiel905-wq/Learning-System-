@@ -5,8 +5,8 @@ import { rpc } from "@/lib/rpc";
 /**
  * The teacher's pages for a live lesson (control room, Present, a game hosted
  * from it) say "here" every 20 seconds, and "left" when the tab is closed or the
- * teacher moves elsewhere in the app. The lesson ends 45 seconds after the
- * teacher left, or 3 minutes after the last "here" (migration 1020). Going from
+ * teacher moves elsewhere in the app. The lesson ends 1 minute after the
+ * teacher left, or 10 minutes after the last "here" (migrations 1020, 1040). Going from
  * the control room to Present says "here" again at once, so it carries on.
  */
 export function useTeacherPresence(sessionId: string | null | undefined) {

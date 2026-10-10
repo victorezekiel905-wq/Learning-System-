@@ -57,7 +57,7 @@ test.describe("live classroom", () => {
 
     await signIn(tPage, teacher, `/teacher/live/${sessionId}`);
     await expect(tPage.getByText(joinCode)).toBeVisible();
-    await expect(tPage.getByRole("button", { name: /Lockdown on/ })).toBeVisible();
+    await expect(tPage.getByText("Lockdown on", { exact: true })).toBeVisible();
 
     // Student: the lockdown gate covers the lesson until they share and go full screen.
     await signIn(sPage, student, `/student/live/${sessionId}`);
