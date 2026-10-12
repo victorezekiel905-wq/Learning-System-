@@ -11,6 +11,7 @@ import { useAnnotations } from "@/lib/annotations";
 import { createClient } from "@/lib/supabase/client";
 import { useLoader } from "@/lib/hooks";
 import { errorText, rpc } from "@/lib/rpc";
+import { useSlideNav } from "@/lib/slide-nav";
 import type { Me } from "./LiveRoom";
 
 type Payload = { lesson: { id: string; title: string } | null; slides: SlideData[] };
@@ -25,16 +26,11 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
     const { data } = await createClient().from("lesson_slides").select("position,notes").eq("lesson_id", s.lesson_id);
     return Object.fromEntries((data ?? []).map((r) => [r.position, r.notes as string]));
   }, [s.lesson_id]);
-  const ann = useAnnotations(s.id, s.current_slide);
-
   const slides = lesson.data?.slides ?? [];
-  const slide = slides.find((x) => x.position === s.current_slide) ?? slides[0];
-
-  // Next/back go through session_control: refused unless the lesson has started.
-  async function nav(action: "next" | "prev") {
-    try { await rpc("session_control", { p_session: s.id, p_action: action }); await reload(); }
-    catch (e) { toast(errorText(e), "error"); }
-  }
+  // Next/back show at once and reach the server in the background (refused before the start).
+  const nav = useSlideNav(s.id, s.current_slide, slides.length, reload, (e) => toast(errorText(e), "error"));
+  const ann = useAnnotations(s.id, nav.slide);
+  const slide = slides.find((x) => x.position === nav.slide) ?? slides[0];
   async function update(args: Record<string, unknown>) {
     try { await rpc("set_session_state", { p_session: s.id, ...args }); await reload(); }
     catch (e) { toast(errorText(e), "error"); }
@@ -61,9 +57,9 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled={s.current_slide <= 0} onClick={() => nav("prev")} title="Previous slide (←)"><Icon name="chevronLeft" className="h-4 w-4" />Prev</Button>
-          <span className="text-sm font-medium">Slide {s.current_slide + 1} / {slides.length}</span>
-          <Button variant="secondary" disabled={s.current_slide >= slides.length - 1} onClick={() => nav("next")} title="Next slide (→)">Next<Icon name="chevronRight" className="h-4 w-4" /></Button>
+          <Button variant="secondary" disabled={nav.atStart} onClick={nav.prev} title="Previous slide (←)"><Icon name="chevronLeft" className="h-4 w-4" />Prev</Button>
+          <span className="text-sm font-medium tabular-nums">Slide {nav.slide + 1} / {slides.length}</span>
+          <Button variant="secondary" disabled={nav.atEnd} onClick={nav.next} title="Next slide (→)">Next<Icon name="chevronRight" className="h-4 w-4" /></Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select className="w-auto py-1 text-xs" value={s.mode} onChange={(e) => update({ p_mode: e.target.value })} aria-label="Delivery mode">
@@ -102,8 +98,8 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
 
       <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
         {slides.map((sl) => (
-          <button key={sl.id} onClick={() => update({ p_slide: sl.position })}
-            className={`shrink-0 rounded-lg border px-3 py-2 text-left text-xs ${sl.position === s.current_slide ? "border-brand-500 bg-brand-50" : "border-ink-200 bg-white"}`}>
+          <button key={sl.id} onClick={() => (s.phase ?? "active") === "active" ? nav.go(sl.position) : update({ p_slide: sl.position })}
+            className={`shrink-0 rounded-lg border px-3 py-2 text-left text-xs ${sl.position === nav.slide ? "border-brand-500 bg-brand-50" : "border-ink-200 bg-white"}`}>
             <span className="font-bold text-ink-500">{sl.position + 1}</span> <Badge>{sl.kind}</Badge>
             <span className="mt-1 block max-w-[9rem] truncate">{sl.activity?.title ?? sl.content.heading ?? ""}</span>
           </button>
@@ -113,7 +109,7 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
       <TeacherBroadcast sessionId={s.id} />
 
       <div className="grid gap-4 md:grid-cols-2">
-        {notes.data?.[s.current_slide] && <Alert title="Speaker notes">{notes.data[s.current_slide]}</Alert>}
+        {notes.data?.[nav.slide] && <Alert title="Speaker notes">{notes.data[nav.slide]}</Alert>}
         <div className="card space-y-3 p-4">
           <Toggle checked={s.responses_visible} onChange={(v) => update({ p_responses_visible: v })} label="Share results with students" description="Students see anonymous totals for the open activity." />
           <Toggle checked={s.group_chat_enabled} disabled={!state.settings.allow_group_chat} onChange={(v) => update({ p_group_chat: v })}

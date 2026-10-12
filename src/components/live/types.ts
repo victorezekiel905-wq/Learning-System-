@@ -35,6 +35,8 @@ export type ActivityResults = {
   submitted: number;
   /** Live engine (0900): students who answered, people in the lesson, and whether answers were revealed. */
   answered?: number; joined?: number; revealed?: boolean;
+  /** Who has answered (1130), for each student's view on Present. */
+  answered_ids?: string[];
   questions: {
     question_id: string; prompt: string; kind: string; points: number; responses: number; correct: number; avg_elapsed_ms: number | null;
     options: { id: string; label: string; is_correct: boolean; count: number }[];

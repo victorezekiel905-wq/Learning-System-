@@ -25,31 +25,39 @@ import type { Screen } from "@/components/live/ScreenRail";
 /** A pretend laptop screen, in a colour of its own. */
 const fakeScreen = (hue: number, text: string) => "data:image/svg+xml," + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="640" height="360" fill="hsl(${hue} 30% 96%)"/><rect width="640" height="36" fill="hsl(${hue} 45% 40%)"/><text x="24" y="120" font-family="sans-serif" font-size="34" font-weight="700" fill="#1f2937">${text}</text><rect x="24" y="160" width="380" height="18" rx="9" fill="hsl(${hue} 40% 70%)"/><rect x="24" y="196" width="300" height="18" rx="9" fill="hsl(${hue} 40% 80%)"/><rect x="24" y="250" width="160" height="60" rx="12" fill="hsl(${hue} 60% 55%)"/></svg>`);
-const PEOPLE: [string, string, "share" | "phone" | "left", boolean?][] = [["Ada Obi", "a", "share"], ["Tobi Bello", "b", "share", true], ["Kemi Eze", "c", "share"], ["Femi Ade", "d", "left"],
-  ["Zara Musa", "e", "share"], ["Gift Ola", "f", "phone"], ["Uche Nwosu", "g", "share"], ["Bisi Kalu", "h", "share"]];
-function presentState(): SessionState {
+const PEOPLE: [string, string, "lesson" | "share" | "phone" | "left", boolean?][] = [["Ada Obi", "a", "lesson"], ["Tobi Bello", "b", "lesson", true], ["Kemi Eze", "c", "share"], ["Femi Ade", "d", "left"],
+  ["Zara Musa", "e", "lesson"], ["Gift Ola", "f", "phone"], ["Uche Nwosu", "g", "lesson"], ["Bisi Kalu", "h", "lesson"]];
+const PRESENT_SLIDES: SlideData[] = [
+  { id: "s0", position: 0, kind: "title", content: { heading: "Equivalent fractions", body: "Same amount, different numbers." } },
+  { id: "s1", position: 1, kind: "text", content: { heading: "Halves, quarters, eighths", body: "1/2 = 2/4 = 4/8. Multiply the top and the bottom by the same number." } },
+  { id: "s2", position: 2, kind: "activity", content: {}, activity: { id: "q", kind: "quiz", title: "Check" } }
+];
+function presentState(question: boolean): SessionState {
   const st = bar("active", "none");
   st.session.guest_monitoring = true;
+  st.session.current_slide = question ? 2 : 1;
+  if (question) st.activity = { activity: { id: "q", title: "Check", kind: "quiz" }, attempts: 5, submitted: 3, answered: 3, joined: 7, revealed: false, answered_ids: ["a", "e", "g"],
+    questions: [{ question_id: "q1", prompt: "Which is the same as 3/4?", kind: "mcq", points: 1, responses: 3, correct: 2, avg_elapsed_ms: null,
+      options: [{ id: "o1", label: "6/8", is_correct: true, count: 2 }, { id: "o2", label: "3/8", is_correct: false, count: 1 }, { id: "o3", label: "4/3", is_correct: false, count: 0 }, { id: "o4", label: "1/4", is_correct: false, count: 0 }] }] } as SessionState["activity"];
   st.roster = PEOPLE.map(([name, id, how, hand]) => ({
-    student_id: id, name, presence: how === "left" ? "offline" : "online", last_seen_at: null, current_slide: 3, device: null, open_alerts: 0, hand_raised: !!hand, guest: how === "phone",
-    web: { sharing: how === "share", unsupported: how === "phone", surface: "monitor", visible: true, fullscreen: true, away_since: how === "left" ? new Date().toISOString() : null, away_reason: how === "left" ? "Closed the lesson" : null }
+    student_id: id, name, presence: how === "left" ? "offline" : "online", last_seen_at: null, current_slide: null, device: null, open_alerts: 0, hand_raised: !!hand, guest: how === "phone",
+    web: { sharing: how === "share", unsupported: how === "phone", surface: "monitor", visible: id !== "h", fullscreen: true, away_since: how === "left" ? new Date().toISOString() : null, away_reason: how === "left" ? "Closed the lesson" : null }
   }));
   return st;
 }
-const PRESENT_SCREENS: Record<string, Screen> = Object.fromEntries(PEOPLE.filter((x) => x[2] === "share").map(([name, id], i) =>
-  [id, { student_id: id, device_id: null, image: fakeScreen(i * 47, `${name.split(" ")[0]}: 3/4 = 6/8`), captured_at: new Date().toISOString(), url: null, stale: false, source: "web" as const }]));
-const PRESENT_SLIDE: SlideData = { id: "sl", position: 3, kind: "title", content: { heading: "Equivalent fractions", body: "Same amount, different numbers." } };
-function PresentPreview({ start = null }: { start?: string | null }) {
+const PRESENT_SCREENS: Record<string, Screen> = { c: { student_id: "c", device_id: null, image: fakeScreen(100, "Kemi: 3/4 = 6/8"), captured_at: new Date().toISOString(), url: null, stale: false, source: "web" } };
+function PresentPreview({ start = null, question = false }: { start?: string | null; question?: boolean }) {
   const [shown, setShown] = useState<string | null>(start);
-  const st = presentState();
+  const st = presentState(question);
+  const cur = PRESENT_SLIDES[st.session.current_slide];
   return (
     <div className="flex min-h-[600px] flex-col bg-ink-900 text-white lg:flex-row">
       <main className="relative flex min-w-0 flex-1 items-center justify-center p-4 sm:p-6">
-        {shown ? <ProjectedScreen state={st} sessionId="s" studentId={shown} live={PRESENT_SCREENS[shown]} onBack={() => setShown(null)}
-          lesson={<SlideView slide={PRESENT_SLIDE} />} lessonLabel="Lesson · slide 4 of 12" />
-          : <div className="w-full max-w-6xl text-ink-900"><SlideView slide={PRESENT_SLIDE} /></div>}
+        {shown ? <ProjectedScreen state={st} sessionId="s" studentId={shown} screens={PRESENT_SCREENS} slides={PRESENT_SLIDES} slide={st.session.current_slide} onBack={() => setShown(null)}
+          lesson={<SlideView slide={cur} />} lessonLabel={`Lesson · slide ${st.session.current_slide + 1} of 3`} />
+          : <div className="w-full max-w-6xl text-ink-900"><SlideView slide={cur} /></div>}
       </main>
-      <ScreenStrip state={st} screens={PRESENT_SCREENS} shown={shown} onShow={(id) => setShown(shown === id ? null : id)} onHide={() => {}} />
+      <ScreenStrip state={st} screens={PRESENT_SCREENS} slides={PRESENT_SLIDES} slide={st.session.current_slide} shown={shown} onShow={(id) => setShown(shown === id ? null : id)} onHide={() => {}} />
     </div>
   );
 }
@@ -150,7 +158,8 @@ export function Preview() {
       <section id="guide" className="bg-ink-50 p-5"><StartGuide done={{ classes: true, lessons: false, taught: false, report: false }} /></section>
 
       <section id="present"><PresentPreview /></section>
-      <section id="present-shown"><PresentPreview start="c" /></section>
+      <section id="present-question"><PresentPreview question /></section>
+      <section id="present-shown"><PresentPreview start="a" question /></section>
 
       <section id="control" className="space-y-px bg-ink-200">
         {([["lobby", "none"], ["active", "open"], ["active", "revealed"], ["paused", "none"]] as const).map(([ph, q]) => (

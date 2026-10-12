@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { requireRole, TEACHERS } from "@/lib/session";
+import { ADMINS, requireRole, TEACHERS } from "@/lib/session";
 import { Badge, Empty, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { NewLessonButton } from "./NewLessonButton";
 import { LibraryGrid, type LibraryItem } from "./LibraryGrid";
-import { LessonActions, RestoreLesson } from "./LessonActions";
+import { LessonCardActions, RestoreLesson } from "./LessonActions";
 
 export const metadata = { title: "Lessons" };
 
@@ -55,8 +55,8 @@ export default async function LessonsPage(
               <div className="mt-3"><RestoreLesson id={l.id} /></div>
             </div>
           ) : (
-            <div key={l.id} className="card relative transition hover:border-ink-400">
-              <Link href={`/teacher/lessons/${l.id}`} className="block p-5 pr-14 no-underline sm:p-6 sm:pr-14">
+            <div key={l.id} className="card flex flex-col transition hover:border-ink-400">
+              <Link href={`/teacher/lessons/${l.id}`} className="block flex-1 p-5 no-underline sm:p-6">
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="font-semibold text-ink-900">{l.title}</h2>
                   <Badge tone={l.is_template ? "cyan" : l.status === "published" ? "green" : "gray"}>{l.is_template ? "template" : l.status}</Badge>
@@ -64,7 +64,7 @@ export default async function LessonsPage(
                 <p className="mt-1 text-sm text-ink-500">{l.subject ?? "—"}{l.current_version ? ` · v${l.current_version}` : ""}</p>
                 <p className="mt-3 text-xs text-ink-500">{l.owner_id === me.profile.id ? "You" : l.users?.full_name} · updated {formatDate(l.updated_at)}</p>
               </Link>
-              <div className="absolute right-3 top-4"><LessonActions id={l.id} title={l.title} own={l.owner_id === me.profile.id} /></div>
+              <LessonCardActions id={l.id} title={l.title} canDelete={l.owner_id === me.profile.id || ADMINS.includes(me.profile.role)} />
             </div>
           ))}
         </div>

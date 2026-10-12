@@ -22,7 +22,9 @@ import { WordCloud, useWordCloud } from "@/components/game/WordCloud";
 import { TeamStandings, useTeamScores } from "@/components/game/Teams";
 import { useSessionScreens } from "@/components/live/ScreenRail";
 import { useToast } from "@/components/ui";
-import { ProjectedScreen, ScreenStrip } from "./PresentScreens";
+import { liveFrame, ProjectedScreen, ScreenStrip } from "./PresentScreens";
+import { usePresenceAlarms } from "@/components/live/presence-alarms";
+import { useSlideNav, type SlideNav } from "@/lib/slide-nav";
 
 const TILE_KINDS = ["mcq", "true_false", "poll", "multi_select"];
 
@@ -38,8 +40,14 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   // Joins, leaves and hands, for the screens beside the lesson.
   useSignal(`staff:${sessionId}`, ["roster", "alert", "hand"], () => void state.reload(), { debounceMs: 300, minGapMs: 1500 });
   const s = state.data?.session;
-  const ann = useAnnotations(sessionId, s?.current_slide ?? 0);
-  const slide = (lesson.data?.slides ?? []).find((x) => x.position === s?.current_slide);
+  const toast = useToast();
+  const slides = lesson.data?.slides ?? [];
+  // Next/back show at once; the server (and the students) catch up in the background.
+  const nav = useSlideNav(sessionId, s?.current_slide ?? 0, slides.length, state.reload, (e) => toast(errorText(e), "error"));
+  const ann = useAnnotations(sessionId, nav.slide);
+  const slide = slides.find((x) => x.position === nav.slide);
+  // Joining, leaving and coming back pop up here too.
+  usePresenceAlarms(state.data?.roster, true, !!s && s.phase !== "lobby");
   const results = state.data?.activity;
   const isCloud = results?.questions[0]?.kind === "word_cloud";
   const cloud = useWordCloud(results?.activity.id, sessionId, isCloud);
@@ -48,52 +56,66 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   const host = typeof window !== "undefined" ? window.location.host : "";
   const here = (state.data?.roster ?? []).filter((r) => r.presence === "online" || r.presence === "idle");
 
-  // Students' screens beside the lesson (when the school monitors and allows capture).
-  const toast = useToast();
-  const screensOk = !!state.data && state.data.settings.monitoring_enabled !== false && !!state.data.settings.allow_screen_capture;
-  const screens = useSessionScreens(sessionId, screensOk ? state.data : null);
+  // Every student's lesson view beside the lesson. Real screens are used only where a
+  // student happens to share theirs (and the school allows capture).
+  const captureOk = !!state.data && state.data.settings.monitoring_enabled !== false && !!state.data.settings.allow_screen_capture;
+  const screens = useSessionScreens(sessionId, captureOk ? state.data : null);
   const [railOn, setRailOn] = useState(true);
   useEffect(() => { try { if (localStorage.getItem("swiftcipher.present.screens") === "off") setRailOn(false); } catch { /* storage blocked */ } }, []);
   const toggleRail = useCallback(() => setRailOn((v) => {
     try { localStorage.setItem("swiftcipher.present.screens", v ? "off" : "on"); } catch { /* storage blocked */ }
     return !v;
   }), []);
-  const rail = screensOk && railOn && !!s && s.phase !== "lobby";
-  // The student shown large on this screen. It's a spotlight just for the projector:
-  // the student is told; everyone else's device keeps the lesson.
+  const rail = railOn && !!s && s.phase !== "lobby";
+  // The student shown large on this screen; everyone else's device keeps the lesson.
+  // Their lesson view needs nothing from them. A real shared screen goes up as a
+  // spotlight just for the projector, so the student is told.
   const [shown, setShown] = useState<string | null>(null);
   const shownRef = useRef<string | null>(null);
   shownRef.current = shown;
-  const showScreen = useCallback(async (id: string) => {
-    if (shownRef.current === id) { setShown(null); await rpc("spotlight_stop", { p_session: sessionId }).catch(() => {}); void state.reload(); return; }
-    try {
-      await rpc("spotlight_start", { p_session: sessionId, p_student: id, p_anonymized: false, p_show_to_class: false });
-      await state.reload();
-      setShown(id);
-    } catch (e) { toast(errorText(e), "error"); }
-  }, [sessionId, state, toast]);
+  const spotlit = useRef(false);
   const hideScreen = useCallback(() => {
     if (!shownRef.current) return;
     setShown(null);
-    void rpc("spotlight_stop", { p_session: sessionId }).catch(() => {}).then(() => state.reload());
+    if (spotlit.current) {
+      spotlit.current = false;
+      void rpc("spotlight_stop", { p_session: sessionId }).catch(() => {}).then(() => state.reload());
+    }
   }, [sessionId, state]);
-  // Stopped from the control room, or the lesson moved on to its lobby/end: back to the lesson.
+  const showScreen = useCallback(async (id: string) => {
+    if (shownRef.current === id) { hideScreen(); return; }
+    const r = state.data?.roster.find((x) => x.student_id === id);
+    if (r && liveFrame(r, screens)) {
+      try {
+        await rpc("spotlight_start", { p_session: sessionId, p_student: id, p_anonymized: false, p_show_to_class: false });
+        spotlit.current = true;
+        await state.reload();
+        setShown(id);
+      } catch (e) { toast(errorText(e), "error"); }
+      return;
+    }
+    if (spotlit.current) { spotlit.current = false; void rpc("spotlight_stop", { p_session: sessionId }).catch(() => {}); }
+    setShown(id);
+  }, [sessionId, state, screens, toast, hideScreen]);
+  // A shared screen stopped from the control room: back to the lesson.
   const spotStudent = state.data?.spotlight?.student_id ?? null;
-  useEffect(() => { if (shown && state.data && spotStudent !== shown) setShown(null); }, [shown, spotStudent, state.data]);
+  useEffect(() => {
+    if (spotlit.current && shown && state.data && spotStudent !== shown) { spotlit.current = false; setShown(null); }
+  }, [shown, spotStudent, state.data]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && shownRef.current) hideScreen(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [hideScreen]);
   // Leaving Present ends the projector's spotlight.
-  useEffect(() => () => { if (shownRef.current) void rpc("spotlight_stop", { p_session: sessionId }).catch(() => {}); }, [sessionId]);
+  useEffect(() => () => { if (spotlit.current) void rpc("spotlight_stop", { p_session: sessionId }).catch(() => {}); }, [sessionId]);
 
   // Clock skew against the server, so the projector counts down with the phones.
   const [skew, setSkew] = useState(0);
   useEffect(() => { if (state.data?.server_now) setSkew(new Date(state.data.server_now).getTime() - Date.now()); }, [state.data]);
   const timer = state.data?.timer ?? null;
   const q0 = results?.questions[0];
-  const gameOn = s?.phase === "active" && !s.show_leaderboard && !spot.data && !shown && !!results && !!q0;
+  const gameOn = s?.phase === "active" && !s.show_leaderboard && !spot.data && !shown && !nav.pending && !!results && !!q0;
   const asking = gameOn && !results!.revealed && !s.responses_visible;
   const revealedTiles = gameOn && results!.revealed && TILE_KINDS.includes(q0!.kind);
   const [timeUp, setTimeUp] = useState<string | null>(null);
@@ -141,9 +163,9 @@ export function Presenter({ sessionId }: { sessionId: string }) {
         {s?.phase === "lobby" && <GlyphField opacity={0.4} />}
         {shown && state.data && s && s.phase !== "lobby" ? (
           <ProjectedScreen state={state.data} sessionId={sessionId} studentId={shown} onBack={hideScreen}
-            live={screens[shown]?.source === "web" ? screens[shown] : undefined}
+            screens={screens} slides={slides} slide={nav.slide}
             lesson={slide ? <SlideView slide={slide} /> : undefined}
-            lessonLabel={s.phase === "paused" ? "Lesson paused" : `Lesson · slide ${s.current_slide + 1}${lesson.data?.slides.length ? ` of ${lesson.data.slides.length}` : ""}`} />
+            lessonLabel={s.phase === "paused" ? "Lesson paused" : `Lesson · slide ${nav.slide + 1}${slides.length ? ` of ${slides.length}` : ""}`} />
         ) : s?.phase === "lobby" ? (
           <div className="relative text-center">
             <p className="text-2xl text-ink-300">Join at <strong className="text-white">{host}/join</strong></p>
@@ -224,10 +246,10 @@ export function Presenter({ sessionId }: { sessionId: string }) {
           </div>
         ) : <p className="text-2xl text-ink-400">{s ? "Waiting to start…" : "Loading…"}</p>}
       </main>
-      {rail && state.data && <ScreenStrip state={state.data} screens={screens} shown={shown} onShow={(id) => void showScreen(id)} onHide={toggleRail} />}
+      {rail && state.data && <ScreenStrip state={state.data} screens={screens} slides={slides} slide={nav.slide} shown={shown} onShow={(id) => void showScreen(id)} onHide={toggleRail} />}
       </div>
-      {state.data && <PresenterControls sessionId={sessionId} state={state.data} slideCount={lesson.data?.slides.length ?? 0} reload={state.reload}
-        screens={screensOk ? { on: railOn, toggle: toggleRail } : null} />}
+      {state.data && <PresenterControls sessionId={sessionId} state={state.data} slideCount={slides.length} reload={state.reload} nav={nav}
+        screens={{ on: railOn, toggle: toggleRail }} />}
     </div>
   );
 }
@@ -241,9 +263,9 @@ const BAR_BTN = "inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm
  * → next, ← back, S start, R reveal, P pause/resume, L leaderboard, V screens,
  * F full screen, Esc back to the lesson from a student's screen.
  */
-function PresenterControls({ sessionId, state, slideCount, reload, screens }: {
-  sessionId: string; state: SessionState; slideCount: number; reload: () => Promise<void>;
-  /** Students' screens beside the lesson; null when the school doesn't capture screens. */
+function PresenterControls({ sessionId, state, slideCount, reload, nav, screens }: {
+  sessionId: string; state: SessionState; slideCount: number; reload: () => Promise<void>; nav: SlideNav;
+  /** Students' screens beside the lesson. */
   screens: { on: boolean; toggle: () => void } | null;
 }) {
   const s = state.session;
@@ -291,8 +313,8 @@ function PresenterControls({ sessionId, state, slideCount, reload, screens }: {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
-      if (e.key === "ArrowRight" && phase === "active") { e.preventDefault(); void act("next"); }
-      else if (e.key === "ArrowLeft" && phase === "active") { e.preventDefault(); void act("prev"); }
+      if (e.key === "ArrowRight" && phase === "active") { e.preventDefault(); nav.next(); }
+      else if (e.key === "ArrowLeft" && phase === "active") { e.preventDefault(); nav.prev(); }
       else if (k === "s" && phase === "lobby") void act("start");
       else if (k === "p" && (phase === "active" || phase === "paused")) void act(phase === "active" ? "pause" : "resume");
       else if (k === "l" && phase !== "lobby") void act("leaderboard", { show: !s.show_leaderboard });
@@ -302,7 +324,7 @@ function PresenterControls({ sessionId, state, slideCount, reload, screens }: {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, s.show_leaderboard, state.activity, act, toggleFull, screens]);
+  }, [phase, s.show_leaderboard, state.activity, act, toggleFull, screens, nav]);
 
   const visible = shown || phase === "lobby" || !!err;
   const ghost = `${BAR_BTN} bg-white/10 text-white no-underline hover:bg-white/20`;
@@ -317,9 +339,9 @@ function PresenterControls({ sessionId, state, slideCount, reload, screens }: {
         <Link href={`/teacher/live/${sessionId}`} className={ghost} title="Back to the control room"><ArrowLeft className="h-4 w-4" /> Control room</Link>
         {phase === "lobby" && <button type="button" className={accent} disabled={busy} onClick={() => void act("start")} title="Start the lesson (S)"><Play className="h-4 w-4" /> Start lesson</button>}
         {phase === "active" && <>
-          <button type="button" className={ghost} disabled={busy || s.current_slide <= 0} onClick={() => void act("prev")} title="Previous slide (←)"><ChevronLeft className="h-5 w-5" /> Back</button>
-          {slideCount > 0 && <span className="px-1 text-sm tabular-nums text-ink-300">{s.current_slide + 1} / {slideCount}</span>}
-          <button type="button" className={accent} disabled={busy || (slideCount > 0 && s.current_slide >= slideCount - 1)} onClick={() => void act("next")} title="Next slide (→)">Next <ChevronRight className="h-5 w-5" /></button>
+          <button type="button" className={ghost} disabled={nav.atStart} onClick={nav.prev} title="Previous slide (←)"><ChevronLeft className="h-5 w-5" /> Back</button>
+          {slideCount > 0 && <span className="px-1 text-sm tabular-nums text-ink-300">{nav.slide + 1} / {slideCount}</span>}
+          <button type="button" className={accent} disabled={nav.atEnd} onClick={nav.next} title="Next slide (→)">Next <ChevronRight className="h-5 w-5" /></button>
           {state.activity && !state.activity.revealed && <button type="button" className={ghost} disabled={busy} onClick={() => void act("reveal")} title="Show the right answers (R)"><Eye className="h-4 w-4" /> Reveal</button>}
           <button type="button" className={ghost} disabled={busy} onClick={() => void act("pause")} title="Students see “Eyes on your teacher” (P)"><Pause className="h-4 w-4" /> Pause</button>
         </>}

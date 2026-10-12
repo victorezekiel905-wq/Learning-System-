@@ -2642,3 +2642,20 @@ test("class teachers see every subject of their class; subject teachers only the
   await db.rpc(form, "remove_class_subject", { p_id: englishRow });
   await rejects(db.rpc(english, "progress_report", { p_student: ada, p_period: "week" }), /Report not found/);
 });
+
+test("Present: who has answered the open question (1130)", async () => {
+  const L = await lessonWithQuiz("Views");
+  const ada = await db.signUp("ada@views.test", "Ada Obi");
+  await db.rpc(ada, "redeem_code", { p_code: L.cls.join_code });
+  await db.rpc(ada, "join_session", { p_code: L.s.join_code });
+  const gina = await db.signInAnonymously();
+  await db.rpc(gina, "join_session_as_guest", { p_code: L.s.join_code, p_name: "Gina" });
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "start" });
+  await db.rpc(L.T, "session_control", { p_session: L.s.id, p_action: "goto", p_args: { slide: 1 } });
+  assert.deepEqual((await db.rpc(L.T, "teacher_session_state", { p_session: L.s.id })).activity.answered_ids, []);
+  const t = (await db.rpc(gina, "start_attempt", { p_activity: L.act, p_session: L.s.id })).attempt.id;
+  await db.rpc(gina, "submit_answer", { p_attempt: t, p_question: L.q1, p_response: JSON.stringify({ option_id: L.right }) });
+  const st = await db.rpc(L.T, "teacher_session_state", { p_session: L.s.id });
+  assert.deepEqual(st.activity.answered_ids, [gina]);
+  assert.equal(st.activity.answered, 1);
+});

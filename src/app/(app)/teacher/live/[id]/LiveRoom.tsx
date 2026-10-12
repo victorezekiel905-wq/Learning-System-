@@ -10,6 +10,7 @@ import { useNetwork, useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
 import { useTeacherPresence } from "@/lib/teacher-presence";
 import { errorText, rpc } from "@/lib/rpc";
+import { useSlideNav } from "@/lib/slide-nav";
 import { cn, formatJoinCode, timeAgo } from "@/lib/utils";
 import { Critter } from "@/components/live/Critter";
 import { JoinQr } from "@/components/live/JoinQr";
@@ -21,6 +22,7 @@ import { ScreensPanel } from "./ScreensPanel";
 import { EnvironmentPanel } from "./EnvironmentPanel";
 import { ChatPanel } from "./ChatPanel";
 import { FocusView, ScreenRail, useSessionScreens } from "@/components/live/ScreenRail";
+import { beep, osNotify, usePresenceAlarms } from "@/components/live/presence-alarms";
 import { TeamStandings, useTeamScores } from "@/components/game/Teams";
 
 type Tab = "lesson" | "responses" | "screens" | "environment" | "chat";
@@ -48,59 +50,8 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
 
   const openAlerts = useMemo(() => (s?.alerts ?? []).filter((a) => a.status === "open" && !a.resolved_at), [s]);
   const lastAlert = useRef<string | null>(null);
-  const beep = (freq: number) => {
-    if (!sound) return;
-    try {
-      const ctx = new AudioContext();
-      [0, 0.2].forEach((t) => {
-        const o = ctx.createOscillator(); o.frequency.value = freq;
-        o.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.12);
-      });
-    } catch { /* audio blocked until the teacher interacts with the page */ }
-  };
-  const osNotify = (title: string, body?: string) => {
-    if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
-      new Notification(title, { body, tag: `swiftcipher-${title}` });
-    }
-  };
-
-  // Leaving and coming back, for students and guests alike:
-  //  * closed the lesson or the browser: instant (the page says so as it closes);
-  //  * switched away under lockdown: instant, with the reason;
-  //  * went quiet (device off, battery, no internet): once the presence window passes.
-  // Each rings the alarm (unless sound is off), pops up, and stays in the "Left" list
-  // until they are back; coming back, or rejoining on another device, is announced too.
-  const seen = useRef<Map<string, { here: boolean; away: string | null; name: string }> | null>(null);
-  useEffect(() => {
-    if (!s) return;
-    const first = seen.current === null;
-    const prev = seen.current ?? new Map<string, { here: boolean; away: string | null; name: string }>();
-    const next = new Map<string, { here: boolean; away: string | null; name: string }>();
-    const alarm = (title: string, why: string) => {
-      toast(`${title}: ${why}`, "error");
-      beep(880); window.setTimeout(() => beep(660), 380);
-      osNotify(title, why);
-    };
-    for (const r of s.roster) {
-      const here = r.presence === "online" || r.presence === "idle";
-      const away = r.web?.away_since ?? null;
-      next.set(r.student_id, { here, away, name: r.name });
-      if (first) continue;
-      const before = prev.get(r.student_id);
-      if (away && !before?.away) {
-        alarm(`${r.name} left the lesson`, r.web?.away_reason ?? "Left the lesson");
-      } else if (before?.here && !here && !away) {
-        alarm(`${r.name} lost connection`, "Their device went off or lost the internet. They can rejoin with the same code.");
-      } else if (before && (!before.here || before.away) && here && !away) {
-        toast(`${r.name} is back in the lesson`, "success");
-      } else if (!before && here) {
-        const earlier = [...prev.entries()].find(([id, v]) => id !== r.student_id && v.name.toLowerCase() === r.name.toLowerCase());
-        if (earlier) toast(`${r.name} rejoined on another device`, "success");
-      }
-    }
-    seen.current = next;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s]);
+  // Leaving, coming back and rejoining: alarm, pop-up, system notification.
+  usePresenceAlarms(s?.roster, sound, (s?.session.phase ?? "lobby") !== "lobby");
 
   // Formal alerts (grace period passed, blocked sites, off-task): sound + browser notification.
   useEffect(() => {
@@ -110,7 +61,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
       // Already announced instantly when the student left; don't double-alert.
       const announced = newest.kind === "environment_left" && !!s?.roster.find((r) => r.student_id === newest.student_id)?.web?.away_since;
       if (!announced) {
-        beep(newest.kind === "environment_left" || newest.kind === "domain_blocked" ? 880 : 660);
+        if (sound) beep(newest.kind === "environment_left" || newest.kind === "domain_blocked" ? 880 : 660);
         toast(`${newest.student}: ${ALERT_LABEL[newest.kind] ?? newest.kind}. ${newest.rule}`, newest.kind === "off_task" ? "info" : "error");
         osNotify(`${newest.student}: ${ALERT_LABEL[newest.kind] ?? newest.kind}`, newest.rule);
       }
@@ -142,6 +93,11 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
     }, out ? 1200 : 600);
   }, [s, timer, timerLeft, sessionId, state]);
 
+  // Arrow keys move slides at once (the server catches up in the background).
+  const slideNav = useSlideNav(sessionId, s?.session.current_slide ?? 0, 0, state.reload, (e) => toast(errorText(e), "error"));
+  const slideNavRef = useRef(slideNav);
+  slideNavRef.current = slideNav;
+
   // Keyboard: → next, ← back, L leaderboard, R reveal, P pause/resume, S start.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -153,8 +109,8 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
       const act = (action: string, args: Record<string, unknown> = {}) =>
         rpc("session_control", { p_session: sessionId, p_action: action, p_args: args }).then(() => state.reload()).catch((err) => toast(errorText(err), "error"));
       const k = e.key.toLowerCase();
-      if (e.key === "ArrowRight" && ph === "active") { e.preventDefault(); void act("next"); }
-      else if (e.key === "ArrowLeft" && ph === "active") { e.preventDefault(); void act("prev"); }
+      if (e.key === "ArrowRight" && ph === "active") { e.preventDefault(); slideNavRef.current.next(); }
+      else if (e.key === "ArrowLeft" && ph === "active") { e.preventDefault(); slideNavRef.current.prev(); }
       else if (k === "s" && ph === "lobby") void act("start");
       else if (k === "p" && (ph === "active" || ph === "paused")) void act(ph === "active" ? "pause" : "resume");
       else if (k === "l" && ph !== "lobby") void act("leaderboard", { show: !cur.show_leaderboard });

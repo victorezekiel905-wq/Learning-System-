@@ -17,6 +17,7 @@ import { messageForError } from "@/lib/errors";
 import type { ActivityKind, SlideContent, SlideKind } from "@/lib/types";
 import { cn, formatDateTime } from "@/lib/utils";
 import { SlideForm } from "./SlideForm";
+import { DeleteLessonButton } from "../LessonActions";
 
 type Lesson = { id: string; tenant_id: string; owner_id: string; title: string; description: string | null; subject: string | null; status: string; is_template: boolean; current_version: number; default_mode: string };
 type SlideRow = { id: string; position: number; kind: SlideKind; content: SlideContent; notes: string | null; activity_id: string | null };
@@ -228,6 +229,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
             <Button size="sm" variant="secondary" onClick={() => duplicate(true)}>Save as template</Button>
             <Button size="sm" variant="secondary" onClick={() => setShare(true)} disabled={lesson.status !== "published"} title={lesson.status !== "published" ? "Publish first" : undefined}>Share link</Button>
             <Button size="sm" onClick={publish}>{lesson.status === "published" ? "Publish update" : "Publish"}</Button>
+            <DeleteLessonButton id={lesson.id} title={lesson.title} onDeleted={() => router.push("/teacher/lessons")} />
           </> : <Button size="sm" onClick={() => duplicate(false)}>Make my own copy</Button>}
           <Link href={`/teacher/live/new?lesson=${lesson.id}`} className="btn btn-accent btn-sm no-underline">Teach live</Link>
         </div>
