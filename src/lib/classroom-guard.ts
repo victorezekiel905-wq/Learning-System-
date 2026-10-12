@@ -189,7 +189,7 @@ export function useClassroomGuard(sessionId: string, opts: {
       return true;
     } catch (e) {
       setShareError((e as Error).name === "NotAllowedError"
-        ? "Screen sharing was cancelled. You need to share your screen to take part in this class."
+        ? "That was cancelled. Tap again and choose Entire screen, then Share."
         : "Couldn't start screen sharing. Try again, or ask your teacher.");
       return false;
     }

@@ -5,6 +5,7 @@ import { ActivityPlayer } from "@/components/activities/ActivityPlayer";
 import { ThreadView } from "@/components/chat/ThreadView";
 import { Icon } from "@/components/Icon";
 import { LockdownGate } from "@/components/live/LockdownGate";
+import { StartLearning, StartLearningChip } from "@/components/live/StartLearning";
 import { StudentReceiver } from "@/components/live/RtcBroadcast";
 import { BOARD_H, BOARD_W, StrokeLayer } from "@/components/slides/Whiteboard";
 import { LessonStage, type LearnerSlide } from "@/components/student/LessonStage";
@@ -150,6 +151,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
     <div className="page max-w-5xl space-y-4 bg-ink-50">
       {s.session.phase === "paused" && <PausedOverlay teacher={s.session.teacher} />}
       {s.leaderboard && s.session.phase !== "paused" && <BoardOverlay entries={s.leaderboard} me={myName} my={s.my ?? null} />}
+      <StartLearning guard={guard} teacher={s.session.teacher} title={s.session.title} />
       <LockdownGate guard={guard} teacher={s.session.teacher} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs text-ink-500">{paced ? "From" : "Live with"} {s.session.teacher}</p><h1 className="text-xl font-bold">{s.session.title}</h1></div>
@@ -160,7 +162,8 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
           </span>}
           {s.my && <StreakChip streak={s.my.streak} />}
           {myTeam && <TeamChip team={myTeam} />}
-          {guard.sharing && <Badge tone="red"><span className="mr-1 inline-block h-2 w-2 animate-pulse2 rounded-full bg-rose-600" />Sharing screen with your teacher</Badge>}
+          {guard.sharing && <Badge tone="red"><span className="mr-1 inline-block h-2 w-2 animate-pulse2 rounded-full bg-rose-600" />Your teacher can see your screen</Badge>}
+          <StartLearningChip guard={guard} />
           {guard.locked && <Badge tone="gray"><Icon name="lock" className="mr-1 inline h-3 w-3" />Lockdown</Badge>}
           {pending > 0 && <Badge tone="amber">{pending} answer(s) waiting to sync</Badge>}
           {quality === "offline" && <Badge tone="red">Offline</Badge>}

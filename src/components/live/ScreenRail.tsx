@@ -70,7 +70,6 @@ export function useStudentFrame(state: SessionState, sessionId: string, studentI
 export function screenPlaceholder(r: RosterEntry, state: SessionState) {
   if (!state.settings.allow_screen_capture) return "Screen capture is turned off by your school.";
   if (r.guest && !state.session.guest_monitoring) return "Guest: not monitored";
-  if (!state.session.lockdown) return "Lockdown is off";
   if (r.web?.away_since) return r.web.away_reason ?? "Away from the lesson";
   if (r.device && !r.device.online) return "Connection lost";
   if (r.web?.unsupported) return "This device can't share its screen";
@@ -98,8 +97,8 @@ export function EvidenceButton({ eventId, student }: { eventId: string; student:
 }
 
 /**
- * Why screens aren't coming through, with the one-click fix: students share only
- * under lockdown, and guests only when the teacher monitors guests.
+ * Why screens aren't coming through, with the one-click fix: guests share only when
+ * the teacher monitors guests (on by default since 1140).
  */
 export function WhyNoScreens({ state, screens, onChanged }: { state: SessionState; screens: Record<string, Screen>; onChanged?: () => void }) {
   const toast = useToast();
@@ -117,14 +116,6 @@ export function WhyNoScreens({ state, screens, onChanged }: { state: SessionStat
     catch (e) { toast(errorText(e), "error"); }
     finally { setBusy(false); }
   };
-  if (!state.session.lockdown) {
-    return (
-      <Alert tone="warn">
-        Students share their screens only while Lockdown is on.
-        <span className="mt-2 block"><Button size="sm" loading={busy} onClick={() => void fix("set_session_lockdown", { p_on: true }, "Lockdown on: students are asked to share their screen")}>Turn on Lockdown</Button></span>
-      </Alert>
-    );
-  }
   if (guests > 0 && !state.session.guest_monitoring) {
     return (
       <Alert tone="warn">

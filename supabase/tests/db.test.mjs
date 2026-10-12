@@ -1381,7 +1381,8 @@ test("guests join a live lesson with the code and a name, and reach only that le
   await db.as(g, "insert into public.raise_hands (tenant_id, session_id, student_id, message) values ($1, $2, $3, 'help')", [tenant, s.id, g]);
   await rejects(db.rpc(g, "open_group_thread", { p_session: s.id }), /./);
 
-  // Not monitored unless the teacher chooses: lockdown is off for the guest.
+  // With guests turned off for this lesson (they are on by default since 1140), lockdown is off for the guest.
+  await db.rpc(T, "set_session_guests", { p_session: s.id, p_monitor: false });
   const free = await db.rpc(g, "student_report", { p_session: s.id, p_visible: false, p_fullscreen: false, p_sharing: false });
   assert.equal(free.lockdown, false);
   assert.equal(free.away, false);
@@ -2658,4 +2659,22 @@ test("Present: who has answered the open question (1130)", async () => {
   const st = await db.rpc(L.T, "teacher_session_state", { p_session: L.s.id });
   assert.deepEqual(st.activity.answered_ids, [gina]);
   assert.equal(st.activity.answered, 1);
+});
+
+test("screens on by default: a guest is asked without Lockdown (1140)", async () => {
+  const T = await db.signUp("t@screenson.test", "Screens Teacher");
+  const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Screens School", p_full_name: "Screens Teacher" })).tenant_id;
+  await db.admin("update public.tenant_settings set monitoring_enabled = true, allow_screen_capture = true, require_monitoring_consent = false where tenant_id = $1", [tenant]);
+  const lib = (await db.rpc(T, "library_list", { p_query: "States of matter" }))[0];
+  const s = await goLive(T, { p_class: null, p_lesson: await db.rpc(T, "library_copy", { p_item: lib.id }) });
+  await db.rpc(T, "set_session_lockdown", { p_session: s.id, p_on: false });
+  const g = await db.signInAnonymously();
+  await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Gift" });
+  const report = (p) => db.rpc(g, "student_report", { p_session: s.id, p_visible: true, p_fullscreen: false, p_sharing: p });
+  const d = await report(false);
+  assert.equal(d.capture.enabled, true);
+  assert.equal(d.lockdown, false, "no lockdown: nothing is blocked");
+  // The teacher can still leave guests out.
+  await db.rpc(T, "set_session_guests", { p_session: s.id, p_monitor: false });
+  assert.equal((await report(false)).capture.enabled, false);
 });

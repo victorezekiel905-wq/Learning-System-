@@ -19,6 +19,7 @@ import { HomeworkList } from "@/app/(app)/student/HomeworkList";
 import { LibraryGrid } from "@/app/(app)/teacher/lessons/LibraryGrid";
 import { ProgressView, type Progress } from "@/components/progress/ProgressDashboard";
 import { ProjectedScreen, ScreenStrip } from "@/app/present/[id]/PresentScreens";
+import { StartLearning } from "@/components/live/StartLearning";
 import { SlideView, type SlideData } from "@/components/slides/SlideView";
 import type { Screen } from "@/components/live/ScreenRail";
 
@@ -46,6 +47,9 @@ function presentState(question: boolean): SessionState {
   return st;
 }
 const PRESENT_SCREENS: Record<string, Screen> = { c: { student_id: "c", device_id: null, image: fakeScreen(100, "Kemi: 3/4 = 6/8"), captured_at: new Date().toISOString(), url: null, stale: false, source: "web" } };
+/** Just enough of the classroom guard for the Start learning screen. */
+const FAKE_GUARD = { needShare: true, sharing: false, locked: false, needFullscreen: false, fullscreen: false, shareError: null,
+  startShare: async () => false, enterFullscreen: async () => {} } as unknown as Parameters<typeof StartLearning>[0]["guard"];
 function PresentPreview({ start = null, question = false }: { start?: string | null; question?: boolean }) {
   const [shown, setShown] = useState<string | null>(start);
   const st = presentState(question);
@@ -157,6 +161,7 @@ export function Preview() {
 
       <section id="guide" className="bg-ink-50 p-5"><StartGuide done={{ classes: true, lessons: false, taught: false, report: false }} /></section>
 
+      <section id="startlearning" className="relative h-[640px] [transform:translateZ(0)]"><StartLearning guard={FAKE_GUARD} teacher="Mrs Okafor" title="Equivalent fractions" /></section>
       <section id="present"><PresentPreview /></section>
       <section id="present-question"><PresentPreview question /></section>
       <section id="present-shown"><PresentPreview start="a" question /></section>

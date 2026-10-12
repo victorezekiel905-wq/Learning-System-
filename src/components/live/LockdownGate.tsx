@@ -40,10 +40,10 @@ export function LockdownGate({ guard, teacher }: { guard: Guard; teacher: string
 
         <ol className="space-y-3">
           {guard.needShare && (
-            <Step n={1} done={shareDone} title="Share your entire screen"
-              hint="When your browser asks, choose “Entire screen” and press Share. Sharing stops when the class ends.">
+            <Step n={1} done={shareDone} title="Start learning"
+              hint="Your teacher sees your screen during the lesson. When your browser asks, choose “Entire screen”, then Share. It stops when the lesson ends.">
               <Button onClick={async () => { if (await guard.startShare()) setStarted(true); }}>
-                <Icon name="monitor" className="h-4 w-4" /> Share screen
+                <Icon name="play" className="h-4 w-4" /> Start learning
               </Button>
             </Step>
           )}
