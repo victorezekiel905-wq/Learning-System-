@@ -56,8 +56,10 @@ export function GuestJoin({ initialCode = "" }: { initialCode?: string }) {
   const [err, setErr] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  // Codes are shown as "DV6-44Y"; dashes and spaces are ignored.
+  // Codes are 6 digits; spaces and dashes are ignored. Older codes can have letters,
+  // so the number pad can be swapped for the full keyboard.
   const cleanCode = code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const [letters, setLetters] = useState(/[A-Z]/i.test(initialCode));
 
   async function join() {
     setBusy(true); setErr(null);
@@ -104,10 +106,11 @@ export function GuestJoin({ initialCode = "" }: { initialCode?: string }) {
           <form onSubmit={(e) => { e.preventDefault(); if (cleanCode.length >= 6) { setErr(null); setStep("name"); setTimeout(() => nameRef.current?.focus(), 0); } }}>
             <label htmlFor="join-code" className="block text-center font-display text-2xl font-extrabold tracking-tight">Enter the code</label>
             <p className="mt-1 text-center text-sm text-ink-300">It&apos;s on your teacher&apos;s screen.</p>
-            <input id="join-code" autoFocus autoComplete="off" autoCapitalize="characters" spellCheck={false} inputMode="text" maxLength={9}
-              value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ABC-123" aria-describedby={err ? "join-err" : undefined}
+            <input id="join-code" autoFocus autoComplete="off" autoCapitalize="characters" spellCheck={false} inputMode={letters ? "text" : "numeric"} maxLength={8}
+              value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="123456" aria-describedby={err ? "join-err" : undefined}
               className="mt-5 block w-full rounded-2xl border-0 bg-white px-4 py-4 text-center font-mono text-4xl font-extrabold tracking-[0.3em] text-ink-950 placeholder:text-ink-300 focus:outline-none focus:ring-4 focus:ring-accent-400" />
             <Button type="submit" size="lg" className="btn-accent mt-4 w-full disabled:bg-white/15 disabled:text-white/80 disabled:opacity-100" disabled={cleanCode.length < 6}>Next</Button>
+            {!letters && <button type="button" className="mt-3 block w-full text-center text-xs text-ink-300 underline hover:text-white" onClick={() => setLetters(true)}>Code has letters? Use the full keyboard</button>}
           </form>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); void join(); }}>

@@ -2678,3 +2678,19 @@ test("screens on by default: a guest is asked without Lockdown (1140)", async ()
   await db.rpc(T, "set_session_guests", { p_session: s.id, p_monitor: false });
   assert.equal((await report(false)).capture.enabled, false);
 });
+
+test("codes students type are 6 digits (1150)", async () => {
+  const T = await db.signUp("t@digits.test", "Digits Teacher");
+  await db.rpc(T, "bootstrap_school", { p_school_name: "Digits School", p_full_name: "Digits Teacher" });
+  const six = /^[1-9][0-9]{5}$/;
+  const cls = await db.rpc(T, "create_class", { p_name: "Digits 1" });
+  assert.match(cls.join_code, six);
+  assert.match(await db.rpc(T, "regenerate_class_code", { p_class: cls.id }), six);
+  const lib = (await db.rpc(T, "library_list", { p_query: "States of matter" }))[0];
+  const s = await goLive(T, { p_class: null, p_lesson: await db.rpc(T, "library_copy", { p_item: lib.id }) });
+  assert.match(s.join_code, six);
+  const g = await db.signInAnonymously();
+  assert.equal((await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Gift" })).session_id, s.id);
+  // Teacher invites keep their longer letter codes.
+  assert.doesNotMatch(await db.as(T, "select app.unique_code(10, 'invites') c").then((r) => r[0].c), six);
+});

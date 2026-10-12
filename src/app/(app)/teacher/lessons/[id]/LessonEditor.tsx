@@ -18,6 +18,8 @@ import type { ActivityKind, SlideContent, SlideKind } from "@/lib/types";
 import { cn, formatDateTime } from "@/lib/utils";
 import { SlideForm } from "./SlideForm";
 import { DeleteLessonButton } from "../LessonActions";
+import { AiSlides } from "@/components/studio/AiSlides";
+import { downloadPptx } from "@/lib/pptx-export";
 
 type Lesson = { id: string; tenant_id: string; owner_id: string; title: string; description: string | null; subject: string | null; status: string; is_template: boolean; current_version: number; default_mode: string };
 type SlideRow = { id: string; position: number; kind: SlideKind; content: SlideContent; notes: string | null; activity_id: string | null };
@@ -49,6 +51,8 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
   const [addKind, setAddKind] = useState<SlideKind | null>(null);
   const [share, setShare] = useState(false);
   const [versions, setVersions] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty">("saved");
   const [dragging, setDragging] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null);
@@ -228,9 +232,19 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
             <Button size="sm" variant="secondary" onClick={() => setVersions(true)}>Versions</Button>
             <Button size="sm" variant="secondary" onClick={() => duplicate(true)}>Save as template</Button>
             <Button size="sm" variant="secondary" onClick={() => setShare(true)} disabled={lesson.status !== "published"} title={lesson.status !== "published" ? "Publish first" : undefined}>Share link</Button>
+            <Button size="sm" variant="secondary" onClick={() => setAiOpen(true)} title="Add slides made with AI to the end of this lesson">AI slides</Button>
             <Button size="sm" onClick={publish}>{lesson.status === "published" ? "Publish update" : "Publish"}</Button>
             <DeleteLessonButton id={lesson.id} title={lesson.title} onDeleted={() => router.push("/teacher/lessons")} />
           </> : <Button size="sm" onClick={() => duplicate(false)}>Make my own copy</Button>}
+          <Button size="sm" variant="secondary" loading={exporting} title="Save this lesson to your device as a PowerPoint file" onClick={async () => {
+            setExporting(true);
+            try {
+              await downloadPptx(lesson.title, [...local].sort((a, b) => a.position - b.position).map((x) => ({
+                kind: x.kind, content: x.content as Record<string, unknown>, notes: x.notes,
+                activity: x.activity_id ? activities.data?.[x.activity_id] ?? null : null })));
+            } catch (e) { toast(`Couldn't make the file: ${errorText(e)}`, "error"); }
+            finally { setExporting(false); }
+          }}>Download</Button>
           <Link href={`/teacher/live/new?lesson=${lesson.id}`} className="btn btn-accent btn-sm no-underline">Teach live</Link>
         </div>
       </div>
@@ -350,6 +364,10 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
       </Modal>
       {share && <ShareModal lessonId={lesson.id} classes={classes} onClose={() => setShare(false)} />}
       {versions && <VersionsModal lessonId={lesson.id} onClose={() => setVersions(false)} />}
+      <Modal open={aiOpen} onClose={() => setAiOpen(false)} wide title="Add slides with AI">
+        <AiSlides lesson={{ id: lesson.id, tenant_id: lesson.tenant_id, title: lesson.title, subject: lesson.subject }}
+          onAdded={() => { setAiOpen(false); void slides.reload(); }} />
+      </Modal>
     </div>
   );
 }

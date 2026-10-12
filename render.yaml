@@ -48,6 +48,13 @@ services:
       # ---- Optional: "Write with AI" in Import questions (console.anthropic.com → API keys) ----
       - key: ANTHROPIC_API_KEY
         sync: false
+      # ---- Optional: "Create slides with AI" (aistudio.google.com → Get API key) and its photos (unsplash.com/developers → Access Key) ----
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: UNSPLASH_ACCESS_KEY
+        sync: false
       # ---- Optional: sign in with Google or Microsoft (enable them in Supabase Auth first) ----
       - key: NEXT_PUBLIC_SSO_PROVIDERS
         sync: false

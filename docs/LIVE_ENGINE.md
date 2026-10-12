@@ -2,7 +2,7 @@
 
 SwiftCipher becomes a **live, teacher-paced presentation and engagement engine**
 (Nearpod + Pear Deck + Kahoot). This document proposes the data model, the session
-state machine, and the realtime contract. Approved 2026-10-07 (6-character join codes shown as `DV6-44Y`; speed bonus up to +50%).
+state machine, and the realtime contract. Approved 2026-10-07 (join codes are 6 digits, shown without a dash, e.g. `482913`, since 1150; speed bonus up to +50%).
 
 Decisions already taken (2026-10-07):
 

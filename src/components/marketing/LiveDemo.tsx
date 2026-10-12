@@ -91,7 +91,7 @@ export function LiveDemo() {
           )}
           <div className="flex items-center justify-between text-[11px] text-white/55 sm:text-[13px]">
             <span>{q.subject} · {q.n}</span>
-            <span className="hidden sm:inline">Code <span className="font-mono tracking-widest text-white/80">DV6-44Y</span></span>
+            <span className="hidden sm:inline">Code <span className="font-mono tracking-widest text-white/80">482913</span></span>
           </div>
           <div className="mt-3 flex items-start justify-between gap-4 sm:mt-5">
             <p className="max-w-[26ch] font-display text-[19px] font-bold leading-snug sm:text-[30px]">{q.prompt}</p>

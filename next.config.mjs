@@ -15,7 +15,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob: https:",
-  `connect-src 'self' ${supabase} ${supabaseWs}`,
+  // images.unsplash.com: photos are read back when a lesson is downloaded as PowerPoint.
+  `connect-src 'self' ${supabase} ${supabaseWs} https://images.unsplash.com`,
   "frame-src 'self' https: blob:",
   "font-src 'self' data:",
   "object-src 'none'",

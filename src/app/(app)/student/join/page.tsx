@@ -48,7 +48,7 @@ function JoinForm() {
     <Card>
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void go(); }}>
         <Field label="Code" hint="Live lesson, Challenge game or new class: your teacher will show you the code.">
-          <Input autoFocus value={code} maxLength={12} className="text-center font-mono text-3xl font-bold uppercase tracking-[0.3em]"
+          <Input autoFocus value={code} maxLength={12} inputMode={/[A-Z]/.test(code) ? "text" : "numeric"} placeholder="123456" className="text-center font-mono text-3xl font-bold uppercase tracking-[0.3em]"
             onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
         </Field>
         {needNick && <Field label="Nickname for this game" hint="2-20 letters or numbers. Your teacher can see your real name."><Input value={nickname} onChange={(e) => setNickname(e.target.value)} /></Field>}

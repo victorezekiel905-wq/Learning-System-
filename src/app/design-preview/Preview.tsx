@@ -20,6 +20,29 @@ import { LibraryGrid } from "@/app/(app)/teacher/lessons/LibraryGrid";
 import { ProgressView, type Progress } from "@/components/progress/ProgressDashboard";
 import { ProjectedScreen, ScreenStrip } from "@/app/present/[id]/PresentScreens";
 import { StartLearning } from "@/components/live/StartLearning";
+import { buildDeck, tidyOutline, type ThemeKey } from "@/slides/ai-deck";
+import { CanvasFrame } from "@/components/slides/CanvasView";
+import { downloadPptx } from "@/lib/pptx-export";
+
+const LEAF_PHOTO = { url: "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=1080", alt: "Green leaves in sunlight", credit: "Ada Obi", credit_url: "https://unsplash.com", download_location: "" };
+const OUTLINE = tidyOutline({ title: "Photosynthesis", slides: [
+  { layout: "title", heading: "Photosynthesis", subheading: "How green plants make their own food", image_query: "leaf" },
+  { layout: "objectives", heading: "In this lesson we will", points: ["Say what plants need to make food", "Name the parts of a leaf that help", "Explain why plants matter to us"] },
+  { layout: "picture", heading: "Leaves are food factories", points: ["Chlorophyll makes leaves green", "It traps energy from sunlight", "Tiny holes let air in"], image_query: "leaf" },
+  { layout: "compare", heading: "Day and night", left_heading: "In the day", left_points: ["Plants make food", "They give out oxygen"], right_heading: "At night", right_points: ["No food is made", "Plants still breathe"] },
+  { layout: "key_fact", heading: "Plants turn light into food", subheading: "Carbon dioxide + water + light → glucose + oxygen" },
+  { layout: "question", heading: "Why do plants under a tree grow slowly?", subheading: "Think about light." },
+  { layout: "points", heading: "What plants need", points: ["Sunlight", "Water from the soil", "Carbon dioxide from the air"] }
+] }, 8);
+function DeckPreview({ theme }: { theme: ThemeKey }) {
+  const deck = buildDeck(OUTLINE, OUTLINE.slides.map((x) => (x.image_query ? LEAF_PHOTO : undefined)), theme);
+  return (
+    <div className="space-y-3">
+      <button type="button" className="btn btn-secondary btn-sm" onClick={() => void downloadPptx("Photosynthesis", deck.map((d) => ({ kind: "canvas", content: d.content, notes: d.notes })))}>Download {theme} as PowerPoint</button>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{deck.map((d, i) => <CanvasFrame key={i} content={d.content} className="rounded-lg border border-ink-200" />)}</div>
+    </div>
+  );
+}
 import { SlideView, type SlideData } from "@/components/slides/SlideView";
 import type { Screen } from "@/components/live/ScreenRail";
 
@@ -91,7 +114,7 @@ const DIAGRAM = { image_url: LEAF, spots: [{ id: "s1", x: 52, y: 62 }, { id: "s2
 function bar(phase: "lobby" | "active" | "paused", question: "open" | "revealed" | "none"): SessionState {
   const activity = question === "none" ? null : { activity: { id: "q", title: "Check", kind: "quiz" }, revealed: question === "revealed", answered: 17, joined: 24, questions: [] };
   return {
-    session: { id: "s", title: "Equivalent fractions", status: "live", mode: "live_participation", join_code: "DV644Y", class_id: "c", lesson_id: "l",
+    session: { id: "s", title: "Equivalent fractions", status: "live", mode: "live_participation", join_code: "482913", class_id: "c", lesson_id: "l",
       current_slide: 3, active_activity_id: null, environment_id: null, environment_active: false, group_chat_enabled: false, responses_visible: false,
       class_name: "Year 8 Mathematics", lesson_title: "Fractions", environment_name: null, tenant_id: "t", started_at: "", lockdown: true, phase, show_leaderboard: false },
     ranking: [{ user_id: "a", name: "Ada", avatar: "fox", score: 4860, rank: 1, streak: 3 }],
@@ -161,6 +184,7 @@ export function Preview() {
 
       <section id="guide" className="bg-ink-50 p-5"><StartGuide done={{ classes: true, lessons: false, taught: false, report: false }} /></section>
 
+      <section id="aideck" className="space-y-6 bg-ink-50 p-5">{(["swift", "ocean", "sunrise"] as const).map((t) => <DeckPreview key={t} theme={t} />)}</section>
       <section id="startlearning" className="relative h-[640px] [transform:translateZ(0)]"><StartLearning guard={FAKE_GUARD} teacher="Mrs Okafor" title="Equivalent fractions" /></section>
       <section id="present"><PresentPreview /></section>
       <section id="present-question"><PresentPreview question /></section>
@@ -180,7 +204,7 @@ export function Preview() {
         ))}
       </section>
 
-      <section id="lobby"><Lobby sessionId="preview" title="Equivalent fractions" teacher="Mrs. Nwosu" name="Ada" avatar="fox" participants={23} code="DV644Y" onAvatar={() => {}} players={PLAYERS} /></section>
+      <section id="lobby"><Lobby sessionId="preview" title="Equivalent fractions" teacher="Mrs. Nwosu" name="Ada" avatar="fox" participants={23} code="482913" onAvatar={() => {}} players={PLAYERS} /></section>
       <section id="end"><EndScreen name="Ada" avatar="fox" guest summary={{ answered: 8, correct: 7 }} score={{ score: 4860, rank: 1, of: 26 }} /></section>
     </div>
   );

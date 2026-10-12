@@ -5,6 +5,7 @@ import { formatDate } from "@/lib/utils";
 import { NewLessonButton } from "./NewLessonButton";
 import { LibraryGrid, type LibraryItem } from "./LibraryGrid";
 import { LessonCardActions, RestoreLesson } from "./LessonActions";
+import { Sparkles } from "lucide-react";
 
 export const metadata = { title: "Lessons" };
 
@@ -33,7 +34,7 @@ export default async function LessonsPage(
   return (
     <div className="page">
       <PageHeader eyebrow="SwiftCipher Studio" title="Lessons" subtitle="Slides, media, interactive video and activities."
-        actions={<NewLessonButton openInitially={searchParams.new === "1"} templates={templates ?? []} />} />
+        actions={<div className="flex flex-wrap gap-2"><Link href="/teacher/lessons/ai" className="btn btn-secondary no-underline"><Sparkles className="h-4 w-4" aria-hidden /> Create with AI</Link><NewLessonButton openInitially={searchParams.new === "1"} templates={templates ?? []} /></div>} />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <nav className="flex gap-1 text-sm">
           {[["mine", "My lessons"], ["school", "Shared in school"], ["templates", "Templates"], ["library", "Library"], ["deleted", "Deleted"]].map(([id, label]) => (
