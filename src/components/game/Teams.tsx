@@ -1,6 +1,6 @@
 "use client";
 import { useRpc } from "@/lib/hooks";
-import { cn } from "@/lib/utils";
+import { cn, LOCALE } from "@/lib/utils";
 import { OptionShape } from "./Shape";
 import { OPTION_COLORS } from "./types";
 
@@ -18,15 +18,15 @@ export function TeamStandings({ teams, big, light }: { teams: TeamScore[]; big?:
   return (
     <ol className={cn("w-full space-y-2", big && "space-y-3")} aria-label="Team scores">
       {teams.map((t) => (
-        <li key={t.team} className={cn("flex items-center gap-3", big ? "text-2xl" : "text-sm")}>
-          <span className={cn("grid shrink-0 place-items-center rounded-xl", OPTION_COLORS[(t.team - 1) % OPTION_COLORS.length], big ? "h-12 w-12" : "h-8 w-8")}>
+        <li key={t.team} className={cn("flex items-center gap-2 sm:gap-3", big ? "text-lg sm:text-2xl" : "text-sm")}>
+          <span className={cn("grid shrink-0 place-items-center rounded-xl", OPTION_COLORS[(t.team - 1) % OPTION_COLORS.length], big ? "h-10 w-10 sm:h-12 sm:w-12" : "h-8 w-8")}>
             <OptionShape i={t.team - 1} className={big ? "h-6 w-6" : "h-4 w-4"} />
           </span>
-          <span className={cn("shrink-0 font-semibold", big ? "w-44 sm:w-60" : "w-32 sm:w-40")}>{t.name}{t.mine && <span className="ml-1 text-xs font-normal opacity-70">(you)</span>}</span>
+          <span className={cn("min-w-0 shrink truncate font-semibold", big ? "w-28 sm:w-60" : "w-24 sm:w-40")}>{t.name}{t.mine && <span className="ml-1 text-xs font-normal opacity-70">(you)</span>}</span>
           <span className={cn("relative h-3 flex-1 overflow-hidden rounded-full sm:h-4", light ? "bg-ink-100" : "bg-white/10")}>
             <span className={cn("absolute inset-y-0 left-0 rounded-full", OPTION_COLORS[(t.team - 1) % OPTION_COLORS.length])} style={{ width: `${(t.score / top) * 100}%` }} />
           </span>
-          <span className="w-20 text-right font-display font-extrabold tabular-nums">{t.score.toLocaleString()}</span>
+          <span className="shrink-0 text-right font-display font-extrabold tabular-nums sm:w-20">{t.score.toLocaleString(LOCALE)}</span>
         </li>
       ))}
     </ol>

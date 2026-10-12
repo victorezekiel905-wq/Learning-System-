@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Alert, Card, Select, Spinner } from "@/components/ui";
 import { useRpc } from "@/lib/hooks";
-import { cn, plural } from "@/lib/utils";
+import { cn, plural, LOCALE } from "@/lib/utils";
 import { DownloadMenu } from "@/components/progress/DownloadMenu";
 import { downloadCsv, pct, type CsvSection } from "@/lib/download";
 
@@ -71,7 +71,7 @@ export function SchoolProgress({ classId }: { classId?: string } = {}) {
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Pupils taking part" value={`${d.summary.active} of ${d.summary.pupils}`} />
             <Stat label="Right answers" value={d.summary.accuracy === null ? "–" : `${d.summary.accuracy}%`} />
-            <Stat label="Questions answered" value={d.summary.answers.toLocaleString()} />
+            <Stat label="Questions answered" value={d.summary.answers.toLocaleString(LOCALE)} />
             <Stat label="Parent feedback" value={d.feedback?.total ?? 0}
               sub={d.feedback?.unanswered ? <Link href="/teacher/feedback">{d.feedback.unanswered} waiting for a reply</Link> : undefined} />
           </div>

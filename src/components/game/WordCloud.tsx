@@ -21,7 +21,9 @@ export function WordCloud({ words, dark, big }: { words: CloudWord[]; dark?: boo
         const t = most > 1 ? (w.count - 1) / (most - 1) : 1;
         const size = (big ? 22 : 15) + t * (big ? 58 : 26);
         return (
-          <li key={w.word} className={cn("animate-pop font-display font-extrabold leading-tight", palette[i % palette.length])} style={{ fontSize: size }}
+          <li key={w.word} className={cn("animate-pop max-w-full font-display font-extrabold leading-tight [overflow-wrap:anywhere]", palette[i % palette.length])}
+            // Shrinks with the screen, so a long word still fits on a phone.
+            style={{ fontSize: `min(${size}px, ${(size / 6).toFixed(1)}vw)` }}
             title={`${w.word}: ${w.count}`}>
             {w.word}<span className="sr-only"> ({w.count})</span>
           </li>

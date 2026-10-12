@@ -25,11 +25,15 @@ export default async function LessonsPage(
   if (tab === "school") query = query.neq("owner_id", me.profile.id).eq("status", "published");
   if (tab === "templates") query = query.eq("is_template", true);
   if (searchParams.q) query = query.ilike("title", `%${searchParams.q.replace(/[%_]/g, "")}%`);
-  const { data } = await query;
+  // All at once: the lessons, the templates for "New lesson", and (on its tab) the library,
+  // ready-made lessons from every school's shared collection (1060).
+  const [{ data }, { data: templates }, libraryRes] = await Promise.all([
+    query,
+    sb.from("lessons").select("id,title").eq("is_template", true).limit(50),
+    tab === "library" ? sb.rpc("library_list", { p_query: searchParams.q ?? null }) : Promise.resolve({ data: [] })
+  ]);
   const lessons = (data ?? []) as unknown as Lesson[];
-  const { data: templates } = await sb.from("lessons").select("id,title").eq("is_template", true).limit(50);
-  // The SwiftCipher library: ready-made lessons from every school's shared collection (1060).
-  const library = tab === "library" ? ((await sb.rpc("library_list", { p_query: searchParams.q ?? null })).data ?? []) as LibraryItem[] : [];
+  const library = (libraryRes.data ?? []) as LibraryItem[];
 
   return (
     <div className="page">

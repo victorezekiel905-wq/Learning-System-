@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { getMe, homeFor } from "@/lib/session";
 import { LEGAL } from "@/lib/legal";
 import { LiveDemo } from "@/components/marketing/LiveDemo";
 import { OptionShape } from "@/components/game/Shape";
@@ -41,10 +39,9 @@ const FAQ = [
   ["How do parents join?", "The school gives each family a private code for each child. Parents sign up with it, and add a second child to the same account with that child's code."]
 ] as const;
 
-export default async function Landing() {
-  const me = await getMe();
-  if (me?.profile) redirect(homeFor(me.profile.role));
-
+// Signed-in visitors are sent to their home by the proxy, so this page is built once
+// and served from cache: no database call for each visitor.
+export default function Landing() {
   return (
     <main className="overflow-x-clip">
       {/* Opening */}

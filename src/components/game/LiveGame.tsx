@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Flame, X } from "lucide-react";
 import { useNow } from "@/lib/hooks";
-import { cn } from "@/lib/utils";
+import { cn, LOCALE } from "@/lib/utils";
 import { Burst } from "./Celebrate";
 import { OptionShape } from "./Shape";
 import { OPTION_COLORS } from "./types";
@@ -154,7 +154,7 @@ export function AnswerResult({ correct, title, points, extras, streak = 0, answe
         {correct ? <Check className="h-9 w-9" strokeWidth={3.5} /> : <X className="h-9 w-9" strokeWidth={3.5} />}
       </span>
       <p className="relative mt-3 font-display text-4xl font-extrabold tracking-tight">{title ?? (correct ? "Correct!" : "Not quite")}</p>
-      {points != null && points > 0 && <p className="relative mt-1 font-display text-3xl font-extrabold tabular-nums">+{shown.toLocaleString()}</p>}
+      {points != null && points > 0 && <p className="relative mt-1 font-display text-3xl font-extrabold tabular-nums">+{shown.toLocaleString(LOCALE)}</p>}
       {extras && <p className="relative mt-1 text-sm font-semibold text-white/90">{extras}</p>}
       {streak >= 2 && <StreakChip streak={streak} className="relative mt-3 bg-black/25" />}
       {!correct && answer && (

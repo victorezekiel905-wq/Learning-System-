@@ -11,7 +11,7 @@ import { useSignal } from "@/lib/realtime";
 import { useTeacherPresence } from "@/lib/teacher-presence";
 import { errorText, rpc } from "@/lib/rpc";
 import { useSlideNav } from "@/lib/slide-nav";
-import { cn, formatJoinCode, timeAgo } from "@/lib/utils";
+import { cn, formatJoinCode, timeAgo, LOCALE } from "@/lib/utils";
 import { Critter } from "@/components/live/Critter";
 import { JoinQr } from "@/components/live/JoinQr";
 import { FEATURES } from "@/lib/features";
@@ -232,7 +232,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
                   <Critter name={r.avatar} className="h-5 w-5" />
                   <span className="min-w-0 flex-1 truncate">{r.name}</span>
                   {r.streak >= 2 && <span className="text-xs" title={`${r.streak} in a row`}>🔥{r.streak}</span>}
-                  <span className="font-semibold tabular-nums">{r.score.toLocaleString()}</span>
+                  <span className="font-semibold tabular-nums">{r.score.toLocaleString(LOCALE)}</span>
                 </li>
               ))}</ol>
             </div>

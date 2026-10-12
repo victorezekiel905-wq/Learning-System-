@@ -4,7 +4,7 @@ import { Badge, Button, Card, useToast } from "@/components/ui";
 import { useRpc } from "@/lib/hooks";
 import { BADGE_HINT, BADGE_LABEL, CHALLENGE, type Progress } from "@/lib/progress";
 import { errorText, rpc } from "@/lib/rpc";
-import { cn } from "@/lib/utils";
+import { cn, LOCALE } from "@/lib/utils";
 import { Icon } from "@/components/Icon";
 
 type Board = { enabled: boolean; rows: { rank: number; name: string; xp: number; me: boolean }[] };
@@ -38,13 +38,13 @@ export function ProgressPanel() {
         <div className="space-y-3">
           <div className="flex items-end justify-between">
             <p className="font-display text-3xl font-extrabold text-ink-900">Level {d.level}</p>
-            <p className="text-sm text-ink-600"><strong>{d.xp.toLocaleString()}</strong> XP · +{d.week_xp} this week</p>
+            <p className="text-sm text-ink-600"><strong>{d.xp.toLocaleString(LOCALE)}</strong> XP · +{d.week_xp} this week</p>
           </div>
           <div className="h-3 overflow-hidden rounded-full bg-ink-100" role="progressbar" aria-label="Progress to next level"
                aria-valuemin={0} aria-valuemax={span} aria-valuenow={into}>
             <div className="h-full rounded-full bg-brand-600" style={{ width: `${(into / span) * 100}%` }} />
           </div>
-          <p className="text-xs text-ink-500">{(d.next_level_xp - d.xp).toLocaleString()} XP to level {d.level + 1}. Harder questions and explaining your reasoning earn more.</p>
+          <p className="text-xs text-ink-500">{(d.next_level_xp - d.xp).toLocaleString(LOCALE)} XP to level {d.level + 1}. Harder questions and explaining your reasoning earn more.</p>
           <ul className="flex flex-wrap gap-2" aria-label="Badges">
             {Object.keys(BADGE_LABEL).map((b) => (
               <li key={b} title={BADGE_HINT[b]}>

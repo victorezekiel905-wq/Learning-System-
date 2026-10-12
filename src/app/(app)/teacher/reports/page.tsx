@@ -20,7 +20,11 @@ type SessionReport = {
 export default async function ReportsPage(props: { searchParams: Promise<{ session?: string; id?: string }> }) {
   const searchParams = await props.searchParams;
   const { sb } = await requireRole(STAFF);
-  const { data: reports } = await sb.from("reports").select("id,kind,title,created_at,scope_id").order("created_at", { ascending: false }).limit(100);
+  // The class list doesn't depend on the reports: fetch both at once.
+  const [{ data: reports }, { data: classes }] = await Promise.all([
+    sb.from("reports").select("id,kind,title,created_at,scope_id").order("created_at", { ascending: false }).limit(100),
+    sb.rpc("my_teaching_classes")
+  ]);
   const list = reports ?? [];
   const selected = searchParams.id ? list.find((r) => r.id === searchParams.id) : searchParams.session ? list.find((r) => r.scope_id === searchParams.session) : undefined;
   const { data: full } = selected ? await sb.from("reports").select("payload").eq("id", selected.id).single() : { data: null };
@@ -30,7 +34,6 @@ export default async function ReportsPage(props: { searchParams: Promise<{ sessi
     const { data } = await sb.rpc("session_report", { p_session: selected.scope_id });
     if ((data as { version?: number } | null)?.version === 2) v2 = data as SessionReportV2;
   }
-  const { data: classes } = await sb.rpc("my_teaching_classes");
 
   return (
     <div className="page">

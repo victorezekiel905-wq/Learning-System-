@@ -1,6 +1,6 @@
 import { Badge, Card, Stat } from "@/components/ui";
 import { ALERT_LABEL } from "@/components/live/types";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime, LOCALE } from "@/lib/utils";
 
 /** The shape of public.session_report (version 2, migration 0920). */
 export type SessionReportV2 = {
@@ -93,7 +93,7 @@ export function SessionReportView({ id, r }: { id: string; r: SessionReportV2 })
                 <tr key={s.student_id} className={cn(!s.joined && "text-ink-400")}>
                   <td className="font-bold">{s.rank ?? "–"}</td>
                   <td>{s.name} {s.guest && <Badge>code</Badge>} {s.removed && <Badge tone="red">removed</Badge>}{!s.joined && <span className="text-xs"> (didn’t join)</span>}</td>
-                  <td className="text-right font-semibold tabular-nums">{s.joined ? s.score.toLocaleString() : ""}</td>
+                  <td className="text-right font-semibold tabular-nums">{s.joined ? s.score.toLocaleString(LOCALE) : ""}</td>
                   <td className="text-right tabular-nums">{s.joined ? s.answers : ""}</td>
                   <td>{s.accuracy !== null && <span className="flex items-center gap-2"><Meter value={s.accuracy} className="flex-1" /><span className="w-9 text-right tabular-nums">{s.accuracy}%</span></span>}</td>
                   <td className="text-right tabular-nums">{s.avg_seconds !== null ? `${s.avg_seconds} s` : ""}</td>

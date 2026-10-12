@@ -26,7 +26,7 @@ export type ThemeKey = "swift" | "ocean" | "sunrise";
 type Theme = { label: string; dark: string; light: string; soft: string; accent: string; primary: string; text: string; muted: string; onDark: string; onDarkMuted: string };
 export const THEMES: Record<ThemeKey, Theme> = {
   swift: { label: "SwiftCipher", dark: "#111827", light: "#ffffff", soft: "#f5f3ef", accent: "#c6f432", primary: "#2547d0", text: "#111827", muted: "#475569", onDark: "#ffffff", onDarkMuted: "#cbd5e1" },
-  ocean: { label: "Ocean", dark: "#0c4a6e", light: "#f8fafc", soft: "#e0f2fe", accent: "#38bdf8", primary: "#0e7490", text: "#0f172a", muted: "#475569", onDark: "#ffffff", onDarkMuted: "#bae6fd" },
+  ocean: { label: "Ocean", dark: "#0c4a6e", light: "#f8fafc", soft: "#e0f2fe", accent: "#7dd3fc", primary: "#0e7490", text: "#0f172a", muted: "#475569", onDark: "#ffffff", onDarkMuted: "#bae6fd" },
   sunrise: { label: "Sunrise", dark: "#7c2d12", light: "#fffbeb", soft: "#ffedd5", accent: "#fbbf24", primary: "#c2410c", text: "#1c1917", muted: "#57534e", onDark: "#ffffff", onDarkMuted: "#fed7aa" }
 };
 
@@ -134,7 +134,7 @@ export function designSlide(s: OutlineSlide, t: Theme, photo?: Photo): CanvasCon
       bg = t.primary;
       const fact = clip(s.heading, 120), more = clip(s.subheading, 160);
       els.push(text({ x: 160, y: 170, w: 1280, h: 400, text: fact, size: fitSize(fact, 1280, 400, 104, 52), bold: true, font: "display", color: "#ffffff", align: "center", valign: "middle" }));
-      if (more) els.push(text({ x: 200, y: 600, w: 1200, h: 150, text: more, size: fitSize(more, 1200, 150, 40, 26), color: "#ffffff", align: "center", valign: "top", opacity: 0.9 }));
+      if (more) els.push(text({ x: 200, y: 600, w: 1200, h: 150, text: more, size: fitSize(more, 1200, 150, 40, 26), color: "#ffffff", align: "center", valign: "top" }));
       break;
     }
     case "question": {

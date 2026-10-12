@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui";
 import { errorText, rpc } from "@/lib/rpc";
 import { useRpc } from "@/lib/hooks";
-import { cn, formatJoinCode } from "@/lib/utils";
+import { cn, formatJoinCode, LOCALE } from "@/lib/utils";
 import { AVATARS, avatarFor } from "./avatars";
 import { Critter } from "./Critter";
 import { Leaderboard, type BoardEntry } from "./Leaderboard";
@@ -117,7 +117,7 @@ export function EndScreen({ name, avatar, summary, guest, score = null, closedNo
       <h1 className="relative mt-5 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">Well done, {name}!</h1>
       <p className="relative mt-1 text-ink-300">{closedNote}</p>
       {score && score.score > 0 && (
-        <p className="relative mt-6 font-display text-5xl font-extrabold text-accent-400">{score.score.toLocaleString()}<span className="ml-2 text-xl text-ink-300">points</span></p>
+        <p className="relative mt-6 font-display text-5xl font-extrabold text-accent-400">{score.score.toLocaleString(LOCALE)}<span className="ml-2 text-xl text-ink-300">points</span></p>
       )}
       {score && score.score > 0 && <p className="relative mt-2 flex items-center justify-center gap-2 text-lg text-ink-200"><RankBadge rank={score.rank} />#{score.rank} of {score.of}</p>}
       <dl className="relative mt-8 grid w-full max-w-sm grid-cols-2 gap-3">
@@ -142,7 +142,7 @@ export function BoardOverlay({ entries, me, my }: { entries: BoardEntry[]; me: s
         <div className="mt-8"><Podium entries={entries.slice(0, 3)} size="md" highlight={me} /></div>
         {entries.length > 3 && <div className="mt-6"><Leaderboard entries={entries.slice(3)} highlight={me} /></div>}
         {my && !inTop && my.score > 0 && (
-          <p className="mt-4 rounded-2xl bg-white/5 px-4 py-3 text-center">You: <strong>#{my.rank}</strong> of {my.of} · <strong className="text-accent-400">{my.score.toLocaleString()}</strong> points</p>
+          <p className="mt-4 rounded-2xl bg-white/5 px-4 py-3 text-center">You: <strong>#{my.rank}</strong> of {my.of} · <strong className="text-accent-400">{my.score.toLocaleString(LOCALE)}</strong> points</p>
         )}
         <div className="mt-6 text-center"><button type="button" onClick={() => setHidden(key)} className="text-sm text-ink-300 underline hover:text-white">Back to the lesson</button></div>
       </div>

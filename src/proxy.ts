@@ -31,13 +31,26 @@ export async function proxy(request: NextRequest) {
   if (error && isAuthRetryableFetchError(error)) return response;
   const signedIn = !!data?.claims?.sub;
   const path = request.nextUrl.pathname;
+  // The home page is the same for everyone (built once); signed-in people go to their own home.
+  if (signedIn && path === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    url.search = "";
+    return withCookies(NextResponse.redirect(url), response);
+  }
   if (!signedIn && PROTECTED.some((p) => path === p || path.startsWith(p + "/"))) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = `?next=${encodeURIComponent(path + request.nextUrl.search)}`;
-    return NextResponse.redirect(url);
+    return withCookies(NextResponse.redirect(url), response);
   }
   return response;
+}
+
+/** A redirect keeps any refreshed session cookies. */
+function withCookies(redirect: NextResponse, from: NextResponse) {
+  from.cookies.getAll().forEach((c) => redirect.cookies.set(c));
+  return redirect;
 }
 
 export const config = {

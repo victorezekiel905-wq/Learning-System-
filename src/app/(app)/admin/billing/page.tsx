@@ -1,7 +1,7 @@
 import { LEGAL } from "@/lib/legal";
 import { requireRole, ADMINS } from "@/lib/session";
 import { Alert, Badge, Card, PageHeader, Stat } from "@/components/ui";
-import { formatDate } from "@/lib/utils";
+import { formatDate, LOCALE } from "@/lib/utils";
 import { UpgradeButton } from "./UpgradeButton";
 import { Icon } from "@/components/Icon";
 
@@ -45,7 +45,7 @@ export default async function BillingPage(props: { searchParams: Promise<{ statu
         {(plans ?? []).map((p) => (
           <Card key={p.code} className={p.code === u.plan.code ? "ring-2 ring-brand-500" : ""}>
             <p className="font-bold">{p.name}</p>
-            <p className="mt-1 font-display text-2xl font-extrabold">{p.code === "enterprise" ? "Custom" : p.price_cents === 0 ? "Free" : `$${(p.price_cents / 100).toLocaleString()}`}<span className="text-sm font-normal text-ink-500">{p.price_cents ? `/${p.interval}` : ""}</span></p>
+            <p className="mt-1 font-display text-2xl font-extrabold">{p.code === "enterprise" ? "Custom" : p.price_cents === 0 ? "Free" : `$${(p.price_cents / 100).toLocaleString(LOCALE)}`}<span className="text-sm font-normal text-ink-500">{p.price_cents ? `/${p.interval}` : ""}</span></p>
             <ul className="mt-3 space-y-1 text-xs text-ink-600">
               {Object.entries(p.limits as Record<string, number | null>).map(([k, v]) => <li key={k}>{k.replace(/_/g, " ")}: {v ?? "unlimited"}</li>)}
               {Object.entries(p.features as Record<string, boolean>).filter(([, v]) => v).map(([k]) => <li key={k} className="flex items-center gap-2"><Icon name="check" className="h-3.5 w-3.5 text-emerald-700" />{k.replace(/_/g, " ")}</li>)}

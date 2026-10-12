@@ -132,7 +132,7 @@ export function ProgressView({ p, error, viewer, isAdmin, period, date, onPeriod
             <Big label="Questions answered" value={p.summary.answers}>
               <Change now={p.summary.answers} before={p.summary.prev_answers} word={word} />
             </Big>
-            <Big label="Points earned" value={p.summary.points.toLocaleString()} />
+            <Big label="Points earned" value={p.summary.points.toLocaleString(LOCALE)} />
           </div>
 
           {p.trend && p.trend.length > 0 && <Trend p={p} />}
@@ -167,7 +167,7 @@ export function ProgressView({ p, error, viewer, isAdmin, period, date, onPeriod
                       <td>{l.attended ? "Yes" : <Badge tone="red">Missed</Badge>}</td>
                       <td className="text-right tabular-nums">{l.attended ? l.answers : ""}</td>
                       <td>{l.accuracy !== null && <span className="flex items-center gap-2"><Meter value={l.accuracy} className="flex-1" /><span className="w-9 text-right tabular-nums">{l.accuracy}%</span></span>}</td>
-                      <td className="text-right tabular-nums">{l.attended && l.points ? l.points.toLocaleString() : ""}</td>
+                      <td className="text-right tabular-nums">{l.attended && l.points ? l.points.toLocaleString(LOCALE) : ""}</td>
                     </tr>
                   ))}</tbody>
                 </table>

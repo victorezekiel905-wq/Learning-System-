@@ -62,7 +62,8 @@ export function SlideView({ slide, activitySlot, overlay, onVideoTime, videoRef 
       break;
     case "text":
       inner = (
-        <div className="h-full overflow-y-auto p-8 sm:p-12">
+        // tabIndex: a long text slide scrolls, so keyboard users can reach it to scroll it.
+        <div className="h-full overflow-y-auto p-8 sm:p-12" tabIndex={0}>
           {c.heading && <h2 className="mb-4 text-2xl font-bold text-ink-900 sm:text-3xl">{c.heading}</h2>}
           <RichText text={c.body} className="text-base text-ink-700 sm:text-lg" />
         </div>

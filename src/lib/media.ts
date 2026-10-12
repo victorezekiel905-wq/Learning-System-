@@ -3,16 +3,24 @@ import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
 
 const cache = new Map<string, { url: string; exp: number }>();
+// Requests already on their way: many views of the same slide (e.g. every student tile
+// on Present) share one request instead of each asking the server.
+const pending = new Map<string, Promise<string | null>>();
 
 /** Short-lived signed URL for a private lesson-media object (tenant-scoped by storage RLS). */
 export async function signedUrl(path: string, bucket = "lesson-media"): Promise<string | null> {
   const key = `${bucket}:${path}`;
   const hit = cache.get(key);
   if (hit && hit.exp > Date.now() + 60_000) return hit.url;
-  const { data } = await createClient().storage.from(bucket).createSignedUrl(path, 3600);
-  if (!data?.signedUrl) return null;
-  cache.set(key, { url: data.signedUrl, exp: Date.now() + 3600_000 });
-  return data.signedUrl;
+  const inFlight = pending.get(key);
+  if (inFlight) return inFlight;
+  const req = createClient().storage.from(bucket).createSignedUrl(path, 3600).then(({ data }) => {
+    if (!data?.signedUrl) return null;
+    cache.set(key, { url: data.signedUrl, exp: Date.now() + 3600_000 });
+    return data.signedUrl;
+  }, () => null).finally(() => pending.delete(key));
+  pending.set(key, req);
+  return req;
 }
 
 export function useSignedUrl(path: string | null | undefined, bucket = "lesson-media") {

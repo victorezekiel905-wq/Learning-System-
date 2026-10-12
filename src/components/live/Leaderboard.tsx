@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn, LOCALE } from "@/lib/utils";
 import { Critter } from "./Critter";
 
 export type BoardEntry = { name: string; avatar: string | null; score: number; rank: number; delta?: number };
@@ -21,7 +21,7 @@ export function Leaderboard({ entries, size = "md", highlight }: { entries: Boar
           <span className="line-clamp-2 min-w-0 flex-1 break-words font-semibold leading-tight">{e.name}</span>
           {e.delta ? <span className={cn("text-sm font-bold", e.delta > 0 ? "text-accent-400" : "text-rose-300")} aria-label={e.delta > 0 ? `up ${e.delta}` : `down ${-e.delta}`}>
             {e.delta > 0 ? `▲${e.delta}` : `▼${-e.delta}`}</span> : null}
-          <span className="font-display font-extrabold tabular-nums">{e.score.toLocaleString()}</span>
+          <span className="font-display font-extrabold tabular-nums">{e.score.toLocaleString(LOCALE)}</span>
         </li>
       ))}
     </ol>

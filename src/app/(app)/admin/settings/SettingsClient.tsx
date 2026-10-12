@@ -8,6 +8,7 @@ import { useRpc } from "@/lib/hooks";
 import type { Me, TenantSettings } from "@/lib/types";
 import { uploadMedia, useSignedUrl } from "@/lib/media";
 import { contrastWithWhite, paletteVars } from "@/lib/theme";
+import { LOCALE } from "@/lib/utils";
 
 /**
  * Parents' signed undertakings that their child's device may be monitored in class.
@@ -40,7 +41,7 @@ function ConsentCard() {
       {!d ? <p className="text-sm text-ink-500">Loading…</p> : (
         <div className="space-y-4">
           <p className="text-sm text-ink-600">
-            <strong className="text-ink-900">{d.with_consent.toLocaleString()}</strong> of {d.students.toLocaleString()} students have a parent&apos;s
+            <strong className="text-ink-900">{d.with_consent.toLocaleString(LOCALE)}</strong> of {d.students.toLocaleString(LOCALE)} students have a parent&apos;s
             monitoring consent on file.{d.required ? " Screens are only shown for these students." : ""}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -52,7 +53,7 @@ function ConsentCard() {
           </div>
           {d.missing.length > 0 && (
             <details className="text-sm">
-              <summary className="cursor-pointer font-medium text-ink-700">Students without consent on file ({(d.students - d.with_consent).toLocaleString()})</summary>
+              <summary className="cursor-pointer font-medium text-ink-700">Students without consent on file ({(d.students - d.with_consent).toLocaleString(LOCALE)})</summary>
               <ul className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-ink-100">
                 {d.missing.map((m) => <li key={m.id} className="border-b border-ink-100 px-3 py-1.5 last:border-0">{m.name} <span className="text-xs text-ink-500">{m.email}</span></li>)}
               </ul>

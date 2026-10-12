@@ -6,7 +6,7 @@ import { Alert, Badge, Button, CopyButton, Field, Input, Modal, Select, Tabs, us
 import { createClient } from "@/lib/supabase/client";
 import { api, errorText, rpc, must } from "@/lib/rpc";
 import { ROLE_LABEL, type Role } from "@/lib/types";
-import { formatDate, timeAgo } from "@/lib/utils";
+import { formatDate, timeAgo, LOCALE } from "@/lib/utils";
 import { Icon } from "@/components/Icon";
 
 type U = { id: string; full_name: string; email: string; role: Role; status: string; created_at: string; last_seen_at: string | null };
@@ -42,7 +42,7 @@ export function UsersClient({ users, total, page, pageSize, q, role, invites, me
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tabs value={tab} onChange={setTab} tabs={[{ id: "people", label: `People (${total.toLocaleString()})` }, { id: "invites", label: `Invites (${invites.filter((i) => !i.revoked_at && new Date(i.expires_at) > new Date() && i.uses < i.max_uses).length} active)` }]} />
+        <Tabs value={tab} onChange={setTab} tabs={[{ id: "people", label: `People (${total.toLocaleString(LOCALE)})` }, { id: "invites", label: `Invites (${invites.filter((i) => !i.revoked_at && new Date(i.expires_at) > new Date() && i.uses < i.max_uses).length} active)` }]} />
         <Button onClick={() => setInvite(true)}>Invite people</Button>
       </div>
 
@@ -77,7 +77,7 @@ export function UsersClient({ users, total, page, pageSize, q, role, invites, me
           </table></div>
           {rows.length === 0 && <p className="text-sm text-ink-500">No one matches.</p>}
           <nav className="flex items-center justify-between text-sm" aria-label="Pages">
-            <span className="text-ink-500">Page {page} of {pages.toLocaleString()}</span>
+            <span className="text-ink-500">Page {page} of {pages.toLocaleString(LOCALE)}</span>
             <span className="flex gap-2">
               {page > 1 && <Link href={href(page - 1)} className="btn btn-secondary btn-sm no-underline"><Icon name="chevronLeft" className="h-4 w-4" />Previous</Link>}
               {page < pages && <Link href={href(page + 1)} className="btn btn-secondary btn-sm no-underline">Next<Icon name="chevronRight" className="h-4 w-4" /></Link>}

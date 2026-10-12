@@ -6,7 +6,7 @@ import { useNow } from "@/lib/hooks";
 import { sendOrQueue, useOfflineQueue } from "@/lib/offline-queue";
 import { errorText, rpc } from "@/lib/rpc";
 import type { ActivitySettings, PublicQuestion } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, LOCALE } from "@/lib/utils";
 import { CollabBoard } from "./CollabBoard";
 import { isAnswered, Prompt, QuestionInput, type Answer } from "./QuestionInput";
 import { BADGE_LABEL, CHALLENGE, type Progress } from "@/lib/progress";
@@ -162,7 +162,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
       <div className="card card-pad space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-bold">Submitted: {data.activity.title}</h3>
-          {finished.attempt.points != null && <Badge tone="green" className="text-sm">{finished.attempt.points.toLocaleString()} points</Badge>}
+          {finished.attempt.points != null && <Badge tone="green" className="text-sm">{finished.attempt.points.toLocaleString(LOCALE)} points</Badge>}
           {finished.attempt.max_score ? (
             <Badge tone="brand" className="text-sm">{Number(finished.attempt.score ?? 0)} / {Number(finished.attempt.max_score)}{pendingReview && " so far"}</Badge>
           ) : null}
@@ -321,9 +321,9 @@ function PointsLine({ p }: { p: LivePoints }) {
   const extras = [p.speed > 0 && `fast +${p.speed}`, p.streak_bonus > 0 && `streak +${p.streak_bonus}`].filter(Boolean).join(" · ");
   return (
     <div role="status" className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl bg-ink-950 px-4 py-3 text-white">
-      <span className="font-display text-2xl font-extrabold text-accent-400">+{p.points.toLocaleString()}</span>
+      <span className="font-display text-2xl font-extrabold text-accent-400">+{p.points.toLocaleString(LOCALE)}</span>
       <span className="text-sm text-ink-200">{p.points === 100 && p.base === 100 ? "for taking part" : extras || "points"}</span>
-      <span className="ml-auto text-sm text-ink-300">Total {p.total.toLocaleString()}{p.streak >= 2 ? ` · 🔥 ${p.streak} in a row` : ""}</span>
+      <span className="ml-auto text-sm text-ink-300">Total {p.total.toLocaleString(LOCALE)}{p.streak >= 2 ? ` · 🔥 ${p.streak} in a row` : ""}</span>
     </div>
   );
 }

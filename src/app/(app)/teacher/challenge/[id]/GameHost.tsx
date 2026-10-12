@@ -12,7 +12,7 @@ import { useRpc } from "@/lib/hooks";
 import { useTeacherPresence } from "@/lib/teacher-presence";
 import { useSignal } from "@/lib/realtime";
 import { errorText, rpc } from "@/lib/rpc";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 export function GameHost({ gameId, school, sessionId }: { gameId: string; school: string; sessionId?: string | null }) {
   // A game run from a live lesson keeps that lesson open while the teacher hosts it.
@@ -144,7 +144,7 @@ function Standings({ board, ended, school, title, certificates }: { board: Leade
             if (!w) return;
             const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
             w.document.write(`<title>Certificates</title><style>body{font-family:system-ui;margin:0}.c{page-break-after:always;border:12px double #151411;margin:24px;padding:48px;text-align:center}h1{font-size:40px;margin:0 0 8px}p{font-size:20px}</style>` +
-              board.top.filter((p) => p.badges.length).map((p) => `<div class="c"><p>${esc(school)}</p><h1>Certificate of Achievement</h1><p>awarded to</p><h2 style="font-size:34px">${esc(p.name)}</h2><p>${p.badges.map((b) => esc(BADGE[b] ?? b)).join(" · ")}</p><p>in the Challenge "${esc(title)}", with ${p.score} points</p><p>${new Date().toLocaleDateString()}</p></div>`).join(""));
+              board.top.filter((p) => p.badges.length).map((p) => `<div class="c"><p>${esc(school)}</p><h1>Certificate of Achievement</h1><p>awarded to</p><h2 style="font-size:34px">${esc(p.name)}</h2><p>${p.badges.map((b) => esc(BADGE[b] ?? b)).join(" · ")}</p><p>in the Challenge "${esc(title)}", with ${p.score} points</p><p>${formatDate(new Date().toISOString())}</p></div>`).join(""));
             w.document.close(); w.print();
           }}>Print certificates</Button>
         </Card>

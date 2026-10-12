@@ -1,7 +1,8 @@
 "use client";
 // Sends browser errors to the platform error log (public.log_error), which the
 // super admin reviews at /super/errors. Deduplicated and capped per page load.
-import { createClient } from "@/lib/supabase/client";
+// The Supabase client is loaded only when there is an error to send, so pages that
+// don't otherwise need it (the home page, pricing) stay light.
 
 const seen = new Set<string>();
 let sent = 0;
@@ -17,12 +18,12 @@ export function reportError(err: unknown, context?: string) {
   if (IGNORE.some((re) => re.test(message) || re.test(e.stack ?? ""))) return;
   if (seen.has(message) || sent >= MAX_PER_PAGE) return;
   seen.add(message); sent++;
-  void createClient().rpc("log_error", {
+  void import("@/lib/supabase/client").then(({ createClient }) => createClient().rpc("log_error", {
     p_source: "client",
     p_message: message,
     p_stack: (e.stack ?? "").slice(0, 8000),
     p_url: window.location.pathname + window.location.search,
     p_user_agent: navigator.userAgent.slice(0, 500),
     p_release: process.env.NEXT_PUBLIC_RELEASE ?? null
-  }).then(() => {}, () => {});
+  })).then(() => {}, () => {});
 }

@@ -22,6 +22,7 @@ import { FEATURES } from "@/lib/features";
 import { BoardOverlay, EndScreen, Lobby, PausedOverlay, RevealedResults } from "@/components/live/StudentPhases";
 import type { BoardEntry } from "@/components/live/Leaderboard";
 import { TeamChip, useTeamScores } from "@/components/game/Teams";
+import { LOCALE } from "@/lib/utils";
 
 type StudentState = {
   session: { id: string; title: string; status: string; mode: string; current_slide: number; group_chat_enabled: boolean; responses_visible: boolean; class_id: string | null; teacher: string; environment_active: boolean; settings?: { teams?: number };
@@ -157,7 +158,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
         <div><p className="text-xs text-ink-500">{paced ? "From" : "Live with"} {s.session.teacher}</p><h1 className="text-xl font-bold">{s.session.title}</h1></div>
         <div className="flex flex-wrap items-center gap-2">
           {s.my && <span className="inline-flex items-center gap-2 rounded-lg bg-ink-950 px-3 py-1.5 text-sm font-semibold text-white" title="Your score and rank">
-            <span className="font-display text-base font-extrabold tabular-nums text-accent-400">{s.my.score.toLocaleString()}</span>
+            <span className="font-display text-base font-extrabold tabular-nums text-accent-400">{s.my.score.toLocaleString(LOCALE)}</span>
             <span className="text-ink-300">#{s.my.rank} of {s.my.of}</span>
           </span>}
           {s.my && <StreakChip streak={s.my.streak} />}

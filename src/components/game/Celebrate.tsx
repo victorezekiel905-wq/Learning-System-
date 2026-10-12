@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn, LOCALE } from "@/lib/utils";
 import { Critter } from "@/components/live/Critter";
 import { Crown } from "lucide-react";
 import { OptionShape } from "./Shape";
@@ -86,7 +86,7 @@ export function Podium({ entries, size = "lg", highlight }: { entries: PodiumEnt
       {top.map((e) => {
         const st = STEP[e.rank as 1 | 2 | 3];
         return (
-          <li key={`${e.rank}-${e.name}`} className="flex w-1/3 max-w-[13rem] flex-col items-center" aria-label={`${st.label}: ${e.name}, ${e.score.toLocaleString()} points`}>
+          <li key={`${e.rank}-${e.name}`} className="flex w-1/3 max-w-[13rem] flex-col items-center" aria-label={`${st.label}: ${e.name}, ${e.score.toLocaleString(LOCALE)} points`}>
             <div className="relative flex flex-col items-center animate-pop" style={{ animationDelay: `calc(${st.delay} + .35s)` }}>
               {e.rank === 1 && <Burst delay={1300} />}
               {e.rank === 1 && <Crown aria-hidden className={cn("absolute -top-7 animate-pop text-tile-star [animation-delay:1.25s]", lg ? "h-9 w-9" : "h-7 w-7")} fill="currentColor" strokeWidth={1.5} />}
@@ -94,7 +94,7 @@ export function Podium({ entries, size = "lg", highlight }: { entries: PodiumEnt
                 e.name === highlight && "ring-4 ring-accent-400")}><Critter name={e.avatar} className="h-[78%] w-[78%]" />
                 {e.rank > 1 && <RankBadge rank={e.rank} className="absolute -right-2.5 -top-2.5" />}</span>
               <span className={cn("mt-2 max-w-full truncate font-display font-extrabold", lg ? "text-2xl" : "text-base")}>{e.name}</span>
-              <span className={cn("font-display font-bold tabular-nums text-white/70", lg ? "text-lg" : "text-sm")}>{e.score.toLocaleString()}</span>
+              <span className={cn("font-display font-bold tabular-nums text-white/70", lg ? "text-lg" : "text-sm")}>{e.score.toLocaleString(LOCALE)}</span>
             </div>
             <div className="mt-3 w-full overflow-hidden rounded-t-2xl">
               <div className={cn("flex w-full items-start justify-center pt-3 font-display font-extrabold animate-rise", st.h, st.bg, lg ? "text-4xl" : "text-2xl")}
