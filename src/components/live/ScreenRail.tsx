@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Modal, useToast, useDialog } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL, type RosterEntry, type SessionState } from "./types";
-import { useRpc } from "@/lib/hooks";
+import { useNow, useRpc } from "@/lib/hooks";
+import { useScreenFeed } from "@/lib/screen-feed";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -20,7 +21,53 @@ export function screenLive(r: RosterEntry) {
   return !!(r.device?.online || r.web?.sharing);
 }
 
-function placeholder(r: RosterEntry, state: SessionState) {
+/** Every joined student's latest frame: streamed live from the lesson page, or uploaded by a managed browser. */
+export function useSessionScreens(sessionId: string, state: SessionState | null | undefined): Record<string, Screen> {
+  const captureOn = !!state?.settings.allow_screen_capture;
+  // Live frames stream from each joined student's private channel (never stored).
+  const joinedIds = useMemo(() => (state?.roster ?? []).filter((r) => r.presence === "online" || r.presence === "idle").map((r) => r.student_id), [state]);
+  const feed = useScreenFeed(sessionId, joinedIds, captureOn);
+  // Managed browsers (extension) still upload to the database: poll only if any exist.
+  const hasDevices = (state?.roster ?? []).some((r) => r.device);
+  const thumbEvery = Math.max(state?.settings.thumbnail_interval_seconds ?? 10, 5) * 1000;
+  const screensQ = useRpc<Screen[]>("session_screens", { p_session: sessionId }, [sessionId], { intervalMs: thumbEvery, enabled: captureOn && hasDevices });
+  const now = useNow(5000);
+  return useMemo(() => {
+    const out: Record<string, Screen> = Object.fromEntries((screensQ.data ?? []).map((x) => [x.student_id, x]));
+    const staleAfter = Math.max(thumbEvery * 3, 30_000);
+    for (const [id, f] of Object.entries(feed)) {
+      const at = new Date(f.receivedAt).toISOString();
+      if (!out[id] || out[id].captured_at < at) {
+        out[id] = { student_id: id, device_id: null, image: f.image, captured_at: at, url: null, stale: now - f.receivedAt > staleAfter, source: "web" };
+      }
+    }
+    return out;
+  }, [screensQ.data, feed, now, thumbEvery]);
+}
+
+export type Frame = { image: string; captured_at: string; url: string | null; quality: string; stale: boolean };
+
+/**
+ * One student's screen at full size: the newest of the live stream and a managed
+ * browser's upload. While it's open the student is asked for sharper frames.
+ */
+export function useStudentFrame(state: SessionState, sessionId: string, studentId: string, live?: Screen): Frame | null {
+  const r = state.roster.find((x) => x.student_id === studentId);
+  const stored = useRpc<Frame | null>("session_screen", { p_session: sessionId, p_student: studentId }, [sessionId, studentId], { intervalMs: 3000, enabled: !!r?.device });
+  useEffect(() => {
+    if (!state.settings.allow_screen_capture) return;
+    const ask = () => rpc("request_screenshot", { p_session: sessionId, p_student: studentId }).catch(() => {});
+    void ask();
+    const id = window.setInterval(ask, 10000);
+    return () => window.clearInterval(id);
+  }, [sessionId, studentId, state.settings.allow_screen_capture]);
+  return live && (!stored.data || stored.data.captured_at < live.captured_at)
+    ? { image: live.image, captured_at: live.captured_at, url: null, quality: "live", stale: live.stale }
+    : stored.data ?? null;
+}
+
+/** What a screen tile says when there's no picture. */
+export function screenPlaceholder(r: RosterEntry, state: SessionState) {
   if (!state.settings.allow_screen_capture) return "Screen capture is turned off by your school.";
   if (r.guest && !state.session.guest_monitoring) return "Guest: not monitored";
   if (!state.session.lockdown) return "Lockdown is off";
@@ -124,7 +171,7 @@ export function ScreenRail({ state, screens, focus, onFocus, onChanged }: {
             focus === r.student_id ? "border-brand-500 ring-2 ring-brand-200" : left || stepping ? "border-rose-500 ring-2 ring-rose-200" : alert ? "border-amber-400" : "border-ink-200")}>
           <div className="relative aspect-video bg-ink-100">
             {live ? <img src={sc.image} alt={`${r.name}'s screen`} className="h-full w-full object-cover" />
-              : <span className="grid h-full place-items-center px-1 text-center text-[10px] text-ink-500">{placeholder(r, state)}</span>}
+              : <span className="grid h-full place-items-center px-1 text-center text-[10px] text-ink-500">{screenPlaceholder(r, state)}</span>}
             {left && <span className="absolute inset-x-0 bottom-0 animate-pulse2 bg-rose-600 px-1 py-0.5 text-center text-[10px] font-bold text-white">LEFT CLASS</span>}
             {stepping && <span className="absolute inset-x-0 bottom-0 animate-pulse2 bg-rose-600 px-1 py-0.5 text-center text-[10px] font-bold text-white">LEFT LESSON</span>}
             {live && <span className="absolute left-1 top-1 rounded bg-rose-600 px-1 text-[9px] font-bold text-white">LIVE</span>}
@@ -169,21 +216,8 @@ export function FocusView({ state, studentId, sessionId, onMinimize, live }: {
   const dialog = useDialog();
   const r = state.roster.find((x) => x.student_id === studentId);
   // Managed browsers upload frames to the database; web sharing streams them live.
-  const stored = useRpc<{ image: string; captured_at: string; url: string | null; quality: string; stale: boolean } | null>(
-    "session_screen", { p_session: sessionId, p_student: studentId }, [sessionId, studentId], { intervalMs: 3000, enabled: !!r?.device });
-  const f = live && (!stored.data || stored.data.captured_at < live.captured_at)
-    ? { image: live.image, captured_at: live.captured_at, url: null, quality: "live", stale: live.stale }
-    : stored.data;
+  const f = useStudentFrame(state, sessionId, studentId, live);
   const alert = alertFor(state, studentId);
-
-  // Ask the student's page/extension for sharper frames while this view is open.
-  useEffect(() => {
-    if (!state.settings.allow_screen_capture) return;
-    const ask = () => rpc("request_screenshot", { p_session: sessionId, p_student: studentId }).catch(() => {});
-    void ask();
-    const id = window.setInterval(ask, 10000);
-    return () => window.clearInterval(id);
-  }, [sessionId, studentId, state.settings.allow_screen_capture]);
 
   if (!r) return null;
   return (

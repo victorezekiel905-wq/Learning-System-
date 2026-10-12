@@ -99,7 +99,7 @@ export function ProgressView({ p, error, viewer, isAdmin, period, date, onPeriod
               className={cn("rounded-lg px-3 py-1.5 text-sm font-semibold", period === x.id ? "bg-ink-900 text-white" : "text-ink-700 hover:bg-ink-100")}>{x.label}</button>
           ))}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <button type="button" className="btn btn-ghost btn-sm" aria-label={`Previous ${word}`} disabled={!p?.prev_date} onClick={() => p?.prev_date && setDate(p.prev_date)}>
             <ChevronLeft className="h-4 w-4" /></button>
           <span className="min-w-[11rem] text-center text-sm font-semibold text-ink-900">{p?.label ?? (p?.needs_terms ? "Terms not set" : "…")}</span>

@@ -2011,6 +2011,31 @@ test("rejoining after a lost device, open lessons, deleting lessons (1110)", asy
   void tenant;
 });
 
+test("Present shows a guest's screen on the projector only (1120)", async () => {
+  const T = await db.signUp("t@present.test", "Present Teacher");
+  await db.rpc(T, "bootstrap_school", { p_school_name: "Present School", p_full_name: "Present Teacher" });
+  const lib = (await db.rpc(T, "library_list", { p_query: "States of matter" }))[0];
+  const s = await goLive(T, { p_class: null, p_lesson: await db.rpc(T, "library_copy", { p_item: lib.id }) });
+  const g = await db.signInAnonymously();
+  await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Gift" });
+  const other = await db.signInAnonymously();
+  await db.rpc(other, "join_session_as_guest", { p_code: s.join_code, p_name: "Tobi" });
+
+  // Not sharing yet: refused with the reason.
+  await rejects(db.rpc(T, "spotlight_start", { p_session: s.id, p_student: g }), /isn't sharing/);
+  await db.admin("update public.session_participants set screen_sharing = true, last_seen_at = now() where user_id = $1", [g]);
+  await db.rpc(T, "spotlight_start", { p_session: s.id, p_student: g, p_show_to_class: false });
+  // She is told; the rest of the class keeps the lesson.
+  assert.equal((await db.as(g, "select 1 from public.notifications where kind = 'spotlight'")).length, 1);
+  assert.equal((await db.rpc(g, "session_student_state", { p_session: s.id })).spotlight.me, true);
+  assert.deepEqual((await db.rpc(other, "session_student_state", { p_session: s.id })).spotlight, { me: false, show_to_class: false, anonymized: false });
+  assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).spotlight.student_id, g);
+  await db.rpc(T, "spotlight_stop", { p_session: s.id });
+  assert.equal((await db.rpc(T, "teacher_session_state", { p_session: s.id })).spotlight, null);
+  // Someone not in the lesson can't be shown.
+  await rejects(db.rpc(T, "spotlight_start", { p_session: s.id, p_student: (await db.signInAnonymously()) }), /not in this class/);
+});
+
 test("designed slides: canvas kind, size cap, only the lesson's school can edit (0910)", async () => {
   const T = await db.signUp("t@canvas.test", "Canvas Teacher");
   const tenant = (await db.rpc(T, "bootstrap_school", { p_school_name: "Canvas School", p_full_name: "Canvas Teacher" })).tenant_id;

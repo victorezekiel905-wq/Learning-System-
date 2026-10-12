@@ -53,7 +53,7 @@ export function SchoolProgress({ classId }: { classId?: string } = {}) {
             <option value="">Whole school</option>{(d?.classes ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <button type="button" className="btn btn-ghost btn-sm" aria-label="Earlier" disabled={!d?.prev_date} onClick={() => d?.prev_date && setDate(d.prev_date)}><ChevronLeft className="h-4 w-4" /></button>
           <span className="min-w-[11rem] text-center text-sm font-semibold">{d?.label ?? "…"}</span>
           <button type="button" className="btn btn-ghost btn-sm" aria-label="Later" disabled={!d?.next_date} onClick={() => d?.next_date && setDate(d.next_date)}><ChevronRight className="h-4 w-4" /></button>

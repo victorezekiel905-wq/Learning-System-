@@ -6,9 +6,8 @@ import { Alert, Avatar, Badge, Button, Select, Tabs, Textarea, Toggle, useToast,
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL, type SessionState } from "@/components/live/types";
 import { createClient } from "@/lib/supabase/client";
-import { useNetwork, useNow, useRpc } from "@/lib/hooks";
+import { useNetwork, useRpc } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
-import { useScreenFeed } from "@/lib/screen-feed";
 import { useTeacherPresence } from "@/lib/teacher-presence";
 import { errorText, rpc } from "@/lib/rpc";
 import { cn, formatJoinCode, timeAgo } from "@/lib/utils";
@@ -21,7 +20,7 @@ import { ResponsesPanel } from "./ResponsesPanel";
 import { ScreensPanel } from "./ScreensPanel";
 import { EnvironmentPanel } from "./EnvironmentPanel";
 import { ChatPanel } from "./ChatPanel";
-import { FocusView, ScreenRail, type Screen } from "@/components/live/ScreenRail";
+import { FocusView, ScreenRail, useSessionScreens } from "@/components/live/ScreenRail";
 import { TeamStandings, useTeamScores } from "@/components/game/Teams";
 
 type Tab = "lesson" | "responses" | "screens" | "environment" | "chat";
@@ -44,26 +43,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
   useSignal(`staff:${sessionId}`, ["state", "roster", "alert", "hand"], () => void state.reload(), { debounceMs: 300, minGapMs: 1500 });
 
   const s = state.data;
-  const captureOn = !!s?.settings.allow_screen_capture;
-  // Live frames stream from each joined student's private channel (never stored).
-  const joinedIds = useMemo(() => (s?.roster ?? []).filter((r) => r.presence === "online" || r.presence === "idle").map((r) => r.student_id), [s]);
-  const feed = useScreenFeed(sessionId, joinedIds, captureOn);
-  // Managed browsers (extension) still upload to the database: poll only if any exist.
-  const hasDevices = (s?.roster ?? []).some((r) => r.device);
-  const thumbEvery = Math.max(s?.settings.thumbnail_interval_seconds ?? 10, 5) * 1000;
-  const screensQ = useRpc<Screen[]>("session_screens", { p_session: sessionId }, [sessionId], { intervalMs: thumbEvery, enabled: captureOn && hasDevices });
-  const now = useNow(5000);
-  const screens = useMemo(() => {
-    const out: Record<string, Screen> = Object.fromEntries((screensQ.data ?? []).map((x) => [x.student_id, x]));
-    const staleAfter = Math.max(thumbEvery * 3, 30_000);
-    for (const [id, f] of Object.entries(feed)) {
-      const at = new Date(f.receivedAt).toISOString();
-      if (!out[id] || out[id].captured_at < at) {
-        out[id] = { student_id: id, device_id: null, image: f.image, captured_at: at, url: null, stale: now - f.receivedAt > staleAfter, source: "web" };
-      }
-    }
-    return out;
-  }, [screensQ.data, feed, now, thumbEvery]);
+  const screens = useSessionScreens(sessionId, s);
   const [focus, setFocus] = useState<string | null>(null);
 
   const openAlerts = useMemo(() => (s?.alerts ?? []).filter((a) => a.status === "open" && !a.resolved_at), [s]);

@@ -20,6 +20,9 @@ import { getSound } from "@/lib/sound";
 import { useTeacherPresence } from "@/lib/teacher-presence";
 import { WordCloud, useWordCloud } from "@/components/game/WordCloud";
 import { TeamStandings, useTeamScores } from "@/components/game/Teams";
+import { useSessionScreens } from "@/components/live/ScreenRail";
+import { useToast } from "@/components/ui";
+import { ProjectedScreen, ScreenStrip } from "./PresentScreens";
 
 const TILE_KINDS = ["mcq", "true_false", "poll", "multi_select"];
 
@@ -27,8 +30,13 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   useTeacherPresence(sessionId);
   const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: 15000 });
   const lesson = useLoader(() => rpc<{ slides: SlideData[] }>("session_lesson", { p_session: sessionId }), [sessionId]);
-  const spot = useRpc<{ student: string; image: string | null; stale: boolean } | null>("spotlight_view", { p_session: sessionId }, [sessionId], { intervalMs: 3000, enabled: !!state.data?.spotlight?.show_to_class });
+  const spotOn = !!state.data?.spotlight?.show_to_class;
+  const spotQ = useRpc<{ student: string; image: string | null; stale: boolean } | null>("spotlight_view", { p_session: sessionId }, [sessionId], { intervalMs: 3000, enabled: spotOn });
+  // A paused query keeps its last answer: only trust it while a class spotlight is on.
+  const spot = { data: spotOn ? spotQ.data : null, reload: spotQ.reload };
   useSignal(`staff:${sessionId}`, ["state"], () => { void state.reload(); void spot.reload(); }, { debounceMs: 100 });
+  // Joins, leaves and hands, for the screens beside the lesson.
+  useSignal(`staff:${sessionId}`, ["roster", "alert", "hand"], () => void state.reload(), { debounceMs: 300, minGapMs: 1500 });
   const s = state.data?.session;
   const ann = useAnnotations(sessionId, s?.current_slide ?? 0);
   const slide = (lesson.data?.slides ?? []).find((x) => x.position === s?.current_slide);
@@ -40,12 +48,52 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   const host = typeof window !== "undefined" ? window.location.host : "";
   const here = (state.data?.roster ?? []).filter((r) => r.presence === "online" || r.presence === "idle");
 
+  // Students' screens beside the lesson (when the school monitors and allows capture).
+  const toast = useToast();
+  const screensOk = !!state.data && state.data.settings.monitoring_enabled !== false && !!state.data.settings.allow_screen_capture;
+  const screens = useSessionScreens(sessionId, screensOk ? state.data : null);
+  const [railOn, setRailOn] = useState(true);
+  useEffect(() => { try { if (localStorage.getItem("swiftcipher.present.screens") === "off") setRailOn(false); } catch { /* storage blocked */ } }, []);
+  const toggleRail = useCallback(() => setRailOn((v) => {
+    try { localStorage.setItem("swiftcipher.present.screens", v ? "off" : "on"); } catch { /* storage blocked */ }
+    return !v;
+  }), []);
+  const rail = screensOk && railOn && !!s && s.phase !== "lobby";
+  // The student shown large on this screen. It's a spotlight just for the projector:
+  // the student is told; everyone else's device keeps the lesson.
+  const [shown, setShown] = useState<string | null>(null);
+  const shownRef = useRef<string | null>(null);
+  shownRef.current = shown;
+  const showScreen = useCallback(async (id: string) => {
+    if (shownRef.current === id) { setShown(null); await rpc("spotlight_stop", { p_session: sessionId }).catch(() => {}); void state.reload(); return; }
+    try {
+      await rpc("spotlight_start", { p_session: sessionId, p_student: id, p_anonymized: false, p_show_to_class: false });
+      await state.reload();
+      setShown(id);
+    } catch (e) { toast(errorText(e), "error"); }
+  }, [sessionId, state, toast]);
+  const hideScreen = useCallback(() => {
+    if (!shownRef.current) return;
+    setShown(null);
+    void rpc("spotlight_stop", { p_session: sessionId }).catch(() => {}).then(() => state.reload());
+  }, [sessionId, state]);
+  // Stopped from the control room, or the lesson moved on to its lobby/end: back to the lesson.
+  const spotStudent = state.data?.spotlight?.student_id ?? null;
+  useEffect(() => { if (shown && state.data && spotStudent !== shown) setShown(null); }, [shown, spotStudent, state.data]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && shownRef.current) hideScreen(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hideScreen]);
+  // Leaving Present ends the projector's spotlight.
+  useEffect(() => () => { if (shownRef.current) void rpc("spotlight_stop", { p_session: sessionId }).catch(() => {}); }, [sessionId]);
+
   // Clock skew against the server, so the projector counts down with the phones.
   const [skew, setSkew] = useState(0);
   useEffect(() => { if (state.data?.server_now) setSkew(new Date(state.data.server_now).getTime() - Date.now()); }, [state.data]);
   const timer = state.data?.timer ?? null;
   const q0 = results?.questions[0];
-  const gameOn = s?.phase === "active" && !s.show_leaderboard && !spot.data && !!results && !!q0;
+  const gameOn = s?.phase === "active" && !s.show_leaderboard && !spot.data && !shown && !!results && !!q0;
   const asking = gameOn && !results!.revealed && !s.responses_visible;
   const revealedTiles = gameOn && results!.revealed && TILE_KINDS.includes(q0!.kind);
   const [timeUp, setTimeUp] = useState<string | null>(null);
@@ -88,9 +136,15 @@ export function Presenter({ sessionId }: { sessionId: string }) {
           </button>
         </div>
       </header>
-      <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
+      <div className="flex flex-1 flex-col lg:flex-row">
+      <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-4 sm:p-6">
         {s?.phase === "lobby" && <GlyphField opacity={0.4} />}
-        {s?.phase === "lobby" ? (
+        {shown && state.data && s && s.phase !== "lobby" ? (
+          <ProjectedScreen state={state.data} sessionId={sessionId} studentId={shown} onBack={hideScreen}
+            live={screens[shown]?.source === "web" ? screens[shown] : undefined}
+            lesson={slide ? <SlideView slide={slide} /> : undefined}
+            lessonLabel={s.phase === "paused" ? "Lesson paused" : `Lesson · slide ${s.current_slide + 1}${lesson.data?.slides.length ? ` of ${lesson.data.slides.length}` : ""}`} />
+        ) : s?.phase === "lobby" ? (
           <div className="relative text-center">
             <p className="text-2xl text-ink-300">Join at <strong className="text-white">{host}/join</strong></p>
             <div className="mt-4 flex items-center justify-center gap-10">
@@ -170,7 +224,10 @@ export function Presenter({ sessionId }: { sessionId: string }) {
           </div>
         ) : <p className="text-2xl text-ink-400">{s ? "Waiting to start…" : "Loading…"}</p>}
       </main>
-      {state.data && <PresenterControls sessionId={sessionId} state={state.data} slideCount={lesson.data?.slides.length ?? 0} reload={state.reload} />}
+      {rail && state.data && <ScreenStrip state={state.data} screens={screens} shown={shown} onShow={(id) => void showScreen(id)} onHide={toggleRail} />}
+      </div>
+      {state.data && <PresenterControls sessionId={sessionId} state={state.data} slideCount={lesson.data?.slides.length ?? 0} reload={state.reload}
+        screens={screensOk ? { on: railOn, toggle: toggleRail } : null} />}
     </div>
   );
 }
@@ -181,9 +238,14 @@ const BAR_BTN = "inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm
  * The teacher's controls on the projector: back to the control room, start, slides,
  * reveal, pause, leaderboard, screens and full screen. The bar fades while the mouse
  * is still, so the class sees just the lesson; keys work whether it shows or not:
- * → next, ← back, S start, R reveal, P pause/resume, L leaderboard, F full screen.
+ * → next, ← back, S start, R reveal, P pause/resume, L leaderboard, V screens,
+ * F full screen, Esc back to the lesson from a student's screen.
  */
-function PresenterControls({ sessionId, state, slideCount, reload }: { sessionId: string; state: SessionState; slideCount: number; reload: () => Promise<void> }) {
+function PresenterControls({ sessionId, state, slideCount, reload, screens }: {
+  sessionId: string; state: SessionState; slideCount: number; reload: () => Promise<void>;
+  /** Students' screens beside the lesson; null when the school doesn't capture screens. */
+  screens: { on: boolean; toggle: () => void } | null;
+}) {
   const s = state.session;
   const phase = s.phase ?? "active";
   const [shown, setShown] = useState(true);
@@ -236,10 +298,11 @@ function PresenterControls({ sessionId, state, slideCount, reload }: { sessionId
       else if (k === "l" && phase !== "lobby") void act("leaderboard", { show: !s.show_leaderboard });
       else if (k === "r" && phase === "active" && state.activity && !state.activity.revealed) void act("reveal");
       else if (k === "f") toggleFull();
+      else if (k === "v" && screens && phase !== "lobby") screens.toggle();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, s.show_leaderboard, state.activity, act, toggleFull]);
+  }, [phase, s.show_leaderboard, state.activity, act, toggleFull, screens]);
 
   const visible = shown || phase === "lobby" || !!err;
   const ghost = `${BAR_BTN} bg-white/10 text-white no-underline hover:bg-white/20`;
@@ -263,7 +326,8 @@ function PresenterControls({ sessionId, state, slideCount, reload }: { sessionId
         {phase === "paused" && <button type="button" className={accent} disabled={busy} onClick={() => void act("resume")} title="Carry on (P)"><Play className="h-4 w-4" /> Resume</button>}
         {phase !== "lobby" && state.ranking && <button type="button" className={s.show_leaderboard ? accent : ghost} aria-pressed={!!s.show_leaderboard} disabled={busy}
           onClick={() => void act("leaderboard", { show: !s.show_leaderboard })} title="Leaderboard (L)"><Trophy className="h-4 w-4" /> {s.show_leaderboard ? "Hide leaderboard" : "Leaderboard"}</button>}
-        {mon && <Link href={`/teacher/live/${sessionId}?tab=screens`} className={ghost} title="Students’ screens, in the control room (never on the projector)"><LayoutGrid className="h-4 w-4" /> Screens</Link>}
+        {screens && phase !== "lobby" ? <button type="button" className={screens.on ? accent : ghost} aria-pressed={screens.on} onClick={screens.toggle} title="Students’ screens beside the lesson (V)"><LayoutGrid className="h-4 w-4" /> {screens.on ? "Hide screens" : "Screens"}</button>
+          : mon && <Link href={`/teacher/live/${sessionId}?tab=screens`} className={ghost} title="Students’ screens, in the control room"><LayoutGrid className="h-4 w-4" /> Screens</Link>}
         <button type="button" className={ghost} onClick={toggleFull} title="Full screen (F)">{full ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}{full ? "Exit full screen" : "Full screen"}</button>
       </nav>
     </div>
