@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RichText } from "@/components/RichText";
 import { Alert, Badge, Button, Spinner, useToast } from "@/components/ui";
 import { useNow } from "@/lib/hooks";
@@ -16,6 +16,7 @@ import { AnswerResult, AnswerTiles, TimerRing, useSecondsLeft, type LiveTimer } 
 import { OptionShape } from "@/components/game/Shape";
 import { OPTION_COLORS } from "@/components/game/types";
 import { buzz } from "@/lib/sound";
+import { KeyboardToggle } from "./OnScreenKeyboard";
 
 /** Question kinds answered by tapping a coloured tile in a live lesson. */
 const TILE_KINDS = ["mcq", "true_false", "poll", "multi_select"];
@@ -56,6 +57,8 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   live?: { timer: LiveTimer | null; skew: number };
 }) {
   const toast = useToast();
+  // The question area, so the on-screen keyboard types only into this activity's answers.
+  const box = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<Started | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
@@ -263,13 +266,15 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   }
 
   return (
-    <div className={cn("card space-y-5", compact ? "p-4" : "card-pad")}>
+    <div ref={box} className={cn("card space-y-5", compact ? "p-4" : "card-pad")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-[13px] font-semibold text-ink-600">{data.activity.title}</p>
           {questions.length > 1 && <p className="text-xs text-ink-500">Question {index + 1} of {questions.length} · {answeredCount} answered</p>}
         </div>
         <div className="flex items-center gap-2">
+          {/* Typed answers: an on-screen keyboard, for touch panels and anyone who finds the device keyboard hard. */}
+          {!["mcq", "true_false", "poll", "multi_select"].includes(q.kind) && <KeyboardToggle scope={box} />}
           {data.attempt.level && <span title={CHALLENGE[data.attempt.level].hint}><Badge tone="brand">{CHALLENGE[data.attempt.level].name} challenge</Badge></span>}
           {pending > 0 && <Badge tone="amber">{pending} waiting to sync</Badge>}
           {liveTimer && <TimerRing timer={liveTimer} skew={live!.skew} size={44} className="text-ink-900" />}

@@ -27,3 +27,22 @@ export function Leaderboard({ entries, size = "md", highlight }: { entries: Boar
     </ol>
   );
 }
+
+/** Everyone below the podium on the projector: compact rows in columns, so a whole class fits. */
+export function RankGrid({ entries }: { entries: BoardEntry[] }) {
+  if (!entries.length) return null;
+  return (
+    <ol className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" aria-label="Everyone else">
+      {entries.map((e) => (
+        <li key={`${e.rank}-${e.name}`} className="flex items-center gap-3 rounded-xl bg-white/[0.07] px-3 py-2 text-white ring-1 ring-inset ring-white/10">
+          <span className="w-8 shrink-0 text-right font-display text-lg font-extrabold tabular-nums text-ink-300">{e.rank}</span>
+          <Critter name={e.avatar} className="h-7 w-7 shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-base font-semibold sm:text-lg">{e.name}</span>
+          {e.delta ? <span className={cn("text-xs font-bold", e.delta > 0 ? "text-accent-400" : "text-rose-300")} aria-label={e.delta > 0 ? `up ${e.delta}` : `down ${-e.delta}`}>
+            {e.delta > 0 ? `▲${e.delta}` : `▼${-e.delta}`}</span> : null}
+          <span className="shrink-0 font-display text-lg font-extrabold tabular-nums">{e.score.toLocaleString(LOCALE)}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}

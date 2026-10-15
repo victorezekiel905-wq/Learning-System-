@@ -23,6 +23,23 @@ import { StartLearning } from "@/components/live/StartLearning";
 import { buildDeck, tidyOutline, type ThemeKey } from "@/slides/ai-deck";
 import { CanvasFrame } from "@/components/slides/CanvasView";
 import { downloadPptx } from "@/lib/pptx-export";
+import { SavableSlide } from "@/components/student/SaveSlide";
+import { KeyboardToggle } from "@/components/activities/OnScreenKeyboard";
+import { useRef } from "react";
+
+function KeyboardPreview() {
+  const box = useRef<HTMLDivElement>(null);
+  const [short, setShort] = useState("");
+  const [long, setLong] = useState("");
+  return (
+    <div ref={box} className="card card-pad mx-auto max-w-xl space-y-3">
+      <div className="flex items-center justify-between"><p className="text-sm font-semibold">Check · Question 2 of 4</p><KeyboardToggle scope={box} /></div>
+      <label className="block text-sm font-medium">Area of a circle<input className="input mt-1" aria-label="Short answer" value={short} onChange={(e) => setShort(e.target.value)} /></label>
+      <label className="block text-sm font-medium">Explain why<textarea className="input mt-1" aria-label="Long answer" rows={3} value={long} onChange={(e) => setLong(e.target.value)} /></label>
+      <p className="text-xs text-ink-500" data-testid="echo">{short}|{long}</p>
+    </div>
+  );
+}
 
 const LEAF_PHOTO = { url: "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=1080", alt: "Green leaves in sunlight", credit: "Ada Obi", credit_url: "https://unsplash.com", download_location: "" };
 const OUTLINE = tidyOutline({ title: "Photosynthesis", slides: [
@@ -184,6 +201,8 @@ export function Preview() {
 
       <section id="guide" className="bg-ink-50 p-5"><StartGuide done={{ classes: true, lessons: false, taught: false, report: false }} /></section>
 
+      <section id="saveslide" className="mx-auto max-w-3xl bg-ink-50 p-5"><SavableSlide slide={{ id: "x", position: 2, kind: "canvas", content: buildDeck(OUTLINE, [], "swift")[2].content, activity: null }} title="Photosynthesis"><div className="slide-surface"><CanvasFrame content={buildDeck(OUTLINE, [], "swift")[2].content} /></div></SavableSlide></section>
+      <section id="keyboard" className="bg-ink-50 p-5"><KeyboardPreview /></section>
       <section id="aideck" className="space-y-6 bg-ink-50 p-5">{(["swift", "ocean", "sunrise"] as const).map((t) => <DeckPreview key={t} theme={t} />)}</section>
       <section id="startlearning" className="relative h-[640px] [transform:translateZ(0)]"><StartLearning guard={FAKE_GUARD} teacher="Mrs Okafor" title="Equivalent fractions" /></section>
       <section id="present"><PresentPreview /></section>

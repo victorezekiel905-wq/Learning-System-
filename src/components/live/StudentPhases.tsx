@@ -129,7 +129,7 @@ export function EndScreen({ name, avatar, summary, guest, score = null, closedNo
   );
 }
 
-/** The class leaderboard, while the teacher shows it: top 5, and your own place privately. */
+/** The class leaderboard, while the teacher shows it: the whole class (1160), your own row highlighted. */
 export function BoardOverlay({ entries, me, my }: { entries: BoardEntry[]; me: string; my: { score: number; rank: number; of: number } | null }) {
   const [hidden, setHidden] = useState<string | null>(null);
   const key = JSON.stringify(entries);

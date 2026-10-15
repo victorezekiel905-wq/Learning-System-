@@ -5,6 +5,7 @@ import { Alert, Button, PageHeader } from "@/components/ui";
 import { useLoader } from "@/lib/hooks";
 import { rpc } from "@/lib/rpc";
 import { Icon } from "@/components/Icon";
+import { SavableSlide } from "@/components/student/SaveSlide";
 
 type Shared = { lesson: { title: string; description: string | null }; slides: LearnerSlide[]; share: { mode: string; expires_at: string } };
 
@@ -21,7 +22,7 @@ export function SharedLesson({ code, tenantId, userId }: { code: string; tenantI
     <div className="page max-w-5xl space-y-4">
       <PageHeader title={data.data.lesson.title} subtitle={data.data.lesson.description ?? undefined} />
       {slide && (viewOnly && slide.kind === "activity" ? <Alert>This lesson is shared view-only; activities are answered in class.</Alert>
-        : <LessonStage slide={slide} shareCode={code} tenantId={tenantId} userId={userId} />)}
+        : <SavableSlide slide={slide} title={data.data.lesson.title}><LessonStage slide={slide} shareCode={code} tenantId={tenantId} userId={userId} /></SavableSlide>)}
       <div className="flex items-center justify-between">
         <Button variant="secondary" disabled={i === 0} onClick={() => setI(i - 1)}><Icon name="chevronLeft" className="h-4 w-4" />Previous</Button>
         <span className="text-sm text-ink-500">{i + 1} / {slides.length}</span>

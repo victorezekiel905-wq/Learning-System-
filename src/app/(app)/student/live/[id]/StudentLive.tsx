@@ -23,6 +23,7 @@ import { BoardOverlay, EndScreen, Lobby, PausedOverlay, RevealedResults } from "
 import type { BoardEntry } from "@/components/live/Leaderboard";
 import { TeamChip, useTeamScores } from "@/components/game/Teams";
 import { LOCALE } from "@/lib/utils";
+import { SavableSlide } from "@/components/student/SaveSlide";
 
 type StudentState = {
   session: { id: string; title: string; status: string; mode: string; current_slide: number; group_chat_enabled: boolean; responses_visible: boolean; class_id: string | null; teacher: string; environment_active: boolean; settings?: { teams?: number };
@@ -202,8 +203,10 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
       ) : slideRevealed ? (
         <RevealedResults sessionId={sessionId} activityId={revealedId!} />
       ) : slide ? (
-        <LessonStage slide={slide} sessionId={sessionId} tenantId={me.tenantId} userId={me.id} live={game}
-          overlay={ann.strokes.length ? <svg viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} className="h-full w-full"><StrokeLayer strokes={ann.strokes} /></svg> : undefined} />
+        <SavableSlide slide={slide} title={s.session.title}>
+          <LessonStage slide={slide} sessionId={sessionId} tenantId={me.tenantId} userId={me.id} live={game}
+            overlay={ann.strokes.length ? <svg viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} className="h-full w-full"><StrokeLayer strokes={ann.strokes} /></svg> : undefined} />
+        </SavableSlide>
       ) : lesson.loading ? <p className="text-sm text-ink-500">Loading lesson…</p> : !s.active_activity && <Alert>Waiting for your teacher…</Alert>}
 
       {paced && slides.length > 0 && (

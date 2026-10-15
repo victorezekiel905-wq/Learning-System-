@@ -2694,3 +2694,23 @@ test("codes students type are 6 digits (1150)", async () => {
   // Teacher invites keep their longer letter codes.
   assert.doesNotMatch(await db.as(T, "select app.unique_code(10, 'invites') c").then((r) => r[0].c), six);
 });
+
+test("the leaderboard holds the whole class, for the teacher and students (1160)", async () => {
+  const T = await db.signUp("t@board.test", "Board Teacher");
+  await db.rpc(T, "bootstrap_school", { p_school_name: "Board School", p_full_name: "Board Teacher" });
+  const lib = (await db.rpc(T, "library_list", { p_query: "States of matter" }))[0];
+  const s = await goLive(T, { p_class: null, p_lesson: await db.rpc(T, "library_copy", { p_item: lib.id }) });
+  const guests = [];
+  for (let i = 0; i < 12; i++) {
+    const g = await db.signInAnonymously();
+    await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: `Player ${String(i + 1).padStart(2, "0")}` });
+    await db.admin("update public.session_participants set total_score = $2 where user_id = $1", [g, 1000 - i * 10]);
+    guests.push(g);
+  }
+  await db.rpc(T, "session_control", { p_session: s.id, p_action: "leaderboard", p_args: { show: true } });
+  const top = (await db.rpc(T, "teacher_session_state", { p_session: s.id })).session.leaderboard.top;
+  assert.equal(top.length, 12);
+  assert.deepEqual([top[0].name, top[11].name], ["Player 01", "Player 12"]);
+  const seen = (await db.rpc(guests[11], "session_student_state", { p_session: s.id })).leaderboard;
+  assert.equal(seen.length, 12);
+});

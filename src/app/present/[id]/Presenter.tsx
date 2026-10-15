@@ -11,7 +11,7 @@ import { useSignal } from "@/lib/realtime";
 import { errorText, rpc } from "@/lib/rpc";
 import { Icon } from "@/components/Icon";
 import { Critter } from "@/components/live/Critter";
-import { Leaderboard } from "@/components/live/Leaderboard";
+import { RankGrid } from "@/components/live/Leaderboard";
 import { GlyphField, Podium } from "@/components/game/Celebrate";
 import { JoinQr } from "@/components/live/JoinQr";
 import { formatJoinCode } from "@/lib/utils";
@@ -118,6 +118,7 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   const gameOn = s?.phase === "active" && !s.show_leaderboard && !spot.data && !shown && !nav.pending && !!results && !!q0;
   const asking = gameOn && !results!.revealed && !s.responses_visible;
   const revealedTiles = gameOn && results!.revealed && TILE_KINDS.includes(q0!.kind);
+  const revealedOther = gameOn && results!.revealed && !TILE_KINDS.includes(q0!.kind) && !isCloud;
   const [timeUp, setTimeUp] = useState<string | null>(null);
 
   // Music and sound effects (the projector only; browsers need one click first).
@@ -179,11 +180,13 @@ export function Presenter({ sessionId }: { sessionId: string }) {
             </ul>
           </div>
         ) : s?.show_leaderboard && s.leaderboard && s.settings?.leaderboard !== false ? (
-          <div className="w-full max-w-4xl" key={s.leaderboard.at ?? "board"}>
-            <h2 className="mb-10 text-center font-display text-4xl font-extrabold sm:text-6xl">Leaderboard</h2>
+          // Everyone, not just the top few: the podium, then every other player in columns
+          // (the board scrolls when a big class doesn't fit).
+          <div className="max-h-[calc(100dvh-10rem)] w-full max-w-6xl overflow-y-auto px-1" key={s.leaderboard.at ?? "board"}>
+            <h2 className="mb-8 text-center font-display text-4xl font-extrabold sm:text-6xl">Leaderboard</h2>
             {teamsOn && (teams.data ?? []).length > 0 && <div className="mx-auto mb-10 max-w-3xl"><TeamStandings teams={teams.data!} big /></div>}
             <Podium entries={s.leaderboard.top.slice(0, 3)} />
-            {s.leaderboard.top.length > 3 && <div className="mx-auto mt-8 max-w-2xl"><Leaderboard entries={s.leaderboard.top.slice(3, 5)} size="lg" /></div>}
+            <div className="mt-8"><RankGrid entries={s.leaderboard.top.slice(3)} /></div>
           </div>
         ) : s?.phase === "paused" ? (
           <p className="text-center font-display text-6xl font-extrabold">👀 Eyes on me</p>
@@ -213,18 +216,36 @@ export function Presenter({ sessionId }: { sessionId: string }) {
             {timer && timeUp === timer.ends_at && <p className="text-center font-display text-4xl font-extrabold text-accent-300">Time's up!</p>}
           </div>
         ) : revealedTiles ? (
-          <div className="w-full max-w-5xl space-y-8 text-center">
-            <h2 className="font-display text-4xl font-extrabold leading-tight">{q0!.prompt}</h2>
-            <AnswerBars options={q0!.options} counts={Object.fromEntries(q0!.options.map((o) => [o.id, o.count]))}
-              correct={q0!.kind === "poll" ? [] : q0!.options.filter((o) => o.is_correct).map((o) => o.id)} />
-            <AnswerTiles options={q0!.options} big correct={q0!.kind === "poll" ? undefined : q0!.options.filter((o) => o.is_correct).map((o) => o.id)} />
+          // Fits above the controls: the bars, then the answers (compact) with the right one marked.
+          <div className="w-full max-w-5xl space-y-6 text-center">
+            <h2 className="font-display text-3xl font-extrabold leading-tight sm:text-4xl">{q0!.prompt}</h2>
+            {/* The bar chart only where there is room (tall screens); the tiles carry the counts too. */}
+            <div className="hidden [@media(min-height:900px)]:block">
+              <AnswerBars options={q0!.options} counts={Object.fromEntries(q0!.options.map((o) => [o.id, o.count]))}
+                correct={q0!.kind === "poll" ? [] : q0!.options.filter((o) => o.is_correct).map((o) => o.id)} />
+            </div>
+            <AnswerTiles options={q0!.options} counts={Object.fromEntries(q0!.options.map((o) => [o.id, o.count]))}
+              correct={q0!.kind === "poll" ? undefined : q0!.options.filter((o) => o.is_correct).map((o) => o.id)} />
           </div>
-        ) : results && isCloud && (s?.responses_visible || results.revealed) ? (
+        ) : revealedOther ? (
+          // Written answers, ordering, matching, labelling: how many got it right, and the answer.
+          <div className="w-full max-w-4xl space-y-8 text-center">
+            <h2 className="font-display text-3xl font-extrabold leading-tight sm:text-5xl">{q0!.prompt}</h2>
+            <p className="font-display text-7xl font-extrabold tabular-nums text-accent-400">{q0!.responses ? Math.round((100 * q0!.correct) / q0!.responses) : 0}%</p>
+            <p className="text-2xl text-ink-300">{q0!.correct} of {q0!.responses} got it right</p>
+            {q0!.options.some((o) => o.is_correct) && (
+              <div className="mx-auto max-w-2xl rounded-2xl bg-white/[0.07] p-5 ring-1 ring-inset ring-white/10">
+                <p className="text-sm font-semibold uppercase tracking-wide text-ink-300">Answer</p>
+                <p className="mt-2 text-3xl font-bold">{q0!.options.filter((o) => o.is_correct).map((o) => o.label).join(", ")}</p>
+              </div>
+            )}
+          </div>
+        ) : results && isCloud && !nav.pending && (s?.responses_visible || results.revealed) ? (
           <div className="w-full max-w-6xl space-y-8 text-center">
             <h2 className="font-display text-5xl font-extrabold leading-tight">{q0!.prompt}</h2>
             <WordCloud words={cloud.data ?? []} dark big />
           </div>
-        ) : results && s?.responses_visible ? (
+        ) : results && s?.responses_visible && !nav.pending ? (
           <div className="w-full max-w-4xl space-y-6">
             <div className="flex items-baseline justify-between gap-4"><h2 className="text-3xl font-bold">{results.activity.title}</h2>
               {results.answered !== undefined && <p className="text-xl text-ink-300">{results.answered}/{results.joined} answered</p>}</div>
