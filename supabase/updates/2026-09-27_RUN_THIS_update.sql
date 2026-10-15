@@ -139,6 +139,7 @@
 -- ---------------------------------------------------------------------------
 -- Schema
 -- ---------------------------------------------------------------------------
+set constraints all immediate; set constraints all deferred;
 alter table public.quiz_answers
   add column if not exists tries smallint not null default 1 check (tries between 1 and 2),
   add column if not exists revealed boolean not null default false;
@@ -203,16 +204,23 @@ create index if not exists question_submissions_reviewer_idx on public.question_
 create index if not exists question_collabs_opened_by_idx on public.question_collabs(opened_by);
 
 -- XP and a badge for approved questions.
+set constraints all immediate; set constraints all deferred;
 alter table public.xp_events drop constraint if exists xp_events_source_check;
+set constraints all immediate; set constraints all deferred;
 alter table public.xp_events add constraint xp_events_source_check
   check (source in ('answer','reasoning','completion','perfect','game','teacher','question'));
+set constraints all immediate; set constraints all deferred;
 alter table public.student_badges drop constraint if exists student_badges_badge_check;
+set constraints all immediate; set constraints all deferred;
 alter table public.student_badges add constraint student_badges_badge_check
   check (badge in ('first_steps','rising_star','scholar','deep_thinker','perfectionist','challenger','shout_out','game_on','author'));
 
 -- Reads go through RPCs; students may read their own supports and submissions directly.
+set constraints all immediate; set constraints all deferred;
 alter table public.student_supports enable row level security;
+set constraints all immediate; set constraints all deferred;
 alter table public.question_collabs enable row level security;
+set constraints all immediate; set constraints all deferred;
 alter table public.question_submissions enable row level security;
 revoke all on public.student_supports, public.question_collabs, public.question_submissions from anon, authenticated;
 grant select on public.student_supports, public.question_collabs, public.question_submissions to authenticated;
@@ -812,6 +820,7 @@ create table if not exists public.code_attempts (
   at      timestamptz not null default now()
 );
 create index if not exists code_attempts_user_idx on public.code_attempts(user_id, at desc);
+set constraints all immediate; set constraints all deferred;
 alter table public.code_attempts enable row level security;
 revoke all on public.code_attempts from anon, authenticated;
 
@@ -951,6 +960,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Settings
 -- ---------------------------------------------------------------------------
+set constraints all immediate; set constraints all deferred;
 alter table public.tenant_settings
   add column if not exists parent_focus_details boolean not null default true;
 grant update (parent_focus_details) on public.tenant_settings to authenticated;
@@ -958,6 +968,7 @@ grant update (parent_focus_details) on public.tenant_settings to authenticated;
 -- ---------------------------------------------------------------------------
 -- Leave events remember what the student was doing and where they went
 -- ---------------------------------------------------------------------------
+set constraints all immediate; set constraints all deferred;
 alter table public.environment_events
   add column if not exists page_title      text,
   add column if not exists lesson_context  jsonb,
@@ -1012,6 +1023,7 @@ create table if not exists public.parent_alert_prefs (
 );
 create index if not exists parent_alert_prefs_student_idx on public.parent_alert_prefs(student_id);
 create index if not exists parent_alert_prefs_tenant_idx on public.parent_alert_prefs(tenant_id);
+set constraints all immediate; set constraints all deferred;
 alter table public.parent_alert_prefs enable row level security;
 revoke all on public.parent_alert_prefs from anon, authenticated;
 grant select on public.parent_alert_prefs to authenticated;
@@ -1261,15 +1273,20 @@ end$$;
 -- ---------------------------------------------------------------------------
 -- Parent ↔ teacher messages about a child (the child can't see them)
 -- ---------------------------------------------------------------------------
+set constraints all immediate; set constraints all deferred;
 alter table public.chat_threads add column if not exists parent_id uuid;
 do $$ begin
   alter table public.chat_threads add constraint chat_threads_parent_fkey
     foreign key (parent_id, tenant_id) references public.users(id, tenant_id) on delete cascade;
 exception when duplicate_object then null; end $$;
 create index if not exists chat_threads_parent_idx on public.chat_threads(parent_id) where parent_id is not null;
+set constraints all immediate; set constraints all deferred;
 alter table public.chat_threads drop constraint if exists chat_threads_kind_check;
+set constraints all immediate; set constraints all deferred;
 alter table public.chat_threads drop constraint if exists chat_threads_check;
+set constraints all immediate; set constraints all deferred;
 alter table public.chat_threads drop constraint if exists chat_threads_shape_check;
+set constraints all immediate; set constraints all deferred;
 alter table public.chat_threads add constraint chat_threads_shape_check check (
      (kind = 'direct' and student_id is not null and teacher_id is not null and parent_id is null)
   or (kind = 'group' and session_id is not null and parent_id is null)
@@ -1678,6 +1695,7 @@ insert into public.roles (code, label, description, rank) values
   ('guest', 'Guest', 'Joined one live lesson with its code and a name; no account.', 5)
 on conflict (code) do nothing;
 
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions
   add column if not exists guest_monitoring boolean not null default false,
   add column if not exists guests_closed   boolean not null default false;
@@ -1693,6 +1711,7 @@ create table if not exists public.session_guests (
 );
 create index if not exists session_guests_user_idx on public.session_guests(user_id);
 create index if not exists session_guests_tenant_idx on public.session_guests(tenant_id);
+set constraints all immediate; set constraints all deferred;
 alter table public.session_guests enable row level security;
 revoke all on public.session_guests from anon, authenticated;
 grant select on public.session_guests to authenticated;
@@ -2327,9 +2346,16 @@ $$;
 -- exist keep it on, so nothing changes for them. When it is off the database refuses
 -- lockdown and screen capture outright: the switch is not just hidden in the interface.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.tenant_settings add column if not exists monitoring_enabled boolean;
 update public.tenant_settings set monitoring_enabled = true where monitoring_enabled is null;
+-- Run the deferred checks for the rows just changed now: a table with checks still
+-- pending can't be altered later in the same run ("pending trigger events", 55006).
+set constraints all immediate;
+set constraints all deferred;
+set constraints all immediate; set constraints all deferred;
 alter table public.tenant_settings alter column monitoring_enabled set default false;
+set constraints all immediate; set constraints all deferred;
 alter table public.tenant_settings alter column monitoring_enabled set not null;
 grant update (monitoring_enabled) on public.tenant_settings to authenticated;
 
@@ -2337,6 +2363,10 @@ grant update (monitoring_enabled) on public.tenant_settings to authenticated;
 update public.class_sessions s set lockdown = false
   from public.tenant_settings t
  where t.tenant_id = s.tenant_id and not t.monitoring_enabled and s.status = 'live' and s.lockdown;
+-- Run the deferred checks for the rows just changed now: a table with checks still
+-- pending can't be altered later in the same run ("pending trigger events", 55006).
+set constraints all immediate;
+set constraints all deferred;
 
 create or replace function public.start_session(
   p_class uuid, p_lesson uuid default null, p_mode text default 'live_participation',
@@ -2745,22 +2775,32 @@ $$;
 -- * Per-session settings (leaderboard, anonymous names, late join, speed bonus) and a
 --   participant avatar for the lobby.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions
   add column if not exists phase text not null default 'active'
     check (phase in ('lobby','active','paused','ended')),
   add column if not exists settings jsonb not null
     default '{"leaderboard": true, "anonymous_names": false, "late_join": true, "speed_bonus": true}'::jsonb;
 update public.class_sessions set phase = 'ended' where status = 'ended' and phase <> 'ended';
+-- Run the deferred checks for the rows just changed now: a table with checks still
+-- pending can't be altered later in the same run ("pending trigger events", 55006).
+set constraints all immediate;
+set constraints all deferred;
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions alter column phase set default 'lobby';
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions alter column class_id drop not null;
 
+set constraints all immediate; set constraints all deferred;
 alter table public.session_participants
   add column if not exists avatar text check (avatar is null or avatar ~ '^[a-z]{2,16}$'),
   add column if not exists removed_at timestamptz;
 
 -- Session passes: guests (is_guest) and signed-in students without a class.
+set constraints all immediate; set constraints all deferred;
 alter table public.session_guests add column if not exists is_guest boolean not null default true;
 
+set constraints all immediate; set constraints all deferred;
 alter table public.announcements alter column class_id drop not null;
 
 -- Who runs a session: its own teacher, a school admin, or a teacher of its class.
@@ -3559,6 +3599,7 @@ $$;
 -- every screen sees the same board. Students see the top 5 and only their own rank;
 -- lower ranks are never shown to the class.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.session_participants
   add column if not exists total_score   int not null default 0,
   add column if not exists streak        int not null default 0,
@@ -3566,10 +3607,12 @@ alter table public.session_participants
   add column if not exists correct_count int not null default 0,
   add column if not exists last_rank     int;
 
+set constraints all immediate; set constraints all deferred;
 alter table public.quiz_answers
   add column if not exists points      int,
   add column if not exists response_ms int;
 
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions
   add column if not exists activity_opened_at timestamptz,
   add column if not exists slide_changed_at   timestamptz,
@@ -4048,6 +4091,7 @@ $$;
 -- * The teacher's state reports the activity on screen (launched, or on the current
 --   slide) with answered / joined counts and whether it has been revealed.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions add column if not exists revealed_activity_id uuid;
 
 create or replace function public.session_control(p_session uuid, p_action text, p_args jsonb default '{}'::jsonb)
@@ -4518,12 +4562,16 @@ $$;
 --   (existing slides are not checked).
 -- * Guests in a live lesson can see the pictures on its designed slides.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.lesson_slides drop constraint if exists lesson_slides_kind_check;
+set constraints all immediate; set constraints all deferred;
 alter table public.lesson_slides add constraint lesson_slides_kind_check check (kind in (
   'title','text','image','video','audio','embed','link','attachment',
   'shapes','whiteboard','activity','canvas'));
 
+set constraints all immediate; set constraints all deferred;
 alter table public.lesson_slides drop constraint if exists lesson_slides_content_size;
+set constraints all immediate; set constraints all deferred;
 alter table public.lesson_slides add constraint lesson_slides_content_size
   check (octet_length(content::text) <= 262144) not valid;
 
@@ -4678,8 +4726,11 @@ $$;
 --   portal on), their teachers and the school's admins.
 -- * Copying a lesson keeps each question's topic.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.questions add column if not exists topic text;
+set constraints all immediate; set constraints all deferred;
 alter table public.questions drop constraint if exists questions_topic_check;
+set constraints all immediate; set constraints all deferred;
 alter table public.questions add constraint questions_topic_check check (topic is null or length(btrim(topic)) between 1 and 60);
 
 -- ---------------------------------------------------------------------------
@@ -4697,6 +4748,7 @@ create table if not exists public.school_terms (
   unique (tenant_id, starts_on)
 );
 create index if not exists school_terms_tenant_idx on public.school_terms(tenant_id, starts_on);
+set constraints all immediate; set constraints all deferred;
 alter table public.school_terms enable row level security;
 revoke all on public.school_terms from anon;
 grant select, insert, update, delete on public.school_terms to authenticated;
@@ -4993,6 +5045,7 @@ $$;
 -- * Student and teacher states carry the timer; "auto_reveal" is a new game
 --   setting (the teacher's screen reveals answers when time is up).
 
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions add column if not exists paused_at timestamptz;
 
 /** The countdown for the activity on screen, or null when there is none. */
@@ -5658,6 +5711,7 @@ end$$;
 -- ---------------------------------------------------------------------------
 -- Parent codes: one standing code per student, seen by staff only
 -- ---------------------------------------------------------------------------
+set constraints all immediate; set constraints all deferred;
 alter table public.invites add column if not exists standing boolean not null default false;
 create unique index if not exists invites_standing_parent_uidx on public.invites(student_id)
   where standing and revoked_at is null;
@@ -5750,6 +5804,7 @@ create index if not exists parent_feedback_parent_idx on public.parent_feedback(
 create index if not exists parent_feedback_tenant_idx on public.parent_feedback(tenant_id, created_at desc);
 create index if not exists parent_feedback_student_idx on public.parent_feedback(student_id);
 create index if not exists parent_feedback_class_idx on public.parent_feedback(class_id) where class_id is not null;
+set constraints all immediate; set constraints all deferred;
 alter table public.parent_feedback enable row level security;
 revoke all on public.parent_feedback from anon;
 revoke insert, update, delete on public.parent_feedback from authenticated;
@@ -5924,6 +5979,7 @@ grant execute on function public.school_progress(text, date, uuid) to authentica
 -- ---------------------------------------------------------------------------
 -- Platform support accounts ("Open as admin" from the platform console)
 -- ---------------------------------------------------------------------------
+set constraints all immediate; set constraints all deferred;
 alter table public.users add column if not exists is_support boolean not null default false;
 
 revoke execute on function app.progress_answers(uuid, timestamptz, timestamptz, uuid), app.progress_lessons(uuid, timestamptz, timestamptz, uuid)
@@ -6116,6 +6172,7 @@ create table if not exists public.support_accounts (
   user_id    uuid not null unique references auth.users(id) on delete cascade,
   created_at timestamptz not null default now()
 );
+set constraints all immediate; set constraints all deferred;
 alter table public.support_accounts enable row level security;
 revoke all on public.support_accounts from anon, authenticated;
 
@@ -6225,9 +6282,13 @@ $$;
 -- * my_classes: the classes a student is in, each with their own results this
 --   term (or school year), for the student's home page.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.users add column if not exists login_name text;
+set constraints all immediate; set constraints all deferred;
 alter table public.users add column if not exists must_change_password boolean not null default false;
+set constraints all immediate; set constraints all deferred;
 alter table public.users drop constraint if exists users_login_name_check;
+set constraints all immediate; set constraints all deferred;
 alter table public.users add constraint users_login_name_check check (login_name is null or login_name ~ '^[a-z0-9][a-z0-9.]{2,40}$');
 create unique index if not exists users_login_name_uidx on public.users(login_name) where login_name is not null;
 
@@ -6602,6 +6663,7 @@ create table if not exists public.class_subjects (
 create unique index if not exists class_subjects_uidx on public.class_subjects(class_id, lower(subject));
 create index if not exists class_subjects_teacher_idx on public.class_subjects(teacher_id);
 create index if not exists class_subjects_tenant_idx on public.class_subjects(tenant_id);
+set constraints all immediate; set constraints all deferred;
 alter table public.class_subjects enable row level security;
 revoke all on public.class_subjects from anon;
 revoke insert, update, delete on public.class_subjects from authenticated;
@@ -7080,6 +7142,7 @@ $$;
 -- by pg_cron where it is on, for lessons nobody is in. Its report is saved like
 -- any other; the teacher sees it under Reports.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions add column if not exists teacher_left_at timestamptz;
 
 -- The teacher's comings and goings are not lesson state: students don't refetch for them.
@@ -7320,6 +7383,7 @@ create table if not exists public.library_lessons (
   updated_at  timestamptz not null default now()
 );
 create index if not exists library_lessons_browse_idx on public.library_lessons(subject, level) where published;
+set constraints all immediate; set constraints all deferred;
 alter table public.library_lessons enable row level security;
 revoke all on public.library_lessons from anon, authenticated;
 -- Read through library_list / library_copy only.
@@ -7494,6 +7558,7 @@ create table if not exists public.rate_buckets (
   tokens double precision not null,
   at     timestamptz not null default now()
 );
+set constraints all immediate; set constraints all deferred;
 alter table public.rate_buckets enable row level security;
 revoke all on public.rate_buckets from anon, authenticated;
 
@@ -7544,6 +7609,7 @@ $$;
 -- shows as "live", and closes at its due date: on any student's activity, every
 -- minute where pg_cron is on, and in hourly maintenance.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions
   add column if not exists is_homework boolean not null default false,
   add column if not exists due_at timestamptz;
@@ -7798,7 +7864,9 @@ $$;
 --   names follow the answer-tile shapes (Bolt, Star, Hexagon, Moon, Heart, Cloud);
 --   session_team_scores totals the members' points.
 
+set constraints all immediate; set constraints all deferred;
 alter table public.questions drop constraint if exists questions_kind_check;
+set constraints all immediate; set constraints all deferred;
 alter table public.questions add constraint questions_kind_check check (kind in (
   'mcq','multi_select','true_false','poll','open','short','fill_blank',
   'matching','ordering','categorize','draw','file','code','word_cloud','label_diagram'));
@@ -7941,6 +8009,7 @@ end$$;
 
 -- Teams --------------------------------------------------------------------------
 
+set constraints all immediate; set constraints all deferred;
 alter table public.session_participants add column if not exists team smallint check (team between 1 and 6);
 
 create or replace function app.team_name(p_team int) returns text
@@ -8483,6 +8552,7 @@ $$;
 -- step (one tap, then the browser's own Share box), whether or not Lockdown is on.
 -- Guests are included by default too; the teacher can still turn guests off in the
 -- control room, and where the school requires parental consent guests are never captured.
+set constraints all immediate; set constraints all deferred;
 alter table public.class_sessions alter column guest_monitoring set default true;
 
 create or replace function public.health() returns jsonb

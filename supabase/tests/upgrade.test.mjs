@@ -89,3 +89,28 @@ test("2026-09-27 RUN_THIS update also applies on a live database already at 0810
   const r = await db.rpc(admin, "parent_report", { p_student: stu, p_period: "week" });
   assert.ok(r.subjects.some((s) => s.class_id === cls.id));
 });
+
+test("RUN_THIS update runs as one transaction (as the SQL Editor does) with ended lessons in the data", async () => {
+  const db = await createDb("20260901000810_audit_fixes.sql");
+  const admin = await db.signUp("a@tx.test", "Admin Tx");
+  const tenant = (await db.rpc(admin, "bootstrap_school", { p_school_name: "School Tx", p_full_name: "Admin Tx" })).tenant_id;
+  await db.admin("update public.tenants set plan_code = 'school' where id = $1", [tenant]);
+  const cls = await db.rpc(admin, "create_class", { p_name: "Class Tx" });
+  const stu = await db.signUp("s@tx.test", "Student Tx");
+  await db.rpc(stu, "redeem_code", { p_code: cls.join_code });
+  // Lessons that already ended, and one still live: the update tidies their rows.
+  for (let i = 0; i < 2; i++) {
+    const s = await db.rpc(admin, "start_session", { p_class: cls.id });
+    await db.rpc(stu, "join_session", { p_code: s.join_code });
+    await db.rpc(admin, "end_session", { p_session: s.id });
+  }
+  await db.rpc(admin, "start_session", { p_class: cls.id });
+  const sql = readFileSync(new URL("../updates/2026-09-27_RUN_THIS_update.sql", import.meta.url), "utf8");
+  for (let i = 0; i < 2; i++) {
+    // Rows already changed in this transaction make Postgres queue their deferred key
+    // checks: the case that broke the SQL Editor run with 55006 "pending trigger events".
+    const r = await db.pg.exec(`begin;\nupdate public.class_sessions set title = title;\n${sql}\ncommit;`);
+    assert.equal(r.at(-2).rows[0].schema, "1160");
+  }
+  assert.equal((await db.admin("select count(*)::int n from public.class_sessions where status = 'ended' and phase <> 'ended'"))[0].n, 0);
+});

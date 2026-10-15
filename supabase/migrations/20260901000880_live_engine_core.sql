@@ -17,6 +17,10 @@ alter table public.class_sessions
   add column if not exists settings jsonb not null
     default '{"leaderboard": true, "anonymous_names": false, "late_join": true, "speed_bonus": true}'::jsonb;
 update public.class_sessions set phase = 'ended' where status = 'ended' and phase <> 'ended';
+-- Run the deferred checks for the rows just changed now: a table with checks still
+-- pending can't be altered later in the same run ("pending trigger events", 55006).
+set constraints all immediate;
+set constraints all deferred;
 alter table public.class_sessions alter column phase set default 'lobby';
 alter table public.class_sessions alter column class_id drop not null;
 

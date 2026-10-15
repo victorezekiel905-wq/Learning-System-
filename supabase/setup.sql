@@ -10555,6 +10555,10 @@ $$;
 
 alter table public.tenant_settings add column if not exists monitoring_enabled boolean;
 update public.tenant_settings set monitoring_enabled = true where monitoring_enabled is null;
+-- Run the deferred checks for the rows just changed now: a table with checks still
+-- pending can't be altered later in the same run ("pending trigger events", 55006).
+set constraints all immediate;
+set constraints all deferred;
 alter table public.tenant_settings alter column monitoring_enabled set default false;
 alter table public.tenant_settings alter column monitoring_enabled set not null;
 grant update (monitoring_enabled) on public.tenant_settings to authenticated;
@@ -10563,6 +10567,10 @@ grant update (monitoring_enabled) on public.tenant_settings to authenticated;
 update public.class_sessions s set lockdown = false
   from public.tenant_settings t
  where t.tenant_id = s.tenant_id and not t.monitoring_enabled and s.status = 'live' and s.lockdown;
+-- Run the deferred checks for the rows just changed now: a table with checks still
+-- pending can't be altered later in the same run ("pending trigger events", 55006).
+set constraints all immediate;
+set constraints all deferred;
 
 create or replace function public.start_session(
   p_class uuid, p_lesson uuid default null, p_mode text default 'live_participation',
@@ -10978,6 +10986,10 @@ alter table public.class_sessions
   add column if not exists settings jsonb not null
     default '{"leaderboard": true, "anonymous_names": false, "late_join": true, "speed_bonus": true}'::jsonb;
 update public.class_sessions set phase = 'ended' where status = 'ended' and phase <> 'ended';
+-- Run the deferred checks for the rows just changed now: a table with checks still
+-- pending can't be altered later in the same run ("pending trigger events", 55006).
+set constraints all immediate;
+set constraints all deferred;
 alter table public.class_sessions alter column phase set default 'lobby';
 alter table public.class_sessions alter column class_id drop not null;
 
