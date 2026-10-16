@@ -23,14 +23,16 @@ function navFor(sessionId: string): Nav {
 }
 const notify = (n: Nav) => n.listeners.forEach((f) => f());
 
-async function pump(sessionId: string, reload: () => Promise<unknown>, onError: (e: unknown) => void) {
+async function pump(sessionId: string, reload: () => Promise<unknown>, onError: (e: unknown) => void, onReply?: (r: unknown) => void) {
   const n = navFor(sessionId);
   if (n.inflight || n.want === null) return;
   const target = n.want;
   n.inflight = true;
   try {
-    await rpc("session_control", { p_session: sessionId, p_action: "goto", p_args: { slide: target } });
+    const reply = await rpc("session_control", { p_session: sessionId, p_action: "goto", p_args: { slide: target } });
     n.sentAt = Date.now();
+    // The reply carries the new slide and version: the teacher's screen needn't wait for a refresh.
+    onReply?.(reply);
     // Fetch the new state now; the broadcast may bring it sooner. Either clears the wish.
     void reload().catch(() => {});
   } catch (e) {
@@ -39,7 +41,7 @@ async function pump(sessionId: string, reload: () => Promise<unknown>, onError: 
   } finally {
     n.inflight = false;
     // The teacher pressed again meanwhile: send the newest.
-    if (n.want !== null && n.want !== target) void pump(sessionId, reload, onError);
+    if (n.want !== null && n.want !== target) void pump(sessionId, reload, onError, onReply);
     notify(n);
   }
 }
@@ -51,7 +53,7 @@ export type SlideNav = ReturnType<typeof useSlideNav>;
  * `current` is the server's slide; `count` the number of slides (0 if unknown here:
  * another view of the same session that knows it shares it).
  */
-export function useSlideNav(sessionId: string, current: number, count: number, reload: () => Promise<unknown>, onError: (e: unknown) => void) {
+export function useSlideNav(sessionId: string, current: number, count: number, reload: () => Promise<unknown>, onError: (e: unknown) => void, onReply?: (r: unknown) => void) {
   const [tick, rerender] = useReducer((x: number) => x + 1, 0);
   useEffect(() => {
     const n = navFor(sessionId);
@@ -83,8 +85,8 @@ export function useSlideNav(sessionId: string, current: number, count: number, r
     n.want = target;
     n.sentAt = 0;
     notify(n);
-    void pump(sessionId, reload, onError);
-  }, [sessionId, count, current, reload, onError]);
+    void pump(sessionId, reload, onError, onReply);
+  }, [sessionId, count, current, reload, onError, onReply]);
   return {
     slide,
     pending: want !== null,

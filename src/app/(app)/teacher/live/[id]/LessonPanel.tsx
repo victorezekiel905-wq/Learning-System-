@@ -16,7 +16,7 @@ import type { Me } from "./LiveRoom";
 
 type Payload = { lesson: { id: string; title: string } | null; slides: SlideData[] };
 
-export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me; reload: () => Promise<void> }) {
+export function LessonPanel({ state, me, reload, take }: { state: SessionState; me: Me; reload: () => Promise<void>; take?: (r: unknown) => void }) {
   const toast = useToast();
   const s = state.session;
   const [annotate, setAnnotate] = useState(false);
@@ -28,7 +28,7 @@ export function LessonPanel({ state, me, reload }: { state: SessionState; me: Me
   }, [s.lesson_id]);
   const slides = lesson.data?.slides ?? [];
   // Next/back show at once and reach the server in the background (refused before the start).
-  const nav = useSlideNav(s.id, s.current_slide, slides.length, reload, (e) => toast(errorText(e), "error"));
+  const nav = useSlideNav(s.id, s.current_slide, slides.length, reload, (e) => toast(errorText(e), "error"), take);
   const ann = useAnnotations(s.id, nav.slide);
   const slide = slides.find((x) => x.position === nav.slide) ?? slides[0];
   async function update(args: Record<string, unknown>) {

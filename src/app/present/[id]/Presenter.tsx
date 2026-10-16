@@ -25,12 +25,15 @@ import { useToast } from "@/components/ui";
 import { liveFrame, ProjectedScreen, ScreenStrip } from "./PresentScreens";
 import { usePresenceAlarms } from "@/components/live/presence-alarms";
 import { useSlideNav, type SlideNav } from "@/lib/slide-nav";
+import { useLiveState } from "@/lib/live-state";
 
 const TILE_KINDS = ["mcq", "true_false", "poll", "multi_select"];
 
 export function Presenter({ sessionId }: { sessionId: string }) {
   useTeacherPresence(sessionId);
-  const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: 15000 });
+  // In step with students: the lesson broadcast and each button's reply move this screen at
+  // once; the full state follows (with retries).
+  const state = useLiveState(sessionId, { intervalMs: 15000 });
   const lesson = useLoader(() => rpc<{ slides: SlideData[] }>("session_lesson", { p_session: sessionId }), [sessionId]);
   const spotOn = !!state.data?.spotlight?.show_to_class;
   const spotQ = useRpc<{ student: string; image: string | null; stale: boolean } | null>("spotlight_view", { p_session: sessionId }, [sessionId], { intervalMs: 3000, enabled: spotOn });
@@ -43,7 +46,7 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   const toast = useToast();
   const slides = lesson.data?.slides ?? [];
   // Next/back show at once; the server (and the students) catch up in the background.
-  const nav = useSlideNav(sessionId, s?.current_slide ?? 0, slides.length, state.reload, (e) => toast(errorText(e), "error"));
+  const nav = useSlideNav(sessionId, s?.current_slide ?? 0, slides.length, state.reload, (e) => toast(errorText(e), "error"), state.take);
   const ann = useAnnotations(sessionId, nav.slide);
   const slide = slides.find((x) => x.position === nav.slide);
   // Joining, leaving and coming back pop up here too.
@@ -269,7 +272,8 @@ export function Presenter({ sessionId }: { sessionId: string }) {
       </main>
       {rail && state.data && <ScreenStrip state={state.data} screens={screens} slides={slides} slide={nav.slide} shown={shown} onShow={(id) => void showScreen(id)} onHide={toggleRail} />}
       </div>
-      {state.data && <PresenterControls sessionId={sessionId} state={state.data} slideCount={slides.length} reload={state.reload} nav={nav}
+      {state.error && <p role="status" className="fixed left-1/2 top-3 z-30 -translate-x-1/2 rounded-full bg-amber-400 px-3 py-1 text-xs font-semibold text-ink-950">Reconnecting… your screen may be a moment behind</p>}
+      {state.data && <PresenterControls sessionId={sessionId} state={state.data} slideCount={slides.length} reload={state.reload} take={state.take} nav={nav} questionSlide={slide?.kind === "activity"}
         screens={{ on: railOn, toggle: toggleRail }} />}
     </div>
   );
@@ -284,13 +288,18 @@ const BAR_BTN = "inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm
  * → next, ← back, S start, R reveal, P pause/resume, L leaderboard, V screens,
  * F full screen, Esc back to the lesson from a student's screen.
  */
-function PresenterControls({ sessionId, state, slideCount, reload, nav, screens }: {
-  sessionId: string; state: SessionState; slideCount: number; reload: () => Promise<void>; nav: SlideNav;
+function PresenterControls({ sessionId, state, slideCount, reload, take, nav, screens, questionSlide }: {
+  sessionId: string; state: SessionState; slideCount: number; reload: () => Promise<void>; take: (r: unknown) => void; nav: SlideNav;
+  /** The slide on screen holds a question (known from the lesson, before its results arrive). */
+  questionSlide: boolean;
   /** Students' screens beside the lesson. */
   screens: { on: boolean; toggle: () => void } | null;
 }) {
   const s = state.session;
   const phase = s.phase ?? "active";
+  // Reveal as soon as the question is on screen, even if its results are still loading:
+  // the server reveals the question on the current slide.
+  const canReveal = state.activity ? !state.activity.revealed : questionSlide && !nav.pending;
   const [shown, setShown] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -299,10 +308,13 @@ function PresenterControls({ sessionId, state, slideCount, reload, nav, screens 
 
   const act = useCallback(async (action: string, args: Record<string, unknown> = {}) => {
     setBusy(true); setErr(null);
-    try { await rpc("session_control", { p_session: sessionId, p_action: action, p_args: args }); await reload(); }
-    catch (e) { setErr(errorText(e)); }
+    try {
+      // The reply (phase, slide, version) moves this screen at once; the refresh brings results and the board.
+      take(await rpc("session_control", { p_session: sessionId, p_action: action, p_args: args }));
+      await reload();
+    } catch (e) { setErr(errorText(e)); }
     finally { setBusy(false); }
-  }, [sessionId, reload]);
+  }, [sessionId, reload, take]);
   const toggleFull = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     else void document.documentElement.requestFullscreen().catch(() => {});
@@ -339,13 +351,13 @@ function PresenterControls({ sessionId, state, slideCount, reload, nav, screens 
       else if (k === "s" && phase === "lobby") void act("start");
       else if (k === "p" && (phase === "active" || phase === "paused")) void act(phase === "active" ? "pause" : "resume");
       else if (k === "l" && phase !== "lobby") void act("leaderboard", { show: !s.show_leaderboard });
-      else if (k === "r" && phase === "active" && state.activity && !state.activity.revealed) void act("reveal");
+      else if (k === "r" && phase === "active" && canReveal) void act("reveal");
       else if (k === "f") toggleFull();
       else if (k === "v" && screens && phase !== "lobby") screens.toggle();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, s.show_leaderboard, state.activity, act, toggleFull, screens, nav]);
+  }, [phase, s.show_leaderboard, canReveal, act, toggleFull, screens, nav]);
 
   const visible = shown || phase === "lobby" || !!err;
   const ghost = `${BAR_BTN} bg-white/10 text-white no-underline hover:bg-white/20`;
@@ -363,7 +375,7 @@ function PresenterControls({ sessionId, state, slideCount, reload, nav, screens 
           <button type="button" className={ghost} disabled={nav.atStart} onClick={nav.prev} title="Previous slide (←)"><ChevronLeft className="h-5 w-5" /> Back</button>
           {slideCount > 0 && <span className="px-1 text-sm tabular-nums text-ink-300">{nav.slide + 1} / {slideCount}</span>}
           <button type="button" className={accent} disabled={nav.atEnd} onClick={nav.next} title="Next slide (→)">Next <ChevronRight className="h-5 w-5" /></button>
-          {state.activity && !state.activity.revealed && <button type="button" className={ghost} disabled={busy} onClick={() => void act("reveal")} title="Show the right answers (R)"><Eye className="h-4 w-4" /> Reveal</button>}
+          {canReveal && <button type="button" className={ghost} disabled={busy} onClick={() => void act("reveal")} title="Show the right answers (R)"><Eye className="h-4 w-4" /> Reveal</button>}
           <button type="button" className={ghost} disabled={busy} onClick={() => void act("pause")} title="Students see “Eyes on your teacher” (P)"><Pause className="h-4 w-4" /> Pause</button>
         </>}
         {phase === "paused" && <button type="button" className={accent} disabled={busy} onClick={() => void act("resume")} title="Carry on (P)"><Play className="h-4 w-4" /> Resume</button>}

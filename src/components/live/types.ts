@@ -55,6 +55,8 @@ export type SessionState = {
     phase?: "lobby" | "active" | "paused" | "ended";
     settings?: { leaderboard?: boolean; anonymous_names?: boolean; late_join?: boolean; speed_bonus?: boolean; timer?: boolean; auto_reveal?: boolean; teams?: number };
     show_leaderboard?: boolean;
+    /** Bumped on every change; the lesson broadcast carries it (0880). */
+    state_version?: number;
     leaderboard?: { at: string; top: { name: string; avatar: string | null; score: number; rank: number; delta: number }[] } | null;
   };
   /** Points (0890): the live top 10, for the teacher only. */

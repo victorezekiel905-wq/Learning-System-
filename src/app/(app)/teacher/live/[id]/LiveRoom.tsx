@@ -6,7 +6,7 @@ import { Alert, Avatar, Badge, Button, Select, Tabs, Textarea, Toggle, useToast,
 import { Icon } from "@/components/Icon";
 import { ALERT_LABEL, type SessionState } from "@/components/live/types";
 import { createClient } from "@/lib/supabase/client";
-import { useNetwork, useRpc } from "@/lib/hooks";
+import { useNetwork } from "@/lib/hooks";
 import { useSignal } from "@/lib/realtime";
 import { useTeacherPresence } from "@/lib/teacher-presence";
 import { errorText, rpc } from "@/lib/rpc";
@@ -24,6 +24,7 @@ import { ChatPanel } from "./ChatPanel";
 import { FocusView, ScreenRail, useSessionScreens } from "@/components/live/ScreenRail";
 import { beep, osNotify, usePresenceAlarms } from "@/components/live/presence-alarms";
 import { TeamStandings, useTeamScores } from "@/components/game/Teams";
+import { useLiveState } from "@/lib/live-state";
 
 type Tab = "lesson" | "responses" | "screens" | "environment" | "chat";
 export type Me = { id: string; tenantId: string; name: string };
@@ -41,7 +42,9 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
   const { quality } = useNetwork();
   // Roster, alerts and hands are pushed (staff:<session>); the poll is a safety net
   // and also tells students a teacher is watching (so they send screen frames).
-  const state = useRpc<SessionState>("teacher_session_state", { p_session: sessionId }, [sessionId], { intervalMs: quality === "slow" ? 30000 : 15000 });
+  // In step with students: the lesson broadcast and each button's reply move this screen at
+  // once; the full state follows (with retries).
+  const state = useLiveState(sessionId, { intervalMs: quality === "slow" ? 30000 : 15000 });
   useSignal(`staff:${sessionId}`, ["state", "roster", "alert", "hand"], () => void state.reload(), { debounceMs: 300, minGapMs: 1500 });
 
   const s = state.data;
@@ -94,7 +97,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
   }, [s, timer, timerLeft, sessionId, state]);
 
   // Arrow keys move slides at once (the server catches up in the background).
-  const slideNav = useSlideNav(sessionId, s?.session.current_slide ?? 0, 0, state.reload, (e) => toast(errorText(e), "error"));
+  const slideNav = useSlideNav(sessionId, s?.session.current_slide ?? 0, 0, state.reload, (e) => toast(errorText(e), "error"), state.take);
   const slideNavRef = useRef(slideNav);
   slideNavRef.current = slideNav;
 
@@ -107,7 +110,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
       if (!cur) return;
       const ph = cur.phase ?? "active";
       const act = (action: string, args: Record<string, unknown> = {}) =>
-        rpc("session_control", { p_session: sessionId, p_action: action, p_args: args }).then(() => state.reload()).catch((err) => toast(errorText(err), "error"));
+        rpc("session_control", { p_session: sessionId, p_action: action, p_args: args }).then((r) => { state.take(r); return state.reload(); }).catch((err) => toast(errorText(err), "error"));
       const k = e.key.toLowerCase();
       if (e.key === "ArrowRight" && ph === "active") { e.preventDefault(); slideNavRef.current.next(); }
       else if (e.key === "ArrowLeft" && ph === "active") { e.preventDefault(); slideNavRef.current.prev(); }
@@ -128,7 +131,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
   const joined = s.roster.filter((r) => r.presence === "online" || r.presence === "idle").length;
   const phase = s.session.phase ?? "active";
   async function control(action: "start" | "pause" | "resume" | "leaderboard" | "next" | "prev" | "reveal", args?: Record<string, unknown>) {
-    try { await rpc("session_control", { p_session: sessionId, p_action: action, p_args: args ?? {} }); void state.reload(); }
+    try { state.take(await rpc("session_control", { p_session: sessionId, p_action: action, p_args: args ?? {} })); void state.reload(); }
     catch (e) { toast(errorText(e), "error"); }
   }
   const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -177,7 +180,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
               { id: "environment" as Tab, label: "Environment", count: openAlerts.filter((a) => a.kind !== "connection_lost").length }] : []),
             ...(FEATURES.messaging ? [{ id: "chat" as Tab, label: "Chat" }] : [])
           ]} />
-          {tab === "lesson" && <LessonPanel state={s} me={me} reload={state.reload} />}
+          {tab === "lesson" && <LessonPanel state={s} me={me} reload={state.reload} take={state.take} />}
           {tab === "responses" && <ResponsesPanel state={s} me={me} reload={state.reload} />}
           {tab === "screens" && <ScreensPanel state={s} sessionId={sessionId} selected={selected} setSelected={setSelected} reload={state.reload} screens={screens} />}
           {tab === "environment" && <EnvironmentPanel state={s} sessionId={sessionId} envs={envs} scenes={scenes} reload={state.reload} onView={setFocus} />}

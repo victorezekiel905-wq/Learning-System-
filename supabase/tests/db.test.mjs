@@ -2714,3 +2714,20 @@ test("the leaderboard holds the whole class, for the teacher and students (1160)
   const seen = (await db.rpc(guests[11], "session_student_state", { p_session: s.id })).leaderboard;
   assert.equal(seen.length, 12);
 });
+
+test("lesson buttons reply with the new state, board included (1170)", async () => {
+  const T = await db.signUp("t@reply.test", "Reply Teacher");
+  await db.rpc(T, "bootstrap_school", { p_school_name: "Reply School", p_full_name: "Reply Teacher" });
+  const lib = (await db.rpc(T, "library_list", { p_query: "States of matter" }))[0];
+  const s = await goLive(T, { p_class: null, p_lesson: await db.rpc(T, "library_copy", { p_item: lib.id }) });
+  const g = await db.signInAnonymously();
+  await db.rpc(g, "join_session_as_guest", { p_code: s.join_code, p_name: "Gift" });
+  const next = await db.rpc(T, "session_control", { p_session: s.id, p_action: "goto", p_args: { slide: 1 } });
+  assert.equal(next.slide, 1);
+  assert.equal(typeof next.v, "number");
+  assert.equal(next.show_leaderboard, false);
+  const board = await db.rpc(T, "session_control", { p_session: s.id, p_action: "leaderboard", p_args: { show: true } });
+  assert.equal(board.show_leaderboard, true);
+  assert.equal(board.leaderboard.top[0].name, "Gift");
+  assert.ok(board.v > next.v);
+});
